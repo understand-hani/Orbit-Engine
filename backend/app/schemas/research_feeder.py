@@ -5,6 +5,13 @@ from typing import List, Optional
 from pydantic import BaseModel, HttpUrl
 
 from app.schemas.common import VisualAsset
+from app.schemas.user_context import (
+    PersonalProfile,
+    RecommendationContext,
+    UserMaterial,
+    UserPreference,
+    WorkLearningPlan,
+)
 
 
 class ResearchDayRole(str, Enum):
@@ -170,6 +177,13 @@ class ResearchFeederPayload(BaseModel):
     research_day_role: ResearchDayRole
     research_context: ResearchContext
     reading_pack: ReadingPack
+    materials: List[UserMaterial] = []
+    primary_material_id: str = ""
+    candidate_material_ids: List[str] = []
+    recommendation_context: Optional[RecommendationContext] = None
+    user_profile: Optional[PersonalProfile] = None
+    active_plan: Optional[WorkLearningPlan] = None
+    user_preferences: Optional[UserPreference] = None
     papers: List[Paper] = []
     paper_reader: Optional[PaperReader] = None
     paper_readers: List[PaperReader] = []

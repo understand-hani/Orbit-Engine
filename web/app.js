@@ -51,6 +51,7 @@ const manualSessions = [
 
 const state = {
   session: null,
+  userContext: null,
   mode: params.get("manual") ? "manual" : "scheduled",
   manualSelection: params.get("manual") || "deep_dive",
   isSubmitting: false,
@@ -165,53 +166,112 @@ function renderWorkspace() {
   if (!session) return;
 
   const payload = session.payload || {};
-  const context = payload.research_context;
-  const pack = payload.reading_pack;
   const digest = payload.digest;
-  const criteria = session.completion?.criteria || [];
   const display = displaySession();
-  const isMainLoop = display.isMainLoop;
 
   $("detailType").textContent = display.typeLabel;
   $("detailTitle").textContent = display.title;
-  $("workspaceStatus").textContent = session.status;
-  $("checkinPanel").classList.toggle("hidden", !isMainLoop);
 
   if (state.mode === "manual" && state.manualSelection === "weekly_studio") {
-    renderWeeklyStudioWorkspace();
+    renderSessionQueue("Weekly Studio", "复盘、归档、调整下周节奏。", "weekly_detail", "新建 Weekly Studio");
     return;
   }
 
   if (session.task_type === "tech_radar") {
-    renderRadarWorkspace(session, digest);
+    renderSessionQueue("Radar", digest?.summary || "发现外部信号、趋势和可行动线索。", "radar_detail", "新建 Radar");
     return;
   }
 
   if (session.task_type === "jd_analysis") {
-    renderAlignmentWorkspace(session);
+    renderSessionQueue("Opportunity Alignment", "把学习与外部机会、评价标准和现实需求对齐。", "alignment_detail", "新建 Alignment");
     return;
   }
 
-  renderResearchWorkspace(session, criteria);
+  renderDeepDiveQueue(session);
+}
+
+function renderSessionQueue(title, subtitle, detailId, createLabel) {
+  $("workspace").className = "ios-list";
+  $("workspace").innerHTML = `
+    ${sectionIntro(title, subtitle)}
+    ${sectionHeader("当前")}
+    ${actionCard(title, "active · 点击进入当前工作区", detailId)}
+    ${sectionHeader("开始")}
+    ${actionCard(createLabel, "选择信息源并生成新的 session。", "source_select")}
+  `;
+  bindDetailRows();
+}
+
+function renderDeepDiveQueue(session) {
+  const payload = session.payload || {};
+  const materials = payload.materials || [];
+  const primary = materials.find((item) => item.id === payload.primary_material_id) || materials[0];
+  $("workspace").className = "ios-list";
+  $("workspace").innerHTML = `
+    ${sectionIntro("Deep Dive", "先选择继续一个未完成的 Deep Dive，或用 PDF、URL、手动材料卡新建。")}
+    ${sectionHeader("进行中 / 未完成")}
+    ${actionCard(primary?.title || "当前 Deep Dive", `${session.status} · ${primary?.source_type || "material"} · 点击进入`, "deep_dive_detail")}
+    ${sectionHeader("新建")}
+    ${actionCard("新建 Deep Dive", "选择 PDF、URL 或手动材料卡开始。", "source_select")}
+  `;
+  bindDetailRows();
+}
+
+function actionCard(title, subtitle, detailId) {
+  return `
+    <button class="action-card" type="button" data-detail="${detailId}" data-title="${title}" data-subtitle="${subtitle}">
+      <div>
+        <strong>${title}</strong>
+        <small>${subtitle}</small>
+      </div>
+      <span>›</span>
+    </button>
+  `;
 }
 
 function renderResearchWorkspace(session, criteria) {
   $("workspace").className = "ios-list";
-  $("workspace").innerHTML = `
+  $("workspace").innerHTML = researchWorkspaceContent(session, criteria);
+  bindDetailRows();
+}
+
+function researchWorkspaceContent(session, criteria) {
+  const payload = session.payload || {};
+  const materials = payload.materials || [];
+  const primary = materials.find((item) => item.id === payload.primary_material_id) || materials[0];
+  const recommendation = payload.recommendation_context || {};
+  const activePlan = payload.active_plan || state.userContext?.plan;
+  const preferences = payload.user_preferences || state.userContext?.preferences;
+  return `
     ${sectionIntro("Deep Dive", "深入处理一份材料，形成输入输出、核心证据、方向判断和下一步行动。")}
     ${sectionHeader("目标")}
-    ${navRow("当前任务", "选择一份主材料，并围绕一个具体问题完成深入处理。", "target")}
-    ${navRow("阅读目标", "明确材料的输入、输出、核心方法、证据、局限和是否值得继续。", "reading_goal")}
+    ${infoBlock("当前任务", activePlan?.next_action || "选择一份主材料，并围绕一个具体问题完成深入处理。")}
+    ${infoBlock("阅读目标", "明确材料的输入、输出、核心方法、证据、局限和是否值得继续。")}
     ${sectionHeader("计划")}
-    ${navRow("选择理由", "根据用户定义的长期目标、当前阶段和外部现实信号选择材料。", "why_selected")}
-    ${navRow("30 / 60 / 90 分钟路径", "按时间预算拆分阅读深度和产出。", "timebox")}
+    ${infoBlock("选择理由", recommendation.why_this_material_now || "根据用户定义的长期目标、当前阶段和外部现实信号选择材料。")}
+    ${infoBlock("30 / 60 / 90 分钟路径", `${preferences?.session_time_budget_min || 30} 分钟优先形成可记录输出；时间更多时再扩展阅读深度。`)}
     ${sectionHeader("材料")}
-    ${navRow("主材料", "等待接入用户配置领域下的真实来源。", "primary_material")}
-    ${navRow("候选材料", "作为对照或后续追踪材料。", "candidate_material")}
+    ${primary ? materialRow("主材料", primary, "primary_material") : navRow("主材料", "暂无材料，请先在计划或我的中登记材料。", "primary_material")}
     ${sectionHeader("完成标准")}
-    ${navRow("Completion criteria", criteria.map((item) => item.description).join("；") || "完成精读段落和下一步判断。", "criteria")}
+    ${infoBlock("Completion criteria", criteria.map((item) => item.description).join("；") || "完成精读段落和下一步判断。")}
+    <div class="action-grid">
+      ${actionCard("Check-in", "填写完成记录并写入历史。", "checkin_form")}
+      ${actionCard("Agent Guidance", "让 Agent 帮你整理洞察、下一步和 Check-in 草稿。", "deep_dive_agent")}
+    </div>
   `;
-  bindDetailRows();
+}
+
+function materialRow(label, material, detailId) {
+  return navRow(label, `${material.source_type} · ${material.title}`, detailId);
+}
+
+function infoBlock(title, body) {
+  return `
+    <div class="info-block">
+      <strong>${title}</strong>
+      <p>${body}</p>
+    </div>
+  `;
 }
 
 function renderRadarWorkspace(session, digest) {
@@ -311,11 +371,96 @@ function openItemDetail(title, subtitle, detailId) {
   $("itemDetailTitle").textContent = title;
   $("itemDetailBody").innerHTML = detailContentFor(title, subtitle, detailId);
   bindDetailRows();
+  bindDynamicActions();
   showView("itemDetailView");
 }
 
+function bindDynamicActions() {
+  document.querySelectorAll("[data-material-form]").forEach((form) => {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const formData = new FormData(form);
+      const tags = String(formData.get("tags") || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+      const payload = {
+        title: String(formData.get("title") || "").trim(),
+        source_type: form.dataset.sourceType,
+        summary: String(formData.get("summary") || "").trim(),
+        url: String(formData.get("url") || "").trim() || null,
+        file_path: String(formData.get("file_path") || "").trim(),
+        tags,
+        related_plan: state.userContext?.plan?.weekly_focus || "",
+      };
+      const material = await api("/user-context/materials", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      await loadUserContext();
+      if (state.session?.payload) {
+        state.session.payload.materials = [material, ...(state.session.payload.materials || [])];
+        state.session.payload.primary_material_id = material.id;
+        state.session.payload.recommendation_context = {
+          ...(state.session.payload.recommendation_context || {}),
+          why_this_material_now: material.why_selected,
+        };
+      }
+      openItemDetail("当前 Deep Dive", "使用新材料继续。", "deep_dive_detail");
+    });
+  });
+
+  document.querySelectorAll("[data-action='use-agent-draft']").forEach((button) => {
+    button.addEventListener("click", () => {
+      const summary = $("agentSummary")?.value || "";
+      const insight = $("agentInsight")?.value || "";
+      const nextAction = $("agentNextAction")?.value || "";
+      openItemDetail("Check-in", "Agent 已生成草稿，可继续修改。", "checkin_form");
+      $("summary").value = summary;
+      $("keyInsight").value = insight;
+      $("nextAction").value = nextAction;
+    });
+  });
+
+  const checkinForm = $("checkinForm");
+  if (checkinForm) {
+    checkinForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await completeCurrentSession(event.submitter);
+    });
+  }
+}
+
 function detailContentFor(title, subtitle, detailId) {
+  const materialDetail = materialDetailFor(detailId);
+  if (materialDetail) return materialDetail;
+
   const content = {
+    deep_dive_detail: deepDiveDetailContent(),
+    source_select: sourceSelectContent(),
+    source_pdf: materialFormContent("PDF metadata", "pdf", "登记 PDF 文件名或本地路径，后续可接真实上传。"),
+    source_url: materialFormContent("URL", "url", "登记网页、公开文档、GitHub README、文章或课程链接。"),
+    source_manual: materialFormContent("手动材料卡", "manual", "手动输入标题和摘要，用于用户自己的资料或离线材料。"),
+    checkin_form: checkinFormContent(),
+    deep_dive_agent: deepDiveAgentContent(),
+    radar_detail: `
+      ${sectionIntro("Radar", "当前轻量工作区：发现外部信号并判断是否值得进入 Deep Dive 或 Alignment。")}
+      ${sectionHeader("Agent 能做什么")}
+      ${infoBlock("过滤噪声", "从材料、repo、新闻、产品、比赛等来源中过滤和用户目标无关的信息。")}
+      ${infoBlock("转成行动", "把外部信号转成 Deep Dive、Opportunity Alignment 或 Weekly Studio 的下一步。")}
+    `,
+    alignment_detail: `
+      ${sectionIntro("Opportunity Alignment", "当前轻量工作区：把学习计划和外部机会、评价标准、现实需求对齐。")}
+      ${sectionHeader("Agent 能做什么")}
+      ${infoBlock("抽取标准", "从机会描述中抽取能力要求、证据要求、风险和下一步。")}
+      ${infoBlock("反哺计划", "把外部要求转成当前计划里的任务或材料选择依据。")}
+    `,
+    weekly_detail: `
+      ${sectionIntro("Weekly Studio", "当前轻量工作区：归档本周成果，判断继续、暂停或放弃。")}
+      ${sectionHeader("Agent 能做什么")}
+      ${infoBlock("整理证据", "汇总 check-in、材料、洞察和下一步。")}
+      ${infoBlock("调整节奏", "根据完成情况调整下周 scheduled/manual session。")}
+    `,
     add_opportunity: `
       ${sectionHeader("添加方式")}
       ${navRow("手动录入", "粘贴或输入一条真实机会、评价标准或外部需求。", "opportunity_manual_form")}
@@ -391,10 +536,108 @@ function detailContentFor(title, subtitle, detailId) {
     content[detailId] ||
     `
       ${sectionIntro(title, subtitle)}
-      ${sectionHeader("Agent guidance")}
-      ${navRow("下一步问题", guidanceFor(detailId), `${detailId}_question`)}
     `
   );
+}
+
+function deepDiveDetailContent() {
+  const criteria = state.session?.completion?.criteria || [];
+  return researchWorkspaceContent(state.session, criteria);
+}
+
+function sourceSelectContent() {
+  return `
+    ${sectionIntro("新建 Deep Dive", "选择本次 Deep Dive 使用的材料来源。当前 demo 先保存 metadata，后续可接真实 PDF 上传和网页抓取。")}
+    ${sectionHeader("材料来源")}
+    ${actionCard("使用 PDF", "登记 PDF 文件名、本地路径或摘要。", "source_pdf")}
+    ${actionCard("登记 URL", "使用公开网页、官方文档、GitHub README、文章或课程链接。", "source_url")}
+    ${actionCard("手动材料卡", "直接输入标题和摘要。", "source_manual")}
+  `;
+}
+
+function materialFormContent(title, sourceType, hint) {
+  return `
+    ${sectionIntro(title, hint)}
+    <form class="form-card" data-material-form data-source-type="${sourceType}">
+      <label>标题<input name="title" required value="新的 Deep Dive 材料" /></label>
+      <label>摘要<textarea name="summary" rows="4" required>这份材料用于推进当前计划，并形成一次可记录的 Deep Dive 输出。</textarea></label>
+      <label>URL<input name="url" placeholder="https://..." /></label>
+      <label>PDF/本地路径<input name="file_path" placeholder="/path/to/material.pdf" /></label>
+      <label>标签<input name="tags" value="Deep Dive, Material" /></label>
+      <button class="primary" type="submit">保存并用于本次 Deep Dive</button>
+    </form>
+  `;
+}
+
+function checkinFormContent() {
+  return `
+    ${sectionIntro("Check-in", "确认本次 Deep Dive 的完成记录。Agent Guidance 可以先帮你生成草稿，再回来修改。")}
+    <form id="checkinForm" class="checkin-form">
+      <label>
+        Summary
+        <textarea id="summary" rows="3" required>完成了今天的 Deep Dive 任务闭环。</textarea>
+      </label>
+      <label>
+        Key insight
+        <textarea id="keyInsight" rows="2">Agent 的价值不在提醒，而在把材料、任务、证据和下一步组织成闭环。</textarea>
+      </label>
+      <label>
+        Next action
+        <input id="nextAction" value="根据本次 Deep Dive 结果更新计划或进入下一次材料处理。" />
+      </label>
+      <button class="primary" type="submit">完成并写入 History</button>
+    </form>
+  `;
+}
+
+function deepDiveAgentContent() {
+  return `
+    ${sectionIntro("Agent Guidance", "Agent 在这里不是聊天装饰，而是把材料、计划和完成标准组织成可提交的 Check-in 草稿。")}
+    ${sectionHeader("Agent 判断")}
+    ${infoBlock("为什么读这份材料", state.session?.payload?.recommendation_context?.why_this_material_now || "它和当前计划、本周重点或材料偏好相关。")}
+    ${infoBlock("建议输出", "本次只需要形成：材料输入/输出、一条关键证据、一个方向判断、一个下一步。")}
+    ${sectionHeader("Check-in 草稿")}
+    <div class="form-card">
+      <label>Summary<textarea id="agentSummary" rows="3">围绕主材料完成了一次 Deep Dive，明确了它和当前计划的关系。</textarea></label>
+      <label>Key insight<textarea id="agentInsight" rows="3">这份材料的价值在于把当前计划中的下一步具体化，避免开放式阅读。</textarea></label>
+      <label>Next action<input id="agentNextAction" value="把本次洞察写入 History，并在 Weekly Studio 中判断继续/追踪/暂停。" /></label>
+      <button class="primary" type="button" data-action="use-agent-draft">用这份草稿去 Check-in</button>
+    </div>
+  `;
+}
+
+function materialDetailFor(detailId) {
+  const payload = state.session?.payload || {};
+  const materials = payload.materials || state.userContext?.materials || [];
+  const primary = materials.find((item) => item.id === payload.primary_material_id) || materials[0];
+  const candidates = materials.filter((item) => item.id !== primary?.id).slice(0, 2);
+  let material = null;
+  if (detailId === "primary_material") material = primary;
+  if (detailId.startsWith("candidate_material")) {
+    const index = Number(detailId.split("_").pop());
+    material = candidates[index] || candidates[0];
+  }
+  if (!material) return "";
+
+  const source = material.url
+    ? `<a class="source-link" href="${material.url}" target="_blank" rel="noreferrer">打开来源</a>`
+    : `<span class="local-note">${material.file_path || "本地/手动材料卡"}</span>`;
+  return `
+    ${sectionHeader("材料")}
+    ${sectionIntro(material.title, material.summary)}
+    <div class="labeled-list">
+      <div><span>来源类型</span><strong>${material.source_type}</strong></div>
+      <div><span>关联计划</span><strong>${material.related_plan || "当前计划"}</strong></div>
+      <div><span>标签</span><strong>${(material.tags || []).join(" / ") || "-"}</strong></div>
+      <div><span>来源</span><strong>${source}</strong></div>
+    </div>
+    ${sectionHeader("为什么现在读")}
+    ${sectionIntro("Agent 推荐理由", material.why_selected || "这份材料和当前计划、领域偏好或下一步行动相关。")}
+    ${sectionHeader("Deep Dive 输出")}
+    ${navRow("输入 / 输出", "这份材料的输入、输出或要解决的问题是什么？", "material_io")}
+    ${navRow("核心证据", "它提供了哪些证据、方法、案例或判断依据？", "material_evidence")}
+    ${navRow("下一步", "读完后应该继续、追踪、暂停还是转成行动？", "material_next")}
+  `;
 }
 
 function opportunityEntryDetail(title) {
@@ -490,19 +733,6 @@ function chatDetail(context) {
   `;
 }
 
-function guidanceFor(detailId) {
-  const guidance = {
-    target: "这一步要判断材料输入、输出、核心方法和是否值得继续。",
-    reading_goal: "优先读摘要、方法图、实验设置和局限性。",
-    why_selected: "判断它和你的长期领域目标是否有实际关系。",
-    timebox: "按 30/60/90 分钟选择深度，不要把一次 session 做成开放式阅读。",
-    primary_material: "Day 4 会接入真实/public source，并在后续支持用户自定义来源。",
-    candidate_material: "候选材料用于对照，不要求今天完整处理。",
-    criteria: "完成标准用于决定是否可以写入 History。",
-  };
-  return guidance[detailId] || "围绕该条目和 Agent 讨论下一步。";
-}
-
 function openWorkspace() {
   renderWorkspace();
   showView("workspaceView");
@@ -511,6 +741,7 @@ function openWorkspace() {
 async function loadToday() {
   setStatus("Connecting");
   try {
+    if (!state.userContext) await loadUserContext();
     const date = sessionDateForMode();
     state.session = await api(`/sessions/today?date=${date}`);
     setStatus("API OK", true);
@@ -556,6 +787,92 @@ async function loadHistory() {
   } catch (error) {
     $("historyList").innerHTML = `<span class="error">${error.message}</span>`;
   }
+}
+
+async function loadUserContext() {
+  try {
+    state.userContext = await api("/user-context");
+    renderPlanView();
+    renderMineView();
+  } catch (error) {
+    state.userContext = fallbackUserContext();
+    renderPlanView();
+    renderMineView();
+  }
+}
+
+function fallbackUserContext() {
+  return {
+    profile: {
+      goal: "针对一个自定义方向建立周期性的学习、探索、记录和反馈闭环。",
+      background_summary: "本地 demo fallback：后端重启后会从 SQLite 读取真实用户上下文。",
+      current_stage: "验证 Deep Dive 主链路。",
+    },
+    plan: {
+      long_term_goal: "把材料、现实信号和个人行动组织成可持续的能力建设系统。",
+      weekly_focus: "本周重点是验证 Deep Dive 闭环：选择材料、明确阅读目标、完成打卡、写入历史。",
+      active_tasks: ["选择或登记一份材料", "完成一次 Deep Dive", "写入 History"],
+      next_action: "选择 PDF、URL 或手动材料卡开始本次 Deep Dive。",
+      tracking_keywords: ["material source", "deep dive", "agent guidance"],
+    },
+    preferences: {
+      fields: ["自定义领域", "学习/探索", "能力建设"],
+      source_preferences: ["pdf", "url", "manual"],
+      session_time_budget_min: 30,
+    },
+    materials: [
+      {
+        id: "fallback_material",
+        title: "Fallback Deep Dive material",
+        source_type: "manual",
+        summary: "后端未更新时使用的本地材料卡。重启 FastAPI 后会使用 SQLite 中的用户材料记录。",
+        related_plan: "验证 Deep Dive 闭环。",
+        tags: ["Fallback", "Deep Dive"],
+        why_selected: "它用于保证计划/我的页面在旧后端下也能展示，不把 404 暴露给用户。",
+      },
+    ],
+  };
+}
+
+function renderPlanView() {
+  const context = state.userContext;
+  if (!context) return;
+  const plan = context.plan;
+  $("planPanel").className = "ios-list";
+  $("planPanel").innerHTML = `
+    ${sectionHeader("当前目标")}
+    ${navRow("长期目标", plan.long_term_goal, "plan_goal")}
+    ${navRow("本周重点", plan.weekly_focus, "plan_weekly_focus")}
+    ${sectionHeader("任务")}
+    ${(plan.active_tasks || []).map((task, index) => navRow(`任务 ${index + 1}`, task, `plan_task_${index}`)).join("")}
+    ${sectionHeader("推荐依据")}
+    ${navRow("下一步", plan.next_action, "plan_next_action")}
+    ${navRow("Tracking keywords", (plan.tracking_keywords || []).join(" / "), "plan_keywords")}
+  `;
+  bindDetailRows();
+}
+
+function renderMineView() {
+  const context = state.userContext;
+  if (!context) return;
+  const profile = context.profile;
+  const preferences = context.preferences;
+  const materials = context.materials || [];
+  $("minePanel").className = "ios-list";
+  $("minePanel").innerHTML = `
+    ${sectionHeader("个人情况")}
+    ${navRow("个人目标", profile.goal, "mine_goal")}
+    ${navRow("背景摘要", profile.background_summary, "mine_background")}
+    ${navRow("当前阶段", profile.current_stage, "mine_stage")}
+    ${sectionHeader("偏好")}
+    ${navRow("关注领域", (preferences.fields || []).join(" / "), "mine_fields")}
+    ${navRow("材料源偏好", (preferences.source_preferences || []).join(" / "), "mine_sources")}
+    ${sectionHeader("材料库")}
+    ${materials.map((item, index) => navRow(item.title, `${item.source_type} · ${item.related_plan}`, index === 0 ? "primary_material" : `candidate_material_${index - 1}`)).join("")}
+    ${sectionHeader("本地数据")}
+    ${sectionIntro("Local only", "比赛 demo 中个人情况、计划、偏好和材料 metadata 存在本地 SQLite。当前不上传真实隐私资料。")}
+  `;
+  bindDetailRows();
 }
 
 async function completeCurrentSession(submitButton = null) {
@@ -609,6 +926,7 @@ document.querySelectorAll("[data-tab]").forEach((button) => {
   button.addEventListener("click", async () => {
     showView(button.dataset.tab);
     if (button.dataset.tab === "historyView") await loadHistory();
+    if (button.dataset.tab === "planView" || button.dataset.tab === "mineView") await loadUserContext();
   });
 });
 
@@ -616,10 +934,6 @@ $("refreshToday").addEventListener("click", () => loadToday());
 $("refreshHistory").addEventListener("click", () => loadHistory());
 $("backToday").addEventListener("click", () => showView("todayView"));
 $("backWorkspace").addEventListener("click", () => showView("workspaceView"));
-$("checkinForm").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  await completeCurrentSession(event.submitter);
-});
 
 renderManualPicker();
 if (state.mode === "manual") {
@@ -627,7 +941,8 @@ if (state.mode === "manual") {
   document.querySelector('[data-mode="manual"]').classList.add("active");
   $("manualPicker").classList.remove("hidden");
 }
-loadToday()
+loadUserContext()
+  .then(loadToday)
   .then(loadHistory)
   .then(async () => {
     if (AUTO_COMPLETE) await completeCurrentSession();

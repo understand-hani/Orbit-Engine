@@ -1,6 +1,6 @@
 # 13 天竞赛计划
 
-最后更新：2026-08-04
+最后更新：2026-08-05
 
 截止日期：2026-08-16
 
@@ -21,7 +21,7 @@ AI + Education / Vocational Education
 
 ```text
 交付一个手机端可打开、可录屏的 Web Agent demo，并跑通一条完整闭环：
-Today -> Scheduled/Manual session -> Deep Dive -> 真实/公开材料源
+Today -> Scheduled/Manual session -> Deep Dive -> 用户材料/公开材料源
 -> Check-in -> History -> 提交材料。
 ```
 
@@ -47,9 +47,12 @@ Today -> Scheduled/Manual session -> Deep Dive -> 真实/公开材料源
 
 - [x] Mobile-first Web demo 能在手机浏览器或移动端响应式视口打开。
 - [x] `Today -> Deep Dive Workspace -> Check-in -> History` 闭环能端到端跑通。
-- [ ] 至少一个稳定材料源：真实 arXiv / public source，或明确标注的 fallback demo source。
+- [x] 至少一个稳定材料源：用户上传/登记材料、公开 URL/public source，或明确标注的 fallback demo source。
+- [x] Deep Dive 推荐理由能引用用户当前计划或个人偏好，而不是只靠固定查询词。
 - [x] Scheduled Mode / Manual Mode 足够清楚，能解释产品交互模型。
 - [x] Radar / Deep Dive / Weekly Studio / Opportunity Alignment 作为可复用 session template 出现在产品中。
+- [x] 底部导航采用 `今日 / 历史 / 计划 / 我的`；原 `设置` 并入 `我的`。
+- [x] 本地保存最小个人上下文：个人情况/简历摘要、工作/学习计划、材料源偏好、用户资料记录。
 - [ ] README 写清楚怎么运行、点击路径是什么。
 - [ ] 500 字项目介绍完成。
 - [ ] Proposal PPT/PDF 完成。
@@ -197,59 +200,93 @@ Web 壳任务：
 - 即使还没接真实 source，也能在手机竖屏视口录出当前闭环。
 - Web 不再是单页长网页，而是开始遵循原 iOS 前端的递进结构。
 
-## 第 4 天（2026-08-07）：Deep Dive 真实材料源 + Agent 指引
+## 第 4 天（2026-08-07）：Deep Dive 材料源 + 用户计划上下文
 
 目标：
 
-让主 demo 链路可信：给 Deep Dive 接入真实/公开 source，并补上 Agent-guided Deep Dive 结构。
+让主 demo 链路可信：Deep Dive 不只是随机推荐材料，而是能从用户材料、公开材料和个人计划上下文中生成一个可执行阅读/研究 session。
 
-优先 source：
+材料源优先级：
 
 ```text
-arXiv API
+1. 用户上传/登记材料：PDF、URL、手动材料卡。
+2. 公开材料源：public URL、官方文档、GitHub README、文章、论文平台。
+3. arXiv 仅作为 public source 示例之一，不作为产品边界。
+4. 如果外部源失败，使用明确标注的 fallback demo material。
 ```
 
 任务：
 
-- [ ] 添加后端 arXiv/public material source service 或最小 source adapter。
-- [ ] 支持初始查询词：
-  - [ ] `3D Gaussian Splatting`
-  - [ ] `4D Gaussian`
-  - [ ] `world model autonomous driving`
-  - [ ] `driving video generation`
-- [ ] 解析字段：
-  - [ ] title
-  - [ ] authors
-  - [ ] abstract
-  - [ ] published date
-  - [ ] arXiv URL
-  - [ ] PDF URL
-  - [ ] categories
-  - [ ] fetched_at
-- [ ] 生成简单 `why_selected`。
-- [ ] 增加明确标注的 fallback demo data。
-- [ ] 显示主材料和候选材料。
-- [ ] 显示 source 和 source link。
-- [ ] 显示 why selected。
-- [ ] 显示 reading goal。
-- [ ] 显示 30/60/90 分钟计划或所选时间预算。
-- [ ] 显示 Deep Dive prompts：
-  - [ ] Input / Output
-  - [ ] Core method
-  - [ ] Evidence to inspect
-  - [ ] Relation to field
-  - [ ] Continue / track later / drop
+- [x] 添加后端 `MaterialSource` 抽象或最小 source adapter。
+- [x] 支持最小用户材料入口：
+  - [x] PDF metadata 登记或本地文件路径登记。
+  - [x] URL 登记。
+  - [x] 手动材料卡：title / source_type / summary / url_or_file_path。
+- [ ] 支持公开材料源 fallback：
+  - [ ] arXiv/public source adapter 作为可选 demo source。
+  - [x] 外部请求失败时使用明确标注的 fallback demo material。
+- [x] 解析或保存统一字段：
+  - [x] title
+  - [x] source_type
+  - [x] authors / publisher / owner if available
+  - [x] summary / abstract
+  - [x] published date if available
+  - [x] URL 或 file_path
+  - [x] tags / categories
+  - [x] fetched_at
+- [x] 增加最小个人上下文本地记录：
+  - [x] 个人情况 / 简历摘要。
+  - [x] 当前工作/学习计划。
+  - [x] 关注领域和材料源偏好。
+  - [x] 最近 check-in 可被推荐逻辑引用。
+- [x] 推荐逻辑支持从两类上下文生成材料选择理由：
+  - [x] 用户定义侧：目标、领域、偏好、材料源。
+  - [x] 当前计划侧：本周重点、当前任务、最近进度、下一步。
+- [x] 将“固定查询词”改为“tracking keywords seeds”：
+  - [x] 默认 demo 用户可以有示例 keywords。
+  - [x] keywords 必须能解释为来自用户目标/计划，而不是产品写死。
+- [x] 生成简单 `why_selected`，并明确引用 related_plan 或 user_preference。
+- [x] 显示主材料和候选材料。
+- [x] 显示 source 和 source link。
+- [x] 显示 why selected。
+- [x] 显示 reading goal。
+- [x] 显示 30/60/90 分钟计划或所选时间预算。
+- [x] 底部导航调整为：
+  - [x] 今日
+  - [x] 历史
+  - [x] 计划
+  - [x] 我的
+- [x] 原 `设置` 内容并入 `我的`。
+- [x] `计划` 页面最小可见：
+  - [x] 当前目标。
+  - [x] 本周重点。
+  - [x] 当前任务/下一步。
+  - [x] 材料推荐使用了哪些计划信息。
+- [x] `我的` 页面最小可见：
+  - [x] 个人情况/简历摘要。
+  - [x] 领域偏好。
+  - [x] 材料源偏好。
+  - [x] 本地数据说明。
+- [x] 显示 Deep Dive prompts：
+  - [x] Input / Output
+  - [x] Core method
+  - [x] Evidence to inspect
+  - [x] Relation to field
+  - [x] Continue / track later / drop
 
 输出：
 
-- [ ] Public source adapter 或明确标注的 fallback source path。
-- [ ] Source compliance note 草稿。
-- [ ] 可录屏 Deep Dive workspace。
+- [x] `MaterialSource` adapter 或明确标注的 fallback source path。
+- [x] 最小个人上下文/计划数据结构。
+- [x] `计划` 和 `我的` 底部栏入口草版。
+- [x] Source compliance note 草稿。
+- [x] 可录屏 Deep Dive workspace。
 
 完成标准：
 
-- Demo 能展示 live arXiv/public source，或明确标注的 fallback source。
-- 评委能在 10 秒内理解 Agent 为什么选择该材料，以及用户下一步应该做什么。
+- [x] Demo 能展示用户材料、公开材料源或明确标注的 fallback source。
+- [x] 评委能在 10 秒内理解：Agent 选择这份材料，是因为它关联用户当前计划/偏好，而不是随机搜索结果。
+- [x] 底部栏从 `今日 / 历史 / 设置` 过渡到 `今日 / 历史 / 计划 / 我的`。
 
 ## 第 5 天（2026-08-08）：轻量 Radar / Weekly Studio / Opportunity Alignment
 
@@ -395,6 +432,11 @@ arXiv API
 - [ ] 从 clean start 启动后端。
 - [ ] 从 clean start 启动 Web demo。
 - [ ] 验证 fallback source path。
+- [ ] 验证本地用户上下文记录：
+  - [ ] 个人情况/简历摘要。
+  - [ ] 当前工作/学习计划。
+  - [ ] 用户材料记录。
+  - [ ] 偏好/keywords seeds。
 - [ ] 验证 browser console 无关键错误。
 - [ ] 检查 375px / 390px / 430px 移动端宽度。
 - [ ] 修复文本溢出和点击区域。
@@ -402,6 +444,7 @@ arXiv API
   - [ ] source failure
   - [ ] missing data
   - [ ] demo/fallback source
+  - [ ] local-only user context
   - [ ] learning-assistance boundary
 - [ ] 更新 root `README.md` 当前运行说明。
 - [ ] 添加 `docs/demo_runbook.md`。
@@ -434,10 +477,12 @@ arXiv API
   - [ ] 不出现 debug/proof widgets。
   - [ ] 首页没有长下拉。
 - [ ] 清理底部导航：
-  - [ ] Today
-  - [ ] History
-  - [ ] Settings
+  - [ ] 今日
+  - [ ] 历史
+  - [ ] 计划
+  - [ ] 我的
   - [ ] 不出现 standalone JD tab。
+  - [ ] 原设置项进入 `我的`，不再作为独立底部 tab。
 - [ ] 清理 Workspace 逻辑：
   - [ ] 每个可点行都能进入有意义的页面。
   - [ ] 没有死卡片。
@@ -688,3 +733,41 @@ Language learning
 - [x] 生成更新 iOS-style 截图 `docs/day3_ios_style_today_390.png`。
 - [x] 将 `docs/13_day_competition_plan.md` 整理为中文版：主结构、日程标题、任务说明、输出和完成标准均改为中文；保留必要英文产品名、技术名词、API 路径和文件名。
 - [x] 将第 1-13 天对应到实际日期：2026-08-04 至 2026-08-16，其中 2026-08-04 为第 1 天。
+
+### 2026-08-05
+
+- [x] 修正第 4 天产品范围：从 `arXiv/public source` 单一论文源，改为 `MaterialSource` 抽象。
+- [x] 明确 arXiv 仅作为 public source 示例之一，不作为产品边界。
+- [x] 将用户上传/登记资料加入第 4 天：PDF metadata、本地文件路径、URL、手动材料卡。
+- [x] 将个人情况/简历摘要、当前工作/学习计划、领域偏好、材料源偏好加入最小本地上下文。
+- [x] 明确 Deep Dive 推荐理由要引用用户当前计划或个人偏好，而不是只靠固定查询词。
+- [x] 将“初始查询词”调整为 `tracking keywords seeds`：来自用户目标和当前计划，可被用户配置。
+- [x] 将底部导航目标改为 `今日 / 历史 / 计划 / 我的`，原 `设置` 并入 `我的`。
+- [x] 将本地用户资料、用户偏好和计划记忆的验证安排到第 8 天。
+- [x] 完成第 4 天核心实现：新增 `user_context` schema/service/API，本地 SQLite 保存 profile、plan、preferences 和 materials。
+- [x] 新增 `/api/user-context` 和 `/api/user-context/materials`。
+- [x] 扩展 `ResearchFeederPayload`：新增 `materials`、`primary_material_id`、`candidate_material_ids`、`recommendation_context`、`user_profile`、`active_plan`、`user_preferences`。
+- [x] Deep Dive mock generation 改为从用户上下文读取材料和计划，`why_selected` 引用当前计划与偏好。
+- [x] 修复数据库相对路径解析：`../data/infra_agent.db` 现在稳定解析到 GOAI workspace 的 `data/infra_agent.db`。
+- [x] Web 底部栏调整为 `今日 / 历史 / 计划 / 我的`，原 `设置` 内容并入 `我的`。
+- [x] Web Deep Dive 工作区显示主材料、候选材料、推荐理由、时间预算和 source/local note。
+- [x] 新增 `计划` 页面：长期目标、本周重点、当前任务、下一步、tracking keywords。
+- [x] 新增 `我的` 页面：个人情况、背景摘要、阶段、领域偏好、材料源偏好、本地数据说明。
+- [x] 新增 `docs/source_compliance_note.md`。
+- [x] 生成 Day4 截图 `docs/day4_material_context_390.png`。
+- [x] 验证：FastAPI import 成功，`/api/health`、`/api/user-context`、`/api/sessions/today?date=2026-08-06` TestClient smoke 通过。
+- [x] 验证：`node --check web/app.js` 通过。
+- [x] 验证：Chromium headless 打开 `/demo`，DOM 出现 `API OK`、`主材料`、具体材料标题、推荐理由、`计划` 和 `我的`。
+- [ ] 未完成：live arXiv/public source adapter。当前阶段保留为可选 public source 后续任务，主线不依赖它。
+- [!] 测试限制：`venv/bin/python -m pytest -q` 未运行成功，因为当前 venv 未安装 `pytest`。
+- [x] 根据用户反馈修正 Day4 交互结构：Deep Dive 卡片点击后先进入“进行中/未完成 + 新建”队列页，而不是直接进入工作区。
+- [x] 新增新建 Deep Dive 入口：使用 PDF、登记 URL、手动材料卡；当前保存 metadata，后续可接真实文件上传/网页抓取。
+- [x] 其他 session 也调整为类似结构：当前工作区 + 新建入口。
+- [x] 移除 Deep Dive 详情页里的“当前任务 / 阅读目标 / 选择理由 / 30/60/90”伪点击入口，改为静态信息块。
+- [x] 去掉 Deep Dive 详情页候选材料入口，只保留主材料入口。
+- [x] Check-in 不再裸露在 Deep Dive 外层；现在放在完成标准下方的 `Check-in` 按钮内。
+- [x] Agent Guidance 不再作为到处递归出现的 fallback；现在是 Deep Dive 完成标准下方的明确按钮，负责生成 Check-in 草稿。
+- [x] Agent Guidance 草稿支持一键带入 Check-in 表单，用户可继续修改后写入 History。
+- [x] `计划` / `我的` 在旧后端返回 404 时会使用本地 fallback context，不再把 404 裸露给用户；重启新后端后使用 SQLite 用户上下文。
+- [x] 生成修正截图 `docs/day4_deep_dive_queue_390.png`。
+- [x] 验证：`node --check web/app.js` 通过；Chromium headless DOM 出现 `API OK`、`进行中 / 未完成`、`新建 Deep Dive`、`计划`、`我的`。

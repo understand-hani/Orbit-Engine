@@ -15,6 +15,7 @@ from app.schemas.jd_intelligence import (
 )
 from app.schemas.profile import ResearchArchive, ResumeProfile
 from app.schemas.session import BaseSession
+from app.schemas.user_context import UserContext
 
 
 class SessionRepository:
@@ -79,6 +80,40 @@ class SessionRepository:
     def get_latest_by_date(self, date_value: str) -> Optional[BaseSession]:
         sessions = self.get_by_date(date_value)
         return sessions[0] if sessions else None
+
+
+class UserContextRepository:
+    KEY = "default"
+
+    def save(self, context: UserContext) -> UserContext:
+        payload = context.model_dump(mode="json")
+        with connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO user_context_records (
+                    key,
+                    payload_json,
+                    updated_at
+                )
+                VALUES (?, ?, ?)
+                """,
+                (
+                    self.KEY,
+                    json.dumps(payload, ensure_ascii=False),
+                    context.plan.updated_at.isoformat(),
+                ),
+            )
+        return context
+
+    def get(self) -> Optional[UserContext]:
+        with connect() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM user_context_records WHERE key = ?",
+                (self.KEY,),
+            ).fetchone()
+        if row is None:
+            return None
+        return UserContext(**json.loads(row["payload_json"]))
 
 
 class CheckinRepository:

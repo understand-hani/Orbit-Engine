@@ -185,3 +185,12 @@ def init_db() -> None:
             ON candidate_actions(status)
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_context_records (
+                key TEXT PRIMARY KEY,
+                payload_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )

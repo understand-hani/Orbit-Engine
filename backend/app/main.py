@@ -15,6 +15,7 @@ from app.api.routes_resume import router as resume_router
 from app.api.routes_sessions import router as sessions_router
 from app.api.routes_sources import router as sources_router
 from app.api.routes_today import router as today_router
+from app.api.routes_user_context import router as user_context_router
 from app.config import get_settings
 from app.db.migrations import init_db
 
@@ -39,6 +40,7 @@ app.include_router(resume_router, prefix="/api")
 app.include_router(archive_router, prefix="/api")
 app.include_router(sources_router, prefix="/api")
 app.include_router(jd_intelligence_router, prefix="/api")
+app.include_router(user_context_router, prefix="/api")
 
 
 @app.get("/demo", include_in_schema=False)

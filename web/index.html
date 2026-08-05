@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>圆周引擎 / Orbit Engine</title>
-    <link rel="stylesheet" href="./style.css?v=20260804h" />
+    <link rel="stylesheet" href="./style.css?v=20260805b" />
   </head>
   <body>
     <main class="app">
@@ -52,27 +52,6 @@
           <div id="workspace" class="workspace muted">先选择一个任务。</div>
         </section>
 
-        <section class="panel" id="checkinPanel">
-          <div class="section-title">
-            <p>Check-in</p>
-            <span id="workspaceStatus">active</span>
-          </div>
-          <form id="checkinForm" class="checkin-form">
-            <label>
-              Summary
-              <textarea id="summary" rows="3" required>完成了今天的 Deep Dive 任务闭环。</textarea>
-            </label>
-            <label>
-              Key insight
-              <textarea id="keyInsight" rows="2">Agent 的价值不在提醒，而在把材料、任务、证据和下一步组织成闭环。</textarea>
-            </label>
-            <label>
-              Next action
-              <input id="nextAction" value="接入真实材料源并强化 Deep Dive 指引。" />
-            </label>
-            <button class="primary" type="submit">完成并写入 History</button>
-          </form>
-        </section>
       </section>
 
       <section class="view" id="itemDetailView">
@@ -102,16 +81,29 @@
         </section>
       </section>
 
-      <section class="view" id="settingsView">
+      <section class="view" id="planView">
         <section class="panel intro-panel">
-          <h2>设置</h2>
-          <p>当前比赛 demo 使用固定 Deep Dive 日期，保证录屏链路稳定。</p>
+          <h2>计划</h2>
+          <p>Agent 根据当前目标、本周重点、任务和材料偏好推荐今日 session。</p>
+        </section>
+        <section class="panel">
+          <div id="planPanel" class="ios-list muted">正在加载计划...</div>
+        </section>
+      </section>
+
+      <section class="view" id="mineView">
+        <section class="panel intro-panel">
+          <h2>我的</h2>
+          <p>管理个人情况、领域偏好、材料源偏好和本地数据说明。</p>
         </section>
         <section class="panel settings-list">
           <div><span>Demo date</span><strong id="demoDateLabel">2026-08-06</strong></div>
           <div><span>Backend</span><strong id="apiBaseLabel">-</strong></div>
           <div><span>AI provider</span><strong>mock</strong></div>
           <div><span>Delivery</span><strong>Mobile Web</strong></div>
+        </section>
+        <section class="panel">
+          <div id="minePanel" class="ios-list muted">正在加载个人信息...</div>
         </section>
       </section>
 
@@ -124,13 +116,17 @@
           <span class="tab-icon history-icon"></span>
           <span>历史</span>
         </button>
-        <button type="button" data-tab="settingsView">
+        <button type="button" data-tab="planView">
+          <span class="tab-icon plan-icon"></span>
+          <span>计划</span>
+        </button>
+        <button type="button" data-tab="mineView">
           <span class="tab-icon settings-icon"></span>
-          <span>设置</span>
+          <span>我的</span>
         </button>
       </nav>
     </main>
 
-    <script src="./app.js?v=20260804h"></script>
+    <script src="./app.js?v=20260805b"></script>
   </body>
 </html>

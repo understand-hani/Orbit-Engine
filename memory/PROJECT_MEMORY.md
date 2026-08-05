@@ -599,7 +599,7 @@ Third interaction follow-up:
 - User clarified the desired competition Web structure:
   - bottom tab bar, consistent with the iOS app
   - no standalone JD tab in competition Web
-  - tabs should be `今日 / 历史 / 设置`
+  - at that time, tabs were implemented as `今日 / 历史 / 设置`
   - Today should be clean, not a long scroll page
   - Scheduled/Manual selector should be at the top of Today
   - Scheduled is default
@@ -618,6 +618,11 @@ Third interaction follow-up:
   - Radar -> `2026-08-04`
   - Deep Dive -> `2026-08-06`
   - Alignment -> `2026-08-05`
+
+Superseded on 2026-08-05:
+
+- Bottom tabs should now be `今日 / 历史 / 计划 / 我的`.
+- The old `设置` tab is no longer a standalone target; merge those controls into `我的`.
 - Generated updated screenshot:
 
 ```text
@@ -808,3 +813,108 @@ Calendar mapping:
 - For the 13-day GOAI competition plan, 2026-08-04 is Day 1.
 - The plan runs through 2026-08-16 as Day 13, matching the submission deadline.
 - `docs/13_day_competition_plan.md` headings now include both day number and date.
+
+Day 4 scope correction:
+
+- Do not frame the product as an arXiv or paper-reading app.
+- Day 4 should implement or prepare a generic `MaterialSource` abstraction.
+- Supported material sources should be narrated as:
+  - user uploaded/registered materials: PDF metadata, local file path, URL, manual material card
+  - public materials: official docs, GitHub README, articles, public URLs, papers
+  - arXiv as only one optional public-source example
+  - fallback demo materials when external sources fail
+- Deep Dive recommendation should be driven by user context:
+  - personal profile / resume summary
+  - current work or learning plan
+  - field preferences
+  - material-source preferences
+  - recent check-ins and next actions
+- `tracking keywords seeds` should come from user goals and plans, not hardcoded product assumptions.
+
+Navigation update:
+
+- Bottom navigation target is now:
+  - 今日
+  - 历史
+  - 计划
+  - 我的
+- The old `设置` tab should be merged into `我的`.
+- `计划` should manage current goals, weekly focus, active tasks, and what plan context the Agent used.
+- `我的` should manage personal background/resume summary, field preferences, material-source preferences, and local-data notes.
+
+Day 4 implementation completed on 2026-08-05:
+
+- Added backend user context support:
+  - `backend/app/schemas/user_context.py`
+  - `backend/app/services/user_context_service.py`
+  - `backend/app/api/routes_user_context.py`
+  - `user_context_records` SQLite table
+- New API:
+  - `GET /api/user-context`
+  - `POST /api/user-context/materials`
+- Local context now stores:
+  - profile / resume-style background summary
+  - active work or learning plan
+  - preferences
+  - material metadata records
+- `ResearchFeederPayload` now includes:
+  - `materials`
+  - `primary_material_id`
+  - `candidate_material_ids`
+  - `recommendation_context`
+  - `user_profile`
+  - `active_plan`
+  - `user_preferences`
+- `MockResearchFeederAgent` now generates Deep Dive content from local user context and material metadata, while keeping old paper fields for compatibility.
+- Database path resolution was fixed in `backend/app/db/sqlite.py`; relative database paths now resolve from `BACKEND_DIR`, so `../data/infra_agent.db` maps to the GOAI workspace data directory.
+- Web updates:
+  - bottom tabs are now `今日 / 历史 / 计划 / 我的`
+  - old settings content moved into `我的`
+  - Deep Dive workspace shows primary material, candidate material, why selected, source/local note, plan-derived timebox, and completion criteria
+  - `计划` page shows long-term goal, weekly focus, active tasks, next action, and tracking keywords
+  - `我的` page shows personal profile, field preferences, material-source preferences, material library, and local-data note
+- Added:
+  - `docs/source_compliance_note.md`
+  - `docs/day4_material_context_390.png`
+- Verification:
+  - FastAPI import succeeded
+  - TestClient smoke for `/api/health`, `/api/user-context`, and `/api/sessions/today?date=2026-08-06` succeeded
+  - `node --check web/app.js` succeeded
+  - Chromium headless saw `API OK`, `主材料`, material title, recommendation reason, `计划`, and `我的`
+- Known limitation:
+  - live arXiv/public source adapter is not implemented yet; this is intentional because the product should not be framed as an arXiv/paper app.
+  - pytest could not run because the current backend venv does not include `pytest`.
+
+Day 4 interaction correction after user review:
+
+- User rejected the prior Deep Dive detail design because it exposed too many meaningless tappable rows and made Check-in visible at the wrong level.
+- New intended structure:
+  - Today card -> session queue page
+  - session queue page shows current/incomplete work plus a create-new entry
+  - Deep Dive create-new entry lets the user choose source type first:
+    - PDF metadata / local file path
+    - URL
+    - manual material card
+  - Deep Dive detail should have one primary material only, not candidate materials.
+  - `当前任务`, `阅读目标`, `选择理由`, and `30/60/90` are static information blocks unless editing is explicitly implemented later.
+  - Check-in should be behind a `Check-in` button under completion criteria.
+  - Agent guidance should be behind an `Agent Guidance` button under completion criteria.
+  - Agent guidance should generate or adjust Check-in draft content, then let the user modify it before saving.
+- Implemented:
+  - `renderDeepDiveQueue`
+  - generic `renderSessionQueue` for Radar / Weekly Studio / Opportunity Alignment
+  - new source selection page
+  - metadata forms for PDF / URL / manual material cards
+  - dynamic POST to `/api/user-context/materials`
+  - Agent Guidance page that produces a Check-in draft and carries it into the Check-in form
+  - removed visible Check-in panel from `workspaceView`
+  - removed old fallback `Agent guidance -> 下一步问题 -> 下一步` recursion
+  - removed Deep Dive candidate-material display from the main detail view
+  - added frontend fallback context when `/api/user-context` returns 404, so old backend processes do not show raw 404 in `计划` / `我的`
+- Screenshot:
+  - `docs/day4_deep_dive_queue_390.png`
+- Verification:
+  - `node --check web/app.js` passed
+  - Chromium headless saw `API OK`, `进行中 / 未完成`, `新建 Deep Dive`, `计划`, and `我的`
+- Operational note:
+  - If the user still sees 404 on phone, restart the FastAPI server on port 8020 so it loads the new `/api/user-context` route, then hard refresh Safari.

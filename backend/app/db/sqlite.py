@@ -4,10 +4,14 @@ from pathlib import Path
 from typing import Iterator
 
 from app.config import get_settings
+from app.config import BACKEND_DIR
 
 
 def database_path() -> Path:
-    return Path(get_settings().database_path)
+    configured = Path(get_settings().database_path)
+    if configured.is_absolute():
+        return configured
+    return (BACKEND_DIR / configured).resolve()
 
 
 @contextmanager
