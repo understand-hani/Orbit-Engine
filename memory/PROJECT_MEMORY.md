@@ -1,6 +1,6 @@
 # GOAI Project Memory
 
-Last updated: 2026-08-03
+Last updated: 2026-08-06
 
 This file is written for future Codex sessions so the GOAI competition work can resume without rediscovering context.
 
@@ -60,7 +60,7 @@ Current product abstraction:
 Product category:
 
 ```text
-Mobile-first web Agent for recurring field exploration and vocational capability building.
+iOS-first mobile Agent for recurring field exploration and vocational capability building.
 ```
 
 Core idea:
@@ -109,27 +109,39 @@ Weekly Studio can be shown in product narrative or a lightweight page if time al
 
 ## 5. Platform Decision
 
-Do not use iOS native as the main competition delivery path.
+Latest decision on 2026-08-06:
+
+```text
+Use iOS native as the main competition delivery path.
+Use FastAPI as the backend.
+Freeze Web expansion.
+```
 
 Reason:
 
-- User does not have a Mac.
-- Appetize development/debug loop is too slow for the remaining 13-day window.
-- Boundless Agents accepts natural product forms including Web/mobile/browser experiences.
+- User cannot tolerate the current Web UI quality for the competition demo.
+- The existing SwiftUI prototype in `infra/ios` is closer to the intended interaction model.
+- The submitted video should show a credible iPhone-native experience.
+- Web remains useful only as backend API smoke / fallback demonstration.
+
+Superseded earlier decision:
+
+- Earlier on 2026-08-03, the project temporarily chose mobile-first Web because Mac/Appetize iteration looked too slow.
+- That decision is now overridden by the user's 2026-08-06 product-quality decision.
 
 Competition delivery should be:
 
 ```text
-Mobile-first Web / PWA-ready Web App
+iOS native SwiftUI App
   -> FastAPI backend
 ```
 
 Important:
 
-- It must work on phone browser.
-- It should be responsive at mobile width.
-- Demo video should show a phone-like vertical flow.
-- Submission materials should explicitly say it is mobile-first web, not desktop-only.
+- The iOS app is the primary demo surface.
+- The backend must remain runnable and inspectable.
+- Web should not receive new product UI work before 2026-08-16.
+- Submission materials should describe the demo as iOS-first mobile Agent.
 
 ## 6. Submission Materials Needed Before 2026-08-16
 
@@ -170,19 +182,19 @@ Do top-level definition first, then build.
 Recommended next implementation direction:
 
 ```text
-Create a minimal mobile-first Web demo.
+Migrate and continue from the existing SwiftUI iOS prototype.
 Use current FastAPI APIs where possible.
-Add only the smallest backend changes needed for:
-  - research session generation
-  - public paper/arXiv source
-  - check-in -> session status
-  - history restore
+Add only the smallest backend/iOS changes needed for:
+  - Today scheduled/manual entry
+  - Deep Dive queue and detail
+  - user context / plan / profile read path
+  - Agent Guidance -> Check-in draft
+  - check-in -> session status -> History
 ```
 
 Avoid spending critical time on:
 
-- Native iOS.
-- Appetize-first iteration.
+- Web UI expansion or visual polish.
 - Full JD Intelligence polish.
 - PDF annotation persistence.
 - Multi-user auth.
@@ -207,20 +219,20 @@ Copy strategy:
 - Excluded local data/database files.
 - Excluded packaged app zip.
 
-Current interpretation:
+Current interpretation after 2026-08-06:
 
 - `backend/` is the actual reusable FastAPI backend base.
-- `ios/` is preserved as the original SwiftUI prototype and long-term personal app reference.
-- The competition implementation still needs a new mobile-first web frontend under `web/`.
+- `ios/` is now the primary competition demo surface.
+- `web/` is frozen as API smoke / fallback only.
 
-Do not prioritize iOS build or Appetize iteration before the 8/16 submission. The competition demo should be mobile browser / responsive web.
+Do not continue Web frontend development before the 8/16 submission. The competition demo should be iOS native where possible.
 
 ## 10. Operating Rule For Future Sessions
 
 When working on the GOAI project, future Codex sessions must treat the plan document as the active project tracker:
 
 ```text
-/home/maxh/Agent/GOAI/docs/13_day_competition_plan.md
+/home/maxh/Agent/GOAI/docs/11_day_ios_native_dual_track_plan.md
 ```
 
 After completing any GOAI task, update that document before final response:
@@ -230,6 +242,8 @@ After completing any GOAI task, update that document before final response:
 - add a dated note under `Progress Log`
 
 This is a user requirement, not an optional documentation preference.
+
+Also update `/home/maxh/Agent/GOAI/docs/13_day_competition_plan.md` if the completed task belongs to the older 13-day plan or changes its progress record.
 
 ## 11. Schedule Compression Decision
 
@@ -758,6 +772,49 @@ Sixth Opportunity Alignment migration follow-up:
 Dedicated polish day decision:
 
 - User requested a dedicated later day for interaction logic optimization and visual polish.
+
+## 18. 2026-08-06 iOS-Native Branch Reset
+
+User clarified the core engineering boundary:
+
+```text
+/home/maxh/Agent/infra is the user's personal app workspace.
+/home/maxh/Agent/GOAI is the competition workspace.
+Do not modify /home/maxh/Agent/infra for GOAI competition work.
+```
+
+Action taken:
+
+- Created GOAI branch `competition/ios-native-boundless`.
+- Synced the reusable native code baseline from `infra` into `GOAI`:
+  - `backend/`
+  - `ios/`
+  - `README.md`
+  - `codemagic.yaml`
+- Excluded `.env`, local database, virtualenv, Python caches, and `.git`.
+- Kept GOAI competition-specific docs, memory, submission files, and Web fallback files.
+- Restored GOAI-specific `/api/user-context` route registration after sync because it supports the competition product's `计划 / 我的` context layer.
+
+Day 1 development line completed:
+
+- Web expansion is frozen.
+- iOS native is the primary demo surface.
+- Target bottom tabs are `今日 / 历史 / 计划 / 我的`.
+- iOS migration checklist created:
+
+```text
+/home/maxh/Agent/GOAI/docs/ios_native_migration_checklist.md
+```
+
+Day 2 development should start from:
+
+- `RootTabView`: change tabs to `今日 / 历史 / 计划 / 我的`.
+- `TodayView`: keep SwiftUI native structure, add Scheduled / Manual entry model later.
+- `SessionDestinationView`: keep routed workspace model, add/rename product session mapping.
+- Backend endpoints to validate first:
+  - `GET /api/health`
+  - `GET /api/sessions/today`
+  - `GET /api/user-context`
 - Plan changed so Day 9 is now:
 
 ```text
@@ -918,3 +975,19 @@ Day 4 interaction correction after user review:
   - Chromium headless saw `API OK`, `进行中 / 未完成`, `新建 Deep Dive`, `计划`, and `我的`
 - Operational note:
   - If the user still sees 404 on phone, restart the FastAPI server on port 8020 so it loads the new `/api/user-context` route, then hard refresh Safari.
+
+Plan reset on 2026-08-06:
+
+- User decided to stop further Web frontend development because the Web UI quality was not acceptable.
+- Debugging speed / iOS preview issues will be handled separately by the user.
+- From 2026-08-06 to 2026-08-16, the main delivery strategy is:
+  - iOS native app as the primary demo surface
+  - FastAPI backend reused as the action/data layer
+  - Web retained only as backend smoke / fallback, not as the competition-facing UI
+- New active plan document:
+  - `docs/11_day_ios_native_dual_track_plan.md`
+- The new plan has two parallel tracks every day:
+  - development track
+  - documentation / PPT / PDF track
+- The daily plan section should use checklist-style day entries, not a compact table, so completed items can be checked off during execution.
+- Future GOAI work should update this 11-day dual-track plan first.

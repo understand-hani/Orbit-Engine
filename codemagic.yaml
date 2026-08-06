@@ -1,0 +1,69 @@
+workflows:
+  ios-simulator-build:
+    name: iOS Simulator Build
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      xcode: latest
+      vars:
+        XCODE_PROJECT: ios/InfraAgent.xcodeproj
+        XCODE_SCHEME: InfraAgent
+        DERIVED_DATA_PATH: build/DerivedData
+    scripts:
+      - name: Show Xcode version
+        script: |
+          xcodebuild -version
+          xcodebuild -showsdks
+      - name: Inspect project
+        script: |
+          xcodebuild -list -project "$XCODE_PROJECT"
+      - name: Build iOS simulator app
+        script: |
+          set -o pipefail
+          xcodebuild build \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee xcodebuild.log
+    artifacts:
+      - xcodebuild.log
+      - build/DerivedData/Build/Products/**/*.app
+
+  ios-simulator-debug-vnc:
+    name: iOS Simulator Debug VNC
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      xcode: latest
+      vars:
+        XCODE_PROJECT: ios/InfraAgent.xcodeproj
+        XCODE_SCHEME: InfraAgent
+        DERIVED_DATA_PATH: build/DerivedData
+    scripts:
+      - name: Show Xcode version
+        script: |
+          xcodebuild -version
+          xcodebuild -showsdks
+      - name: Inspect project
+        script: |
+          xcodebuild -list -project "$XCODE_PROJECT"
+      - name: Build iOS simulator app
+        script: |
+          set -o pipefail
+          xcodebuild build \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee xcodebuild.log
+      - name: Keep machine alive for VNC debugging
+        script: |
+          echo "VNC debug window is open for 20 minutes."
+          echo "Cancel this build manually after debugging to save build minutes."
+          sleep 1200
+    artifacts:
+      - xcodebuild.log
+      - build/DerivedData/Build/Products/**/*.app

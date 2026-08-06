@@ -10,7 +10,6 @@ from app.db.repositories import SessionRepository
 from app.schemas.common import SuggestedAction, TaskType
 from app.schemas.jd_analysis import JDInput, JDInputCreate
 from app.schemas.session import BaseSession
-from app.services.user_context_service import UserContextService
 
 
 class FeedService:
@@ -20,7 +19,6 @@ class FeedService:
         self.jd_agent = MockJDCareerAgent()
         self.research_agent = MockResearchFeederAgent()
         self.sessions = SessionRepository()
-        self.user_context = UserContextService()
 
     def preview_session(self, target_date: Optional[date] = None) -> BaseSession:
         return self.coordinator.create_session(target_date)
@@ -37,7 +35,7 @@ class FeedService:
             payload = self.jd_agent.generate(session.payload)
             action = SuggestedAction.open_analysis_report
         elif session.task_type == TaskType.research_feeder:
-            payload = self.research_agent.generate(session.payload, self.user_context.get_or_create())
+            payload = self.research_agent.generate(session.payload)
             action = SuggestedAction.open_paper_reader
 
         return session.model_copy(update={"payload": payload, "suggested_action": action})
@@ -56,9 +54,6 @@ class FeedService:
         day = target_date or date.today()
         existing = self.sessions.get_latest_by_date(day.isoformat())
         if existing is not None:
-            if existing.task_type == TaskType.research_feeder and not getattr(existing.payload, "materials", []):
-                refreshed = self.generate_mock_session(day)
-                return self.sessions.save(refreshed)
             return existing
         return self.generate_and_save_mock_session(day)
 

@@ -187,8 +187,8 @@ def init_db() -> None:
         )
         conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS user_context_records (
-                key TEXT PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS user_contexts (
+                id TEXT PRIMARY KEY,
                 payload_json TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )

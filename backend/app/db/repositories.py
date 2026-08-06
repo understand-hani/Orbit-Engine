@@ -82,40 +82,6 @@ class SessionRepository:
         return sessions[0] if sessions else None
 
 
-class UserContextRepository:
-    KEY = "default"
-
-    def save(self, context: UserContext) -> UserContext:
-        payload = context.model_dump(mode="json")
-        with connect() as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO user_context_records (
-                    key,
-                    payload_json,
-                    updated_at
-                )
-                VALUES (?, ?, ?)
-                """,
-                (
-                    self.KEY,
-                    json.dumps(payload, ensure_ascii=False),
-                    context.plan.updated_at.isoformat(),
-                ),
-            )
-        return context
-
-    def get(self) -> Optional[UserContext]:
-        with connect() as conn:
-            row = conn.execute(
-                "SELECT payload_json FROM user_context_records WHERE key = ?",
-                (self.KEY,),
-            ).fetchone()
-        if row is None:
-            return None
-        return UserContext(**json.loads(row["payload_json"]))
-
-
 class CheckinRepository:
     def save(self, checkin: Checkin) -> Checkin:
         payload = checkin.model_dump(mode="json")
@@ -602,3 +568,37 @@ class ResearchArchiveRepository:
                 """
             ).fetchall()
         return [ResearchArchive(**json.loads(row["payload_json"])) for row in rows]
+
+
+class UserContextRepository:
+    context_id = "default"
+
+    def save(self, context: UserContext) -> UserContext:
+        payload = context.model_dump(mode="json")
+        with connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO user_contexts (
+                    id,
+                    payload_json,
+                    updated_at
+                )
+                VALUES (?, ?, ?)
+                """,
+                (
+                    self.context_id,
+                    json.dumps(payload, ensure_ascii=False),
+                    context.profile.updated_at.isoformat(),
+                ),
+            )
+        return context
+
+    def get(self) -> Optional[UserContext]:
+        with connect() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM user_contexts WHERE id = ?",
+                (self.context_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return UserContext(**json.loads(row["payload_json"]))

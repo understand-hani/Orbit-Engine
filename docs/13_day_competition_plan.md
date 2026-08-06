@@ -771,3 +771,14 @@ Language learning
 - [x] `计划` / `我的` 在旧后端返回 404 时会使用本地 fallback context，不再把 404 裸露给用户；重启新后端后使用 SQLite 用户上下文。
 - [x] 生成修正截图 `docs/day4_deep_dive_queue_390.png`。
 - [x] 验证：`node --check web/app.js` 通过；Chromium headless DOM 出现 `API OK`、`进行中 / 未完成`、`新建 Deep Dive`、`计划`、`我的`。
+
+### 2026-08-06
+
+- [x] 根据用户决策停止继续扩展 Web 前端；Web 后续仅作为后端 API smoke / 兜底演示，不再作为主提交展示面。
+- [x] 主展示面切回 iOS 原生 App + FastAPI 后端。
+- [x] 新增 11 天双线并行计划：`docs/11_day_ios_native_dual_track_plan.md`。
+- [x] 新计划每天均匀分配两条线任务：开发线 + 文档/PPT/PDF 线。
+- [x] 在 GOAI 中创建竞赛专用分支 `competition/ios-native-boundless`，后续不在 `/home/maxh/Agent/infra` 中做竞赛开发。
+- [x] 从 `/home/maxh/Agent/infra` 同步原生 iOS / FastAPI 代码基线到 `/home/maxh/Agent/GOAI`，未修改 infra 原目录。
+- [x] 完成 11 天计划 Day1 开发线：冻结 Web、确认 iOS 复用范围、确定底部栏、列出 Day2 endpoint。
+- [x] 创建 `docs/ios_native_migration_checklist.md`。
