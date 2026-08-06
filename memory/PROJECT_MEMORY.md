@@ -833,7 +833,7 @@ Day 2 update requested by user:
 - Change iOS default backend URL to:
 
 ```text
-https://abraham-functionality-pam-charger.trycloudflare.com
+https://graphical-teeth-athletes-holds.trycloudflare.com
 ```
 
 - Do not fully hard-code this tunnel. Keep a user/config override path, preferably the existing `UserDefaults`-based `backendBaseURL` mechanism and settings UI.
@@ -843,7 +843,7 @@ Day 2 implementation status on 2026-08-06:
 - `AppConfig.defaultBackendBaseURL` changed to:
 
 ```text
-https://abraham-functionality-pam-charger.trycloudflare.com
+https://graphical-teeth-athletes-holds.trycloudflare.com
 ```
 
 - Existing `UserDefaults` override remains in place through `AppConfig.backendBaseURL` and `SettingsView`.

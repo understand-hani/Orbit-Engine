@@ -783,7 +783,7 @@ Language learning
 - [x] 完成 11 天计划 Day1 开发线：冻结 Web、确认 iOS 复用范围、确定底部栏、列出 Day2 endpoint。
 - [x] 创建 `docs/ios_native_migration_checklist.md`。
 - [x] 补充 Day2 iOS 开发范围：迁移 Web 已验证的 Scheduled / Manual、四类 session 入口、底部四栏结构，更新默认后端 URL 但保留可配置覆盖。
-- [x] 完成 Day2 iOS 代码线：默认后端 URL 更新为 `https://abraham-functionality-pam-charger.trycloudflare.com`，保留 `UserDefaults` / 设置页覆盖。
+- [x] 完成 Day2 iOS 代码线：默认后端 URL 更新为 `https://graphical-teeth-athletes-holds.trycloudflare.com`，保留 `UserDefaults` / 设置页覆盖。
 - [x] iOS 底部栏改为 `今日 / 历史 / 计划 / 我的`，移除独立 `JD` 底栏，设置并入 `我的`。
 - [x] iOS Today 增加 Scheduled / Manual；Manual 包含 Radar、Deep Dive、Weekly Studio、Opportunity Alignment 四个入口。
 - [x] TodayViewModel 接入 `/api/health`、`/api/sessions/today`、`/api/user-context`。

@@ -75,7 +75,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 开发线：
 
 - [x] iOS APIClient 指向 GOAI FastAPI backend。
-- [x] 默认后端 URL 改为 `https://abraham-functionality-pam-charger.trycloudflare.com`。
+- [x] 默认后端 URL 改为 `https://graphical-teeth-athletes-holds.trycloudflare.com`。
 - [x] 保留后端 URL 可配置能力，不把 tunnel 完全写死；优先继续使用 `UserDefaults` / 设置页覆盖。
 - [x] iOS 验证 `/api/health`。
 - [x] iOS 验证 `/api/sessions/today`。
@@ -424,7 +424,7 @@ PPT/PDF 建议页：
 - [x] 明确目标底部栏：`今日 / 历史 / 计划 / 我的`。
 - [x] 明确 Day 2 优先验证 endpoint：`/api/health`、`/api/sessions/today`、`/api/user-context`。
 - [x] 根据用户评审要求扩展 Day 2 开发项：Scheduled / Manual、四类 session 入口、底部四栏、移除独立 JD 栏、后端默认 URL 更新但保留覆盖能力。
-- [x] 完成 Day2 iOS 代码线：默认后端 URL 更新为 `https://abraham-functionality-pam-charger.trycloudflare.com`，仍保留 `UserDefaults` / 设置页覆盖。
+- [x] 完成 Day2 iOS 代码线：默认后端 URL 更新为 `https://graphical-teeth-athletes-holds.trycloudflare.com`，仍保留 `UserDefaults` / 设置页覆盖。
 - [x] iOS 底部栏改为 `今日 / 历史 / 计划 / 我的`；`JD` 不再作为底部栏，`设置` 并入 `我的`。
 - [x] iOS Today 增加 Scheduled / Manual segmented control。
 - [x] Manual 增加四个入口：Radar、Deep Dive、Weekly Studio、Opportunity Alignment。
