@@ -789,3 +789,5 @@ Language learning
 - [x] TodayViewModel 接入 `/api/health`、`/api/sessions/today`、`/api/user-context`。
 - [x] 后端 smoke 通过：Day2 依赖 endpoint 均返回 200。
 - [!] 限制：本机没有 `xcodebuild`，iOS 编译和视觉验证需要 Codemagic / Appetize。
+- [x] iOS 增加 session type 队列 / 管理层：Today 卡片先进入进行中 / 未完成列表和新建入口，再进入具体 workspace；已完成记录仍归 History 管理。
+- [x] 队列层覆盖 Radar、Deep Dive、Weekly Studio、Opportunity Alignment；Deep Dive 的 PDF / URL / 手动材料新建表单尚未实现。

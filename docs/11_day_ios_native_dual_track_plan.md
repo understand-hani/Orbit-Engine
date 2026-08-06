@@ -110,9 +110,9 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 开发线：
 
-- [ ] iOS 实现 Deep Dive 队列页。
-- [ ] 队列页显示进行中 / 未完成 Deep Dive。
-- [ ] 队列页显示 `新建 Deep Dive`。
+- [x] iOS 实现 Deep Dive 队列页。
+- [x] 队列页显示进行中 / 未完成 Deep Dive。
+- [x] 队列页显示 `新建 Deep Dive`。
 - [ ] 新建入口包含 PDF metadata。
 - [ ] 新建入口包含 URL 登记。
 - [ ] 新建入口包含手动材料卡。
@@ -127,7 +127,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 完成标准：
 
-- [ ] iOS 能从 Today 进入 Deep Dive 队列。
+- [x] iOS 能从 Today 进入 Deep Dive 队列。
 - [ ] iOS 能看到新建 Deep Dive 的三种材料入口。
 - [ ] 录屏路径 v1 明确。
 
@@ -432,3 +432,8 @@ PPT/PDF 建议页：
 - [x] TodayViewModel 接入 `/api/health`、`/api/sessions/today`、`/api/user-context`。
 - [x] 后端 smoke 通过：`/api/health`、`/api/user-context`、`/api/sessions/today`、四个 manual mock date 均返回 200。
 - [!] 本机无 `xcodebuild`，iOS 编译和 Appetize/真机视觉验证待 Codemagic 完成。
+- [x] iOS Today session 卡片不再直接进入 workspace，改为先进入 session type 队列 / 管理页。
+- [x] 新增 `SessionQueueView`：展示进行中 / 未完成 session，已完成记录仍交给 History。
+- [x] `SessionQueueView` 增加新建同类 session 按钮，当前版本通过 `POST /api/sessions/mock?date=...` 生成并保存示例 session。
+- [x] 队列层覆盖 Radar、Deep Dive、Weekly Studio、Opportunity Alignment；其中 Deep Dive 对应 Day3 队列页的前半部分。
+- [!] 尚未实现 Deep Dive 新建时的 PDF metadata / URL / 手动材料卡三种材料入口。

@@ -113,7 +113,7 @@ struct TodayView: View {
                     if let session = viewModel.session {
                         Section("今日工作区") {
                             NavigationLink {
-                                SessionDestinationView(session: session)
+                                SessionQueueView(seedSession: session)
                             } label: {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text(displayTitle(for: session))

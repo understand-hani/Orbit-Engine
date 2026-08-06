@@ -883,6 +883,39 @@ Verification limitation:
 
 - Current machine does not have `xcodebuild`.
 - iOS compile and visual validation must be done through Codemagic / Appetize.
+
+Session queue layer added after user review:
+
+- User requested that tapping a session type card should not jump directly into the concrete workspace.
+- Accepted product structure:
+
+```text
+Today
+  -> session type card
+  -> session queue / management page
+     -> in-progress / unfinished instances
+     -> create new instance
+  -> concrete workspace detail
+
+Completed records stay in History.
+```
+
+- Implemented in iOS:
+  - `SessionQueueView` in `ios/InfraAgent/Views/SessionDestinationView.swift`
+  - `TodayView` now navigates to `SessionQueueView(seedSession:)`
+  - queue page lists unfinished sessions and links to `SessionDestinationView`
+  - create button uses `POST /api/sessions/mock?date=...` via `generateAndSaveMock(date:)`
+- Current queue implementation is demo-oriented:
+  - it seeds the queue with the current session
+  - it uses date mappings to create same-type sample sessions
+  - it does not yet query a real backend list by `task_type` and `status`
+- Later backend improvement:
+  - add an endpoint like `GET /api/sessions?task_type=&status=`
+  - use it to show all real unfinished instances of a session type.
+- Not yet implemented:
+  - Deep Dive create flow with PDF metadata
+  - Deep Dive create flow with URL registration
+  - Deep Dive create flow with manual material card
 - Plan changed so Day 9 is now:
 
 ```text
