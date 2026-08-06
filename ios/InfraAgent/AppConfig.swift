@@ -1,9 +1,9 @@
 import Foundation
 
 struct AppConfig {
-    static let appName = "个人 Infra Agent"
+    static let appName = "圆周引擎"
     static let backendBaseURLKey = "backend_base_url"
-    static let defaultBackendBaseURL = URL(string: "https://dominant-movements-rising-gmc.trycloudflare.com")!
+    static let defaultBackendBaseURL = URL(string: "https://abraham-functionality-pam-charger.trycloudflare.com")!
 
     static var backendBaseURL: URL {
         let storedValue = UserDefaults.standard.string(forKey: backendBaseURLKey)

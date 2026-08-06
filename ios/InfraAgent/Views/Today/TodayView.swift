@@ -8,14 +8,85 @@ struct TodayView: View {
             List {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("今日")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        Text("打开今天的固定任务，生成材料，并记录完成情况。")
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("今日")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Text(viewModel.healthStatus)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.blue)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.blue.opacity(0.12), in: Capsule())
+                        }
+
+                        Text("选择今天的固定 session，或手动启动一个工作区。")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 8)
+                }
+
+                Section {
+                    Picker("模式", selection: $viewModel.mode) {
+                        ForEach(TodayMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: viewModel.mode) { newValue in
+                        Task { await viewModel.selectMode(newValue) }
+                    }
+                }
+
+                if let context = viewModel.userContext {
+                    Section("计划上下文") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(context.plan.weeklyFocus)
+                                .font(.subheadline)
+                            Text(context.plan.nextAction)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            TagRow(tags: Array(context.plan.trackingKeywords.prefix(3)))
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+
+                if viewModel.mode == .manual {
+                    Section("Manual") {
+                        ForEach(ManualSessionEntry.all) { entry in
+                            Button {
+                                Task { await viewModel.loadManual(entry) }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: entry.systemImage)
+                                        .font(.title3)
+                                        .foregroundStyle(.blue)
+                                        .frame(width: 28)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(entry.title)
+                                            .font(.headline)
+                                            .foregroundStyle(.primary)
+                                        Text(entry.subtitle)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                    }
+                }
+
+                if viewModel.mode == .scheduled {
+                    Section("Scheduled") {
+                        Text("默认根据日期读取后端推荐的今日 session。")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 switch viewModel.state {
@@ -40,40 +111,61 @@ struct TodayView: View {
                     }
                 case .loaded:
                     if let session = viewModel.session {
-                        Section("任务") {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(session.title)
-                                    .font(.headline)
-                                Text(session.subtitle)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                TagRow(tags: [session.weekday, session.taskType.rawValue, session.status.rawValue])
-                            }
-                            .padding(.vertical, 4)
-
+                        Section("今日工作区") {
                             NavigationLink {
                                 SessionDestinationView(session: session)
                             } label: {
-                                Label("打开工作区", systemImage: "rectangle.grid.2x2")
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(displayTitle(for: session))
+                                        .font(.headline)
+                                    Text(session.subtitle)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(3)
+                                    TagRow(tags: [session.weekday, displayTaskType(for: session), session.status.rawValue])
+                                }
+                                .padding(.vertical, 4)
                             }
                         }
                     }
                 }
-
-                Section("操作") {
-                    Button {
-                        Task { await viewModel.generateMock() }
-                    } label: {
-                        Label("生成 Mock 任务", systemImage: "wand.and.stars")
-                    }
-                }
             }
-            .navigationTitle("Infra Agent")
+            .navigationTitle("圆周引擎")
             .task {
                 if case .idle = viewModel.state {
                     await viewModel.loadToday()
                 }
             }
+        }
+    }
+
+    private func displayTitle(for session: BaseSession) -> String {
+        switch session.taskType {
+        case .techRadar:
+            return "Radar"
+        case .researchFeeder:
+            if viewModel.mode == .manual,
+               session.date == "2026-08-09" {
+                return "Weekly Studio"
+            }
+            return "Deep Dive"
+        case .jdAnalysis:
+            return "Opportunity Alignment"
+        }
+    }
+
+    private func displayTaskType(for session: BaseSession) -> String {
+        switch session.taskType {
+        case .techRadar:
+            return "radar"
+        case .researchFeeder:
+            if viewModel.mode == .manual,
+               session.date == "2026-08-09" {
+                return "weekly_studio"
+            }
+            return "deep_dive"
+        case .jdAnalysis:
+            return "opportunity_alignment"
         }
     }
 }

@@ -8,25 +8,51 @@ struct RootTabView: View {
                     Label("今日", systemImage: "calendar")
                 }
 
-            InboxView()
-                .tabItem {
-                    Label("收件箱", systemImage: "tray.full")
-                }
-
-            JDIntelligenceView()
-                .tabItem {
-                    Label("JD", systemImage: "briefcase")
-                }
-
             HistoryView()
                 .tabItem {
                     Label("历史", systemImage: "clock")
                 }
 
+            PlanView()
+                .tabItem {
+                    Label("计划", systemImage: "list.bullet.clipboard")
+                }
+
             MoreView()
                 .tabItem {
-                    Label("更多", systemImage: "ellipsis.circle")
+                    Label("我的", systemImage: "person.crop.circle")
                 }
+        }
+    }
+}
+
+struct PlanView: View {
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("计划")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        Text("维护长期目标、本周重点和当前任务，供 Agent 生成今日 session 时引用。")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                }
+
+                Section("当前目标") {
+                    LabeledContent("长期目标", value: "建立一个可持续的领域探索闭环")
+                    LabeledContent("本周重点", value: "跑通 Deep Dive 主链路")
+                    LabeledContent("下一步", value: "让 Today 读取后端并进入工作区")
+                }
+
+                Section("Tracking Keywords") {
+                    TagRow(tags: ["learning workflow", "material source", "agent loop"])
+                }
+            }
+            .navigationTitle("计划")
         }
     }
 }

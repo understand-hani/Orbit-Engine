@@ -815,6 +815,74 @@ Day 2 development should start from:
   - `GET /api/health`
   - `GET /api/sessions/today`
   - `GET /api/user-context`
+
+Day 2 update requested by user:
+
+- Bring the already-proven Web demo interaction structure into iOS native:
+  - Today top area has Scheduled / Manual.
+  - Scheduled is default.
+  - Manual shows four session entries: Radar, Deep Dive, Weekly Studio, Opportunity Alignment.
+  - Tapping an entry creates/switches the corresponding workspace card.
+- Bottom tabs must be:
+  - `今日`
+  - `历史`
+  - `计划`
+  - `我的`
+- Remove standalone bottom `JD`; JD remains only a legacy implementation mapping inside Opportunity Alignment.
+- Move standalone Settings into `我的`.
+- Change iOS default backend URL to:
+
+```text
+https://abraham-functionality-pam-charger.trycloudflare.com
+```
+
+- Do not fully hard-code this tunnel. Keep a user/config override path, preferably the existing `UserDefaults`-based `backendBaseURL` mechanism and settings UI.
+
+Day 2 implementation status on 2026-08-06:
+
+- `AppConfig.defaultBackendBaseURL` changed to:
+
+```text
+https://abraham-functionality-pam-charger.trycloudflare.com
+```
+
+- Existing `UserDefaults` override remains in place through `AppConfig.backendBaseURL` and `SettingsView`.
+- `RootTabView` changed to four bottom tabs:
+  - `今日`
+  - `历史`
+  - `计划`
+  - `我的`
+- Standalone bottom `JD` tab was removed.
+- `MoreView` is now user-facing `我的`; Settings remains inside it as `后端与偏好设置`.
+- Added a minimal `PlanView` in `RootTabView.swift`.
+- `TodayView` now has Scheduled / Manual segmented control.
+- Manual entries:
+  - Radar
+  - Deep Dive
+  - Weekly Studio
+  - Opportunity Alignment
+- Manual entries currently fetch existing mock sessions through date mapping:
+  - Radar -> `2026-08-04`
+  - Opportunity Alignment -> `2026-08-05`
+  - Deep Dive -> `2026-08-06`
+  - Weekly Studio -> `2026-08-09`
+- `TodayViewModel` now calls:
+  - `/api/health`
+  - `/api/sessions/today`
+  - `/api/user-context`
+- Backend smoke using FastAPI TestClient passed for:
+  - `/api/health`
+  - `/api/user-context`
+  - `/api/sessions/today`
+  - `/api/sessions/mock?date=2026-08-04`
+  - `/api/sessions/mock?date=2026-08-05`
+  - `/api/sessions/mock?date=2026-08-06`
+  - `/api/sessions/mock?date=2026-08-09`
+
+Verification limitation:
+
+- Current machine does not have `xcodebuild`.
+- iOS compile and visual validation must be done through Codemagic / Appetize.
 - Plan changed so Day 9 is now:
 
 ```text

@@ -74,12 +74,21 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 开发线：
 
-- [ ] iOS APIClient 指向 GOAI FastAPI backend。
-- [ ] iOS 验证 `/api/health`。
-- [ ] iOS 验证 `/api/sessions/today`。
-- [ ] iOS 验证 `/api/user-context`。
-- [ ] Today 能显示 Deep Dive session 标题、状态、推荐理由和日期。
-- [ ] Today 能显示用户计划上下文摘要。
+- [x] iOS APIClient 指向 GOAI FastAPI backend。
+- [x] 默认后端 URL 改为 `https://abraham-functionality-pam-charger.trycloudflare.com`。
+- [x] 保留后端 URL 可配置能力，不把 tunnel 完全写死；优先继续使用 `UserDefaults` / 设置页覆盖。
+- [x] iOS 验证 `/api/health`。
+- [x] iOS 验证 `/api/sessions/today`。
+- [x] iOS 验证 `/api/user-context`。
+- [x] iOS Today 顶部实现 Scheduled / Manual 入口，交互参考已完成 Web demo。
+- [x] Scheduled 默认展示今天推荐的 session。
+- [x] Manual 展示四个条目入口：Radar、Deep Dive、Weekly Studio、Opportunity Alignment。
+- [x] 四个条目入口点击后能生成 / 切换对应 workspace 入口卡片，先保持轻量。
+- [x] iOS 底部栏改为 `今日 / 历史 / 计划 / 我的`。
+- [x] 取消底部独立 `JD` 栏；JD 只作为 Opportunity Alignment 的一种旧实现映射。
+- [x] 原 `设置` 并入 `我的`。
+- [x] Today 能显示 Deep Dive session 标题、状态、推荐理由和日期。
+- [x] Today 能显示用户计划上下文摘要。
 
 文档 / PPT / PDF 线：
 
@@ -90,7 +99,11 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 完成标准：
 
-- [ ] iOS Today 能读后端。
+- [x] iOS Today 能读后端。
+- [x] iOS 首页具备 Scheduled / Manual 两种入口。
+- [x] iOS Manual 能看到四类 session 入口。
+- [x] iOS 底部栏变为 `今日 / 历史 / 计划 / 我的`。
+- [x] 后端默认 URL 已更新，同时仍可被用户配置覆盖。
 - [ ] PPT 前 3 页有文字初稿。
 
 ### Day 3（2026-08-08）：iOS Deep Dive 队列与新建入口
@@ -410,3 +423,12 @@ PPT/PDF 建议页：
 - [x] 创建 iOS 迁移清单：`docs/ios_native_migration_checklist.md`。
 - [x] 明确目标底部栏：`今日 / 历史 / 计划 / 我的`。
 - [x] 明确 Day 2 优先验证 endpoint：`/api/health`、`/api/sessions/today`、`/api/user-context`。
+- [x] 根据用户评审要求扩展 Day 2 开发项：Scheduled / Manual、四类 session 入口、底部四栏、移除独立 JD 栏、后端默认 URL 更新但保留覆盖能力。
+- [x] 完成 Day2 iOS 代码线：默认后端 URL 更新为 `https://abraham-functionality-pam-charger.trycloudflare.com`，仍保留 `UserDefaults` / 设置页覆盖。
+- [x] iOS 底部栏改为 `今日 / 历史 / 计划 / 我的`；`JD` 不再作为底部栏，`设置` 并入 `我的`。
+- [x] iOS Today 增加 Scheduled / Manual segmented control。
+- [x] Manual 增加四个入口：Radar、Deep Dive、Weekly Studio、Opportunity Alignment。
+- [x] Manual 入口暂时复用现有后端日期映射：Radar=`2026-08-04`、Opportunity Alignment=`2026-08-05`、Deep Dive=`2026-08-06`、Weekly Studio=`2026-08-09`。
+- [x] TodayViewModel 接入 `/api/health`、`/api/sessions/today`、`/api/user-context`。
+- [x] 后端 smoke 通过：`/api/health`、`/api/user-context`、`/api/sessions/today`、四个 manual mock date 均返回 200。
+- [!] 本机无 `xcodebuild`，iOS 编译和 Appetize/真机视觉验证待 Codemagic 完成。
