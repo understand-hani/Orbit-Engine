@@ -3,10 +3,16 @@ import Foundation
 struct AppConfig {
     static let appName = "圆周引擎"
     static let backendBaseURLKey = "backend_base_url"
-    static let defaultBackendBaseURL = URL(string: "https://graphical-teeth-athletes-holds.trycloudflare.com")!
+    static let defaultBackendBaseURL = URL(string: "https://habitat-sequence-investigated-geek.trycloudflare.com")!
+    private static let legacyDefaultBackendBaseURLs = [
+        "https://graphical-teeth-athletes-holds.trycloudflare.com"
+    ]
 
     static var backendBaseURL: URL {
         let storedValue = UserDefaults.standard.string(forKey: backendBaseURLKey)
+        if let storedValue, legacyDefaultBackendBaseURLs.contains(storedValue) {
+            return defaultBackendBaseURL
+        }
         return storedValue.flatMap(URL.init(string:)) ?? defaultBackendBaseURL
     }
 }

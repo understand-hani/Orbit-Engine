@@ -135,7 +135,9 @@ struct SessionDestinationView: View {
             case .jdAnalysis:
                 JDIntelligenceView()
             case .researchFeeder(let payload):
-                ResearchReaderView(session: session, payload: payload)
+                ResearchReaderView(session: session, payload: payload) {
+                    isShowingCompletion = true
+                }
             }
         }
         .toolbar {
