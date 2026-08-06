@@ -37,12 +37,14 @@ struct SessionQueueView: View {
                         message: "已完成的记录会进入历史栏目。"
                     )
                 } else {
-                    ForEach(activeSessions) { session in
+                    ForEach(Array(activeSessions.enumerated()), id: \.element.id) { index, session in
                         NavigationLink {
-                            SessionDestinationView(session: session)
+                            SessionDestinationView(session: session) { completedSession in
+                                updateSession(completedSession)
+                            }
                         } label: {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(session.title)
+                                Text("\(sessionDisplayTitle(session)) · \(instanceLabel(for: session, index: index))")
                                     .font(.headline)
                                 Text(session.subtitle)
                                     .font(.subheadline)
@@ -81,6 +83,14 @@ struct SessionQueueView: View {
         }
     }
 
+    private func updateSession(_ session: BaseSession) {
+        if let index = sessions.firstIndex(where: { $0.id == session.id }) {
+            sessions[index] = session
+        } else {
+            sessions.insert(session, at: 0)
+        }
+    }
+
     private func createSession() async {
         isCreating = true
         errorMessage = nil
@@ -105,19 +115,136 @@ struct SessionQueueView: View {
     private var activeSessions: [BaseSession] {
         sessions.filter { $0.status != .completed && $0.status != .archived }
     }
+
+    private func instanceLabel(for session: BaseSession, index: Int) -> String {
+        "第 \(index + 1) 个 · \(session.date)"
+    }
 }
 
 struct SessionDestinationView: View {
     let session: BaseSession
+    var onCompleted: ((BaseSession) -> Void)?
+
+    @State private var isShowingCompletion = false
 
     var body: some View {
-        switch session.payload {
-        case .techRadar(let payload):
-            TechRadarView(session: session, payload: payload)
-        case .jdAnalysis:
-            JDIntelligenceView()
-        case .researchFeeder(let payload):
-            ResearchReaderView(session: session, payload: payload)
+        Group {
+            switch session.payload {
+            case .techRadar(let payload):
+                TechRadarView(session: session, payload: payload)
+            case .jdAnalysis:
+                JDIntelligenceView()
+            case .researchFeeder(let payload):
+                ResearchReaderView(session: session, payload: payload)
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    isShowingCompletion = true
+                } label: {
+                    Label("完成/归档", systemImage: "checkmark.circle")
+                }
+            }
+        }
+        .sheet(isPresented: $isShowingCompletion) {
+            CompletionArchiveView(session: session) { completedSession in
+                onCompleted?(completedSession)
+                isShowingCompletion = false
+            }
+        }
+    }
+}
+
+struct CompletionArchiveView: View {
+    let session: BaseSession
+    let onCompleted: (BaseSession) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var durationMin = 30
+    @State private var summary = ""
+    @State private var keyInsight = ""
+    @State private var nextAction = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private let checkinAPI = CheckinAPI()
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if let errorMessage {
+                    Section {
+                        ErrorBanner(message: errorMessage)
+                    }
+                }
+
+                Section("归档内容") {
+                    Stepper("用时 \(durationMin) 分钟", value: $durationMin, in: 5...180, step: 5)
+                    TextField("简单总结", text: $summary, axis: .vertical)
+                        .lineLimit(3...5)
+                    TextField("关键收获", text: $keyInsight, axis: .vertical)
+                        .lineLimit(3...5)
+                    TextField("下一步", text: $nextAction, axis: .vertical)
+                        .lineLimit(2...4)
+                }
+
+                Section("去向") {
+                    LabeledContent("状态", value: "completed")
+                    Text("保存后会写入 History；返回队列页后，该 session 不再出现在未完成列表中。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("完成/归档")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") {
+                        Task { await save() }
+                    }
+                    .disabled(isSaving || summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .onAppear {
+                if summary.isEmpty {
+                    summary = "完成了 \(sessionDisplayTitle(session))：\(session.title)"
+                }
+                if keyInsight.isEmpty {
+                    keyInsight = "记录一个和当前目标相关的关键收获。"
+                }
+                if nextAction.isEmpty {
+                    nextAction = "根据本次结果决定继续、暂停或进入下一轮。"
+                }
+            }
+        }
+    }
+
+    private func save() async {
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+
+        do {
+            let response = try await checkinAPI.confirmCompletion(
+                sessionID: session.id,
+                request: CompletionConfirmRequest(
+                    durationMin: durationMin,
+                    status: "completed",
+                    summary: summary,
+                    keyInsight: keyInsight,
+                    nextAction: nextAction
+                )
+            )
+            onCompleted(response.session)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }

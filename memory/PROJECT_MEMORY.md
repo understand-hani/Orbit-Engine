@@ -916,6 +916,44 @@ Completed records stay in History.
   - Deep Dive create flow with PDF metadata
   - Deep Dive create flow with URL registration
   - Deep Dive create flow with manual material card
+
+Follow-up implementation:
+
+- Queue rows now show an instance label:
+
+```text
+Session Type · 第 N 个 · YYYY-MM-DD
+```
+
+- This solves the user's issue that several unfinished Deep Dive sessions looked indistinguishable.
+- Concrete workspace pages now expose a top-right `完成/归档` action.
+- `完成/归档` opens `CompletionArchiveView`, where the user fills:
+  - duration
+  - summary
+  - key insight
+  - next action
+- Saving calls:
+
+```text
+POST /api/sessions/{session_id}/completion/confirm
+```
+
+- The returned completed session updates the queue state, so it is filtered out of `进行中 / 未完成`.
+- Completed records are still managed in `History`.
+- Backend smoke passed for the completion path: generated Deep Dive session -> confirm completion -> session/check-in both returned `completed`.
+
+Agent chat status:
+
+- User observed that Agent chat still feels like mock.
+- This is correct.
+- iOS chat calls the backend `/api/chat/...` routes, but backend `ChatService` currently hardcodes:
+
+```python
+self.llm = MockLLMService()
+```
+
+- `config.py` has `llm_provider` and OpenRouter settings, but ChatService has not been wired to use them.
+- Opening paper/page links working only proves external URL access works; it does not mean real LLM chat is connected.
 - Plan changed so Day 9 is now:
 
 ```text

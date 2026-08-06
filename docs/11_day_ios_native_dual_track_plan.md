@@ -112,6 +112,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 - [x] iOS 实现 Deep Dive 队列页。
 - [x] 队列页显示进行中 / 未完成 Deep Dive。
+- [x] 队列中的同类 session 显示编号和日期，避免多个未完成项无法区分。
 - [x] 队列页显示 `新建 Deep Dive`。
 - [ ] 新建入口包含 PDF metadata。
 - [ ] 新建入口包含 URL 登记。
@@ -437,3 +438,9 @@ PPT/PDF 建议页：
 - [x] `SessionQueueView` 增加新建同类 session 按钮，当前版本通过 `POST /api/sessions/mock?date=...` 生成并保存示例 session。
 - [x] 队列层覆盖 Radar、Deep Dive、Weekly Studio、Opportunity Alignment；其中 Deep Dive 对应 Day3 队列页的前半部分。
 - [!] 尚未实现 Deep Dive 新建时的 PDF metadata / URL / 手动材料卡三种材料入口。
+- [x] 未完成队列中的 session 行增加 `第 N 个 · 日期` 标识，解决多个同类型未完成项难以区分的问题。
+- [x] 具体 workspace 增加右上角 `完成/归档` 入口。
+- [x] `完成/归档` 表单支持填写用时、简单总结、关键收获和下一步。
+- [x] 保存归档调用 `POST /api/sessions/{session_id}/completion/confirm`，写入 History，并让 completed session 从未完成队列中过滤掉。
+- [x] 后端 completion smoke 通过：生成 Deep Dive session 后归档，session/check-in 均返回 `completed`。
+- [!] Agent 对话当前仍是 mock：后端 `ChatService` 直接使用 `MockLLMService()`，尚未按 `llm_provider` 切换真实 LLM。

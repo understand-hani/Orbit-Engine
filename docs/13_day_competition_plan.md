@@ -791,3 +791,7 @@ Language learning
 - [!] 限制：本机没有 `xcodebuild`，iOS 编译和视觉验证需要 Codemagic / Appetize。
 - [x] iOS 增加 session type 队列 / 管理层：Today 卡片先进入进行中 / 未完成列表和新建入口，再进入具体 workspace；已完成记录仍归 History 管理。
 - [x] 队列层覆盖 Radar、Deep Dive、Weekly Studio、Opportunity Alignment；Deep Dive 的 PDF / URL / 手动材料新建表单尚未实现。
+- [x] 未完成队列中的同类 session 增加 `第 N 个 · 日期` 标识，避免多个 Deep Dive 难以区分。
+- [x] 具体 workspace 增加 `完成/归档` 入口，提交用时、总结、关键收获和下一步后调用 completion confirm，写入 History 并从未完成队列中过滤。
+- [x] 后端 completion smoke 通过：session/check-in 均返回 `completed`。
+- [!] Agent 对话仍是 mock：当前后端 `ChatService` 固定使用 `MockLLMService()`，未接真实 LLM provider。
