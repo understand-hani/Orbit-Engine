@@ -17,6 +17,7 @@ struct SessionQueueView: View {
 
     @State private var sessions: [BaseSession] = []
     @State private var isCreating = false
+    @State private var deletingSessionIDs: Set<String> = []
     @State private var errorMessage: String?
 
     private let sessionAPI = SessionAPI()
@@ -50,21 +51,31 @@ struct SessionQueueView: View {
                     )
                 } else {
                     ForEach(Array(activeSessions.enumerated()), id: \.element.id) { index, session in
-                        NavigationLink {
-                            SessionDestinationView(session: session) { completedSession in
-                                updateSession(completedSession)
+                        HStack(alignment: .center, spacing: 12) {
+                            NavigationLink {
+                                SessionDestinationView(session: session) { completedSession in
+                                    updateSession(completedSession)
+                                }
+                            } label: {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("\(sessionDisplayTitle(session)) · \(instanceLabel(for: session, index: index))")
+                                        .font(.headline)
+                                    Text(session.subtitle)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(3)
+                                    TagRow(tags: [session.date, sessionDisplayType(session), session.status.rawValue])
+                                }
+                                .padding(.vertical, 4)
                             }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("\(sessionDisplayTitle(session)) · \(instanceLabel(for: session, index: index))")
-                                    .font(.headline)
-                                Text(session.subtitle)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(3)
-                                TagRow(tags: [session.date, sessionDisplayType(session), session.status.rawValue])
+
+                            Button(role: .destructive) {
+                                Task { await deleteSession(session) }
+                            } label: {
+                                Image(systemName: deletingSessionIDs.contains(session.id) ? "hourglass" : "trash")
                             }
-                            .padding(.vertical, 4)
+                            .buttonStyle(.borderless)
+                            .disabled(deletingSessionIDs.contains(session.id))
                         }
                     }
                 }
@@ -109,19 +120,35 @@ struct SessionQueueView: View {
         defer { isCreating = false }
 
         do {
-            let date = nextManualDate(existingCount: sessions.count)
+            let date = nextManualDate()
             let session = try await sessionAPI.generateAndSaveMock(date: date)
             if !sessions.contains(where: { $0.id == session.id }) {
                 sessions.insert(session, at: 0)
+            } else if let index = sessions.firstIndex(where: { $0.id == session.id }) {
+                sessions[index] = session
             }
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    private func nextManualDate(existingCount: Int) -> String {
+    private func deleteSession(_ session: BaseSession) async {
+        deletingSessionIDs.insert(session.id)
+        errorMessage = nil
+        defer { deletingSessionIDs.remove(session.id) }
+
+        do {
+            try await sessionAPI.delete(id: session.id)
+            sessions.removeAll { $0.id == session.id }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func nextManualDate() -> String {
         let dates = manualDates(for: seedSession)
-        return dates[min(existingCount, dates.count - 1)]
+        let existingDates = Set(sessions.map(\.date))
+        return dates.first { !existingDates.contains($0) } ?? dates.last ?? seedSession.date
     }
 
     private var activeSessions: [BaseSession] {
@@ -160,7 +187,7 @@ struct SessionDestinationView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     completionStartMode = .manual
-                    checkinSourceContext = nil
+                    checkinSourceContext = defaultCheckinContext(for: session)
                     isShowingCompletion = true
                 } label: {
                     Label("完成/归档", systemImage: "checkmark.circle")
@@ -174,6 +201,29 @@ struct SessionDestinationView: View {
             }
         }
     }
+}
+
+func defaultCheckinContext(for session: BaseSession) -> CheckinSourceContext? {
+    guard case .researchFeeder(let payload) = session.payload else {
+        return nil
+    }
+    let primaryPaper = payload.papers.first { $0.id == payload.readingPack.primaryPaperID } ?? payload.papers.first
+    guard let primaryPaper else {
+        return nil
+    }
+    return CheckinSourceContext(
+        sourceTitle: primaryPaper.title,
+        sourceURL: primaryPaper.url?.absoluteString,
+        sourceSummary: nonEmpty(payload.notes.coreIdea) ?? nonEmpty(primaryPaper.summary),
+        userNotes: nil
+    )
+}
+
+func nonEmpty(_ value: String?) -> String? {
+    guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+        return nil
+    }
+    return trimmed
 }
 
 struct CompletionArchiveView: View {

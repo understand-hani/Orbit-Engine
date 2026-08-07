@@ -81,6 +81,14 @@ class SessionRepository:
         sessions = self.get_by_date(date_value)
         return sessions[0] if sessions else None
 
+    def delete(self, session_id: str) -> bool:
+        with connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM sessions WHERE id = ?",
+                (session_id,),
+            )
+        return cursor.rowcount > 0
+
 
 class CheckinRepository:
     def save(self, checkin: Checkin) -> Checkin:

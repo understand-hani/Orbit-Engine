@@ -74,6 +74,19 @@ final class APIClient {
         return try await send(request)
     }
 
+    func delete(_ path: String) async throws {
+        var request = try makeRequest(path: path, queryItems: [])
+        request.httpMethod = "DELETE"
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw APIClientError.badStatus(-1, "Missing HTTP response")
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw APIClientError.badStatus(http.statusCode, body)
+        }
+    }
+
     private func makeRequest(path: String, queryItems: [URLQueryItem]) throws -> URLRequest {
         let normalizedPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
         guard var components = URLComponents(

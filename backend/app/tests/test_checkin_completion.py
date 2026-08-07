@@ -51,3 +51,26 @@ def test_confirm_completion_updates_session_and_creates_checkin():
         else:
             os.environ["DATABASE_PATH"] = original_path
         get_settings.cache_clear()
+
+
+def test_delete_session_removes_saved_session():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_session_delete_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        feed_service = FeedService()
+
+        session = feed_service.generate_and_save_mock_session()
+
+        assert feed_service.get_session(session.id) is not None
+        assert feed_service.delete_session(session.id) is True
+        assert feed_service.get_session(session.id) is None
+        assert feed_service.delete_session(session.id) is False
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()

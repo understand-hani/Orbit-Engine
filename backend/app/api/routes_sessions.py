@@ -1,7 +1,7 @@
 from datetime import date
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from app.schemas.session import BaseSession
 from app.schemas.jd_analysis import JDInputCreate
@@ -47,6 +47,14 @@ def get_session(session_id: str) -> BaseSession:
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
     return session
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+def delete_session(session_id: str) -> Response:
+    deleted = feed_service.delete_session(session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return Response(status_code=204)
 
 
 @router.post("/sessions/{session_id}/jd-analysis", response_model=BaseSession)

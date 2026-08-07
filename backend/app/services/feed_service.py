@@ -50,6 +50,9 @@ class FeedService:
     def get_sessions_by_date(self, target_date: date) -> list:
         return self.sessions.get_by_date(target_date.isoformat())
 
+    def delete_session(self, session_id: str) -> bool:
+        return self.sessions.delete(session_id)
+
     def get_or_create_mock_session(self, target_date: Optional[date] = None) -> BaseSession:
         day = target_date or date.today()
         existing = self.sessions.get_latest_by_date(day.isoformat())

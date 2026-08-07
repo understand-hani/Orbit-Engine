@@ -6,7 +6,7 @@ struct ResearchReaderView: View {
     var onArchiveRequested: ((CompletionStartMode, CheckinSourceContext?) -> Void)?
 
     @State private var isShowingMaterialSheet = false
-    @State private var hasGeneratedMaterials = false
+    @State private var confirmedMaterials: [ConfirmedResearchMaterial] = []
     @State private var userNotesByPaperID: [String: UserPaperNote] = [:]
 
     var body: some View {
@@ -24,34 +24,37 @@ struct ResearchReaderView: View {
                 LabeledContent("预计用时", value: payload.readingPack.expectedFinishWindow)
             }
 
-            Section {
-                Button {
-                    isShowingMaterialSheet = true
-                } label: {
-                    Label("材料生成", systemImage: "sparkles")
+            if confirmedMaterials.isEmpty {
+                Section {
+                    Button {
+                        isShowingMaterialSheet = true
+                    } label: {
+                        Label("材料生成", systemImage: "sparkles")
+                    }
+                } header: {
+                    Text("Deep Dive 材料入口")
+                } footer: {
+                    Text("先确认本次 Deep Dive 要读的材料，再进入正文阅读、Agent 讨论和归档。")
                 }
-            } header: {
-                Text("Deep Dive 材料入口")
-            } footer: {
-                Text("先生成本次 Deep Dive 的材料包，再进入正文阅读、Agent 讨论和归档。")
             }
 
-            if hasGeneratedMaterials {
-                if let primaryPaper {
-                    Section("主文献") {
-                        paperLink(primaryPaper)
+            if !confirmedMaterials.isEmpty {
+                Section("已确认材料") {
+                    ForEach(confirmedMaterials) { material in
+                        if let paper = paper(for: material) {
+                            paperLink(paper)
+                        } else {
+                            materialSummary(material)
+                        }
                     }
                 }
 
-                if let candidatePaper {
-                    Section("候选文献") {
-                        paperLink(candidatePaper)
-                    }
+                let extraPapers = supportingPapers.filter { paper in
+                    !confirmedMaterials.contains { $0.paperID == paper.id }
                 }
-
-                if !supportingPapers.isEmpty {
-                    Section("补充材料") {
-                        ForEach(supportingPapers) { paper in
+                if !extraPapers.isEmpty {
+                    Section("其他候选") {
+                        ForEach(extraPapers) { paper in
                             paperLink(paper)
                         }
                     }
@@ -77,21 +80,6 @@ struct ResearchReaderView: View {
                     Text("这些标准定义本次 Deep Dive 做到什么程度可以归档，避免阅读结束后不知道如何收束。")
                 }
 
-                Section("30 / 60 / 90 分钟路径") {
-                    TimePathRow(
-                        title: "30 分钟",
-                        detail: "读摘要、结论和方法图，写清楚问题、核心思路和是否相关。"
-                    )
-                    TimePathRow(
-                        title: "60 分钟",
-                        detail: "在 30 分钟基础上补读方法和实验，记录 2-3 个关键技术点。"
-                    )
-                    TimePathRow(
-                        title: "90 分钟",
-                        detail: "在 60 分钟基础上做横向比较，形成继续、跟踪或放弃判断。"
-                    )
-                }
-
                 Section {
                     Button {
                         onArchiveRequested?(.manual, primaryCheckinContext)
@@ -105,8 +93,8 @@ struct ResearchReaderView: View {
         }
         .navigationTitle("研究")
         .sheet(isPresented: $isShowingMaterialSheet) {
-            DeepDiveMaterialSheet {
-                hasGeneratedMaterials = true
+            DeepDiveMaterialSheet(payload: payload) { materials in
+                confirmedMaterials = materials
             }
         }
     }
@@ -128,6 +116,13 @@ struct ResearchReaderView: View {
             let isCandidate = payload.readingPack.candidatePaperID.map { paper.id == $0 } ?? false
             return !isPrimary && !isCandidate
         }
+    }
+
+    private func paper(for material: ConfirmedResearchMaterial) -> Paper? {
+        guard let paperID = material.paperID else {
+            return nil
+        }
+        return payload.papers.first { $0.id == paperID }
     }
 
     private var completionCriteria: [CompletionCriterion] {
@@ -226,14 +221,14 @@ struct ResearchReaderView: View {
     }
 
     private var primaryCheckinContext: CheckinSourceContext? {
-        guard let primaryPaper else {
+        guard let material = confirmedMaterials.first else {
             return nil
         }
-        let note = userNotesByPaperID[primaryPaper.id]
+        let note = material.paperID.flatMap { userNotesByPaperID[$0] }
         return CheckinSourceContext(
-            sourceTitle: primaryPaper.title,
-            sourceURL: primaryPaper.url?.absoluteString,
-            sourceSummary: nonEmpty(payload.notes.coreIdea) ?? nonEmpty(primaryPaper.summary),
+            sourceTitle: material.title,
+            sourceURL: material.url,
+            sourceSummary: nonEmpty(material.summary),
             userNotes: note?.combinedText
         )
     }
@@ -244,26 +239,55 @@ struct ResearchReaderView: View {
         }
         return trimmed
     }
-}
 
-private struct TimePathRow: View {
-    let title: String
-    let detail: String
-
-    var body: some View {
+    private func materialSummary(_ material: ConfirmedResearchMaterial) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
+            Text(material.title)
                 .font(.headline)
-            Text(detail)
+            Text(material.summary)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+            if let url = material.url, let destination = URL(string: url) {
+                Link("打开网页", destination: destination)
+                    .font(.caption)
+            }
         }
         .padding(.vertical, 2)
     }
 }
 
+struct ConfirmedResearchMaterial: Identifiable {
+    let id: String
+    let paperID: String?
+    let title: String
+    let summary: String
+    let url: String?
+    let sourceType: String
+}
+
+private struct MaterialCandidate: Identifiable {
+    let id: String
+    let paperID: String?
+    let title: String
+    let summary: String
+    let url: String?
+    let sourceType: String
+
+    var confirmed: ConfirmedResearchMaterial {
+        ConfirmedResearchMaterial(
+            id: id,
+            paperID: paperID,
+            title: title,
+            summary: summary,
+            url: url,
+            sourceType: sourceType
+        )
+    }
+}
+
 private struct DeepDiveMaterialSheet: View {
-    let onGenerated: () -> Void
+    let payload: ResearchFeederPayload
+    let onGenerated: ([ConfirmedResearchMaterial]) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
@@ -274,6 +298,8 @@ private struct DeepDiveMaterialSheet: View {
     @State private var summary = ""
     @State private var message: String?
     @State private var isSaving = false
+    @State private var candidates: [MaterialCandidate] = []
+    @State private var selectedCandidateID: String?
 
     private let api = DeepDiveMaterialAPI()
 
@@ -303,7 +329,7 @@ private struct DeepDiveMaterialSheet: View {
 
                         TextField("补充说明", text: $summary, axis: .vertical)
                             .lineLimit(3...5)
-                        Text("当前版本先记录检索需求；下一步接入 arXiv/GitHub 搜索后，Agent 会把候选材料放回同一个入口。")
+                        Text("Agent 会先给出候选材料；确认后才进入研究页。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -327,6 +353,36 @@ private struct DeepDiveMaterialSheet: View {
                     }
                 }
 
+                if !candidates.isEmpty {
+                    Section("候选材料") {
+                        ForEach(candidates) { candidate in
+                            Button {
+                                selectedCandidateID = candidate.id
+                            } label: {
+                                HStack(alignment: .top, spacing: 12) {
+                                    Image(systemName: selectedCandidateID == candidate.id ? "checkmark.seal.fill" : "doc.text")
+                                        .foregroundStyle(selectedCandidateID == candidate.id ? .green : .secondary)
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(candidate.title)
+                                            .font(.headline)
+                                            .foregroundStyle(.primary)
+                                        Text(candidate.summary)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(3)
+                                        if let url = candidate.url {
+                                            Text(url)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if let message {
                     Section {
                         Text(message)
@@ -344,7 +400,7 @@ private struct DeepDiveMaterialSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("生成") {
+                    Button(candidates.isEmpty ? "生成候选" : "确认") {
                         Task { await save() }
                     }
                     .disabled(isSaving || !canSave)
@@ -354,6 +410,9 @@ private struct DeepDiveMaterialSheet: View {
     }
 
     private var canSave: Bool {
+        if !candidates.isEmpty {
+            return selectedCandidateID != nil
+        }
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         if selectedSource == "public_source" && agentSearchMode == "auto" {
             return true
@@ -371,28 +430,87 @@ private struct DeepDiveMaterialSheet: View {
         let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
 
         do {
-            let materialTitle: String
-            if selectedSource == "public_source" && agentSearchMode == "auto" {
-                materialTitle = "Agent 自动生成检索主题"
-            } else {
-                materialTitle = trimmedTitle
+            if candidates.isEmpty {
+                candidates = makeCandidates(
+                    title: trimmedTitle,
+                    summary: trimmedSummary,
+                    url: trimmedURL
+                )
+                selectedCandidateID = candidates.first?.id
+                message = "请选择一个材料并确认。"
+                return
             }
 
+            guard let selected = candidates.first(where: { $0.id == selectedCandidateID }) else {
+                message = "请先选择一个候选材料。"
+                return
+            }
             _ = try await api.add(
                 DeepDiveMaterialCreate(
-                    title: materialTitle,
-                    sourceType: selectedSource,
-                    summary: trimmedSummary.isEmpty ? "待 Agent 读取后补全摘要。" : trimmedSummary,
-                    url: selectedSource == "url" && !trimmedURL.isEmpty ? trimmedURL : nil,
+                    title: selected.title,
+                    sourceType: selected.sourceType,
+                    summary: selected.summary,
+                    url: selected.url,
                     relatedPlan: "Deep Dive"
                 )
             )
-            message = "材料包已生成。"
-            onGenerated()
+            onGenerated([selected.confirmed])
             dismiss()
         } catch {
             message = error.localizedDescription
         }
+    }
+
+    private func makeCandidates(title: String, summary: String, url: String) -> [MaterialCandidate] {
+        if selectedSource == "url" {
+            return [
+                MaterialCandidate(
+                    id: "url_candidate",
+                    paperID: nil,
+                    title: title,
+                    summary: summary.isEmpty ? "用户提供的网址材料，等待阅读后补全主旨。" : summary,
+                    url: url.isEmpty ? nil : url,
+                    sourceType: selectedSource
+                )
+            ]
+        }
+
+        if selectedSource == "pdf" {
+            return [
+                MaterialCandidate(
+                    id: "pdf_candidate",
+                    paperID: nil,
+                    title: title,
+                    summary: summary.isEmpty ? "用户提供的 PDF 材料，等待阅读后补全主旨。" : summary,
+                    url: nil,
+                    sourceType: selectedSource
+                )
+            ]
+        }
+
+        let generated = payload.papers.prefix(3).map { paper in
+            MaterialCandidate(
+                id: paper.id,
+                paperID: paper.id,
+                title: paper.title,
+                summary: summary.isEmpty ? paper.summary : summary,
+                url: paper.url?.absoluteString,
+                sourceType: selectedSource
+            )
+        }
+        if !generated.isEmpty {
+            return Array(generated)
+        }
+        return [
+            MaterialCandidate(
+                id: "agent_candidate",
+                paperID: nil,
+                title: title.isEmpty ? "Agent 推荐材料" : title,
+                summary: summary.isEmpty ? payload.readingPack.readingGoal : summary,
+                url: nil,
+                sourceType: selectedSource
+            )
+        ]
     }
 }
 
