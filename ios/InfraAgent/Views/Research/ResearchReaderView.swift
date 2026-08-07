@@ -28,10 +28,6 @@ struct ResearchReaderView: View {
                 } label: {
                     Label("添加材料", systemImage: "plus.circle")
                 }
-
-                LabeledContent("Agent 检索", value: "按研究目标找论文、repo、技术文章")
-                LabeledContent("粘贴网址", value: "抓取网页或 PDF 链接后进入同一阅读流")
-                LabeledContent("个人上传", value: "PDF / 文档导入后统一管理")
             } header: {
                 Text("Deep Dive 材料入口")
             } footer: {
@@ -154,6 +150,7 @@ private struct DeepDiveMaterialSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedSource = "url"
+    @State private var agentSearchMode = "auto"
     @State private var title = ""
     @State private var url = ""
     @State private var summary = ""
@@ -176,8 +173,17 @@ private struct DeepDiveMaterialSheet: View {
 
                 if selectedSource == "public_source" {
                     Section("Agent 检索") {
-                        TextField("检索主题", text: $title)
-                        TextField("为什么现在需要它", text: $summary, axis: .vertical)
+                        Picker("检索方式", selection: $agentSearchMode) {
+                            Text("Agent 自动生成").tag("auto")
+                            Text("输入检索主题").tag("manual")
+                        }
+                        .pickerStyle(.segmented)
+
+                        if agentSearchMode == "manual" {
+                            TextField("检索主题", text: $title)
+                        }
+
+                        TextField("补充说明", text: $summary, axis: .vertical)
                             .lineLimit(3...5)
                         Text("当前版本先记录检索需求；下一步接入 arXiv/GitHub 搜索后，Agent 会把候选材料放回同一个入口。")
                             .font(.caption)
@@ -223,10 +229,18 @@ private struct DeepDiveMaterialSheet: View {
                     Button("保存") {
                         Task { await save() }
                     }
-                    .disabled(isSaving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(isSaving || !canSave)
                 }
             }
         }
+    }
+
+    private var canSave: Bool {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if selectedSource == "public_source" && agentSearchMode == "auto" {
+            return true
+        }
+        return !trimmedTitle.isEmpty
     }
 
     private func save() async {
@@ -239,9 +253,16 @@ private struct DeepDiveMaterialSheet: View {
         let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
 
         do {
+            let materialTitle: String
+            if selectedSource == "public_source" && agentSearchMode == "auto" {
+                materialTitle = "Agent 自动生成检索主题"
+            } else {
+                materialTitle = trimmedTitle
+            }
+
             _ = try await api.add(
                 DeepDiveMaterialCreate(
-                    title: trimmedTitle,
+                    title: materialTitle,
                     sourceType: selectedSource,
                     summary: trimmedSummary.isEmpty ? "待 Agent 读取后补全摘要。" : trimmedSummary,
                     url: selectedSource == "url" && !trimmedURL.isEmpty ? trimmedURL : nil,

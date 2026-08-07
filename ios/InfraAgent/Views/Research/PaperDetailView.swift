@@ -7,6 +7,7 @@ struct PaperDetailView: View {
     let notes: PaperNotes?
 
     @State private var extractionStatus: String?
+    @State private var hasExtractedReadingSignals = false
     @State private var isExtracting = false
 
     var body: some View {
@@ -34,29 +35,6 @@ struct PaperDetailView: View {
                 Text(paper.summary)
             }
 
-            Section("Agent 阅读提取") {
-                Button {
-                    extractReadingSignals()
-                } label: {
-                    if isExtracting {
-                        Label("Agent 正在读取", systemImage: "hourglass")
-                    } else {
-                        Label("Agent 自动读取并提取关键段落", systemImage: "sparkles")
-                    }
-                }
-                .disabled(isExtracting)
-
-                if let extractionStatus {
-                    Text(extractionStatus)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("让 Agent 读取正文后，生成阅读章节、精选段落和关键图，后续讨论会围绕这些上下文展开。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
             if let reader {
                 Section("阅读器") {
                     NavigationLink {
@@ -75,7 +53,32 @@ struct PaperDetailView: View {
                         Label("和 Agent 讨论", systemImage: "bubble.left.and.bubble.right")
                     }
                 }
+            }
 
+            Section("Agent 阅读提取") {
+                Button {
+                    extractReadingSignals()
+                } label: {
+                    if isExtracting {
+                        Label("Agent 正在读取", systemImage: "hourglass")
+                    } else {
+                        Label("Agent 自动读取并提取关键段落", systemImage: "sparkles")
+                    }
+                }
+                .disabled(isExtracting)
+
+                if let extractionStatus {
+                    Text(extractionStatus)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("点击后生成阅读章节、精选段落和关键图，后续讨论会围绕这些上下文展开。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let reader, hasExtractedReadingSignals {
                 Section("阅读章节") {
                     ForEach(reader.sections) { section in
                         NavigationLink {
@@ -163,6 +166,7 @@ struct PaperDetailView: View {
         let sectionCount = reader.sections.count
         let passageCount = reader.selectedPassages.count
         let figureCount = reader.keyFigures.count
+        hasExtractedReadingSignals = true
         extractionStatus = "已生成 \(sectionCount) 个阅读章节、\(passageCount) 个精选段落、\(figureCount) 个关键图。当前版本使用后端结构化阅读结果；下一步会改为真实读取正文后生成。"
     }
 }
