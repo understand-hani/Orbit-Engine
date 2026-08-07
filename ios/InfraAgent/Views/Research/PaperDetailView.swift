@@ -9,6 +9,10 @@ struct PaperDetailView: View {
     @State private var extractionStatus: String?
     @State private var hasExtractedReadingSignals = false
     @State private var isExtracting = false
+    @State private var didLoadNoteDraft = false
+    @State private var noteCoreIdea = ""
+    @State private var noteNextAction = ""
+    @State private var noteRelationToPlan = ""
 
     var body: some View {
         List {
@@ -134,14 +138,15 @@ struct PaperDetailView: View {
                 }
             }
 
-            if let notes {
-                Section("笔记") {
-                    LabeledContent("核心", value: notes.coreIdea.isEmpty ? "未开始" : notes.coreIdea)
-                    LabeledContent("下一步", value: notes.nextAction.isEmpty ? "未设置" : notes.nextAction)
-                    if !notes.relationToMyPlan.isEmpty {
-                        Text(notes.relationToMyPlan)
-                    }
-                }
+            Section("我的笔记") {
+                TextField("核心理解", text: $noteCoreIdea, axis: .vertical)
+                    .lineLimit(2...5)
+                TextField("下一步", text: $noteNextAction, axis: .vertical)
+                    .lineLimit(2...4)
+                TextField("和当前计划的关系", text: $noteRelationToPlan, axis: .vertical)
+                    .lineLimit(2...5)
+            } footer: {
+                Text("这里由用户记录阅读判断；Agent 可以提供初稿或讨论输入，但不替代你的最终笔记。")
             }
 
             if let url = paper.url {
@@ -152,6 +157,19 @@ struct PaperDetailView: View {
         }
         .navigationTitle("论文")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            loadNoteDraftIfNeeded()
+        }
+    }
+
+    private func loadNoteDraftIfNeeded() {
+        guard !didLoadNoteDraft else {
+            return
+        }
+        didLoadNoteDraft = true
+        noteCoreIdea = notes?.coreIdea ?? ""
+        noteNextAction = notes?.nextAction ?? ""
+        noteRelationToPlan = notes?.relationToMyPlan ?? ""
     }
 
     private func extractReadingSignals() {

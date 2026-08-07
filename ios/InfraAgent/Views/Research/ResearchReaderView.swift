@@ -6,6 +6,7 @@ struct ResearchReaderView: View {
     var onArchiveRequested: (() -> Void)?
 
     @State private var isShowingMaterialSheet = false
+    @State private var hasGeneratedMaterials = false
 
     var body: some View {
         List {
@@ -26,30 +27,32 @@ struct ResearchReaderView: View {
                 Button {
                     isShowingMaterialSheet = true
                 } label: {
-                    Label("添加材料", systemImage: "plus.circle")
+                    Label("材料生成", systemImage: "sparkles")
                 }
             } header: {
                 Text("Deep Dive 材料入口")
             } footer: {
-                Text("目标是把 Agent 自检索、用户上传和 URL 材料统一成一个材料库，再进入正文阅读、Agent 讨论和归档。")
+                Text("先生成本次 Deep Dive 的材料包，再进入正文阅读、Agent 讨论和归档。")
             }
 
-            if let primaryPaper {
-                Section("主文献") {
-                    paperLink(primaryPaper)
+            if hasGeneratedMaterials {
+                if let primaryPaper {
+                    Section("主文献") {
+                        paperLink(primaryPaper)
+                    }
                 }
-            }
 
-            if let candidatePaper {
-                Section("候选文献") {
-                    paperLink(candidatePaper)
+                if let candidatePaper {
+                    Section("候选文献") {
+                        paperLink(candidatePaper)
+                    }
                 }
-            }
 
-            if !supportingPapers.isEmpty {
-                Section("补充材料") {
-                    ForEach(supportingPapers) { paper in
-                        paperLink(paper)
+                if !supportingPapers.isEmpty {
+                    Section("补充材料") {
+                        ForEach(supportingPapers) { paper in
+                            paperLink(paper)
+                        }
                     }
                 }
             }
@@ -69,7 +72,9 @@ struct ResearchReaderView: View {
         }
         .navigationTitle("研究")
         .sheet(isPresented: $isShowingMaterialSheet) {
-            DeepDiveMaterialSheet()
+            DeepDiveMaterialSheet {
+                hasGeneratedMaterials = true
+            }
         }
     }
 
@@ -147,9 +152,11 @@ struct ResearchReaderView: View {
 }
 
 private struct DeepDiveMaterialSheet: View {
+    let onGenerated: () -> Void
+
     @Environment(\.dismiss) private var dismiss
 
-    @State private var selectedSource = "url"
+    @State private var selectedSource = "public_source"
     @State private var agentSearchMode = "auto"
     @State private var title = ""
     @State private var url = ""
@@ -164,8 +171,8 @@ private struct DeepDiveMaterialSheet: View {
             Form {
                 Section("来源") {
                     Picker("来源", selection: $selectedSource) {
-                        Text("粘贴网址").tag("url")
                         Text("Agent 检索").tag("public_source")
+                        Text("粘贴网址").tag("url")
                         Text("个人上传").tag("pdf")
                     }
                     .pickerStyle(.segmented)
@@ -217,7 +224,7 @@ private struct DeepDiveMaterialSheet: View {
                     }
                 }
             }
-            .navigationTitle("添加材料")
+            .navigationTitle("材料生成")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -226,7 +233,7 @@ private struct DeepDiveMaterialSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") {
+                    Button("生成") {
                         Task { await save() }
                     }
                     .disabled(isSaving || !canSave)
@@ -269,7 +276,9 @@ private struct DeepDiveMaterialSheet: View {
                     relatedPlan: "Deep Dive"
                 )
             )
-            message = "已保存到材料入口。"
+            message = "材料包已生成。"
+            onGenerated()
+            dismiss()
         } catch {
             message = error.localizedDescription
         }
