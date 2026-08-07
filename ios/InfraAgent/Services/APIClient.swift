@@ -74,9 +74,19 @@ final class APIClient {
         return try await send(request)
     }
 
+    func postNoContent(_ path: String, queryItems: [URLQueryItem] = []) async throws {
+        var request = try makeRequest(path: path, queryItems: queryItems)
+        request.httpMethod = "POST"
+        try await sendNoContent(request)
+    }
+
     func delete(_ path: String) async throws {
         var request = try makeRequest(path: path, queryItems: [])
         request.httpMethod = "DELETE"
+        try await sendNoContent(request)
+    }
+
+    private func sendNoContent(_ request: URLRequest) async throws {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw APIClientError.badStatus(-1, "Missing HTTP response")

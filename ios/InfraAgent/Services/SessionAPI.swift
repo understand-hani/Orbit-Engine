@@ -32,7 +32,7 @@ struct SessionAPI {
     }
 
     func delete(id: String) async throws {
-        try await resolvedClient.delete("/api/sessions/\(id)")
+        try await resolvedClient.postNoContent("/api/sessions/\(id)/delete")
     }
 
     func analyzeJD(sessionID: String, request: JDInputCreate) async throws -> BaseSession {

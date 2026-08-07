@@ -49,6 +49,14 @@ def delete_session(session_id: str) -> Response:
     return Response(status_code=204)
 
 
+@router.post("/sessions/{session_id}/delete", status_code=204)
+def delete_session_via_post(session_id: str) -> Response:
+    deleted = feed_service.delete_session(session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return Response(status_code=204)
+
+
 @router.get("/sessions/{session_id}", response_model=BaseSession)
 def get_session(session_id: str) -> BaseSession:
     session = feed_service.get_session(session_id)
