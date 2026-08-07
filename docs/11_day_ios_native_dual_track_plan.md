@@ -114,10 +114,11 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] 队列页显示进行中 / 未完成 Deep Dive。
 - [x] 队列中的同类 session 显示编号和日期，避免多个未完成项无法区分。
 - [x] 队列页显示 `新建 Deep Dive`。
-- [ ] 新建入口包含 PDF metadata。
-- [ ] 新建入口包含 URL 登记。
-- [ ] 新建入口包含手动材料卡。
-- [ ] 新建材料 metadata 可写入后端或本地状态。
+- [x] Deep Dive 工作区新增 `材料生成` 入口。
+- [x] 材料生成入口支持 Agent 检索、URL 登记、个人上传三类来源的前端选择。
+- [x] Agent 检索支持 `Agent 自动生成` 和 `输入检索主题` 两种模式。
+- [x] 材料生成结果可写入现有 `/api/user-context/materials`。
+- [!] PDF 二进制上传、真实网页抓取和真实公开源检索仍是 roadmap；当前版本先完成入口语义和材料卡片显示状态。
 
 文档 / PPT / PDF 线：
 
@@ -129,19 +130,19 @@ Web 仅保留为后端 API smoke / 兜底演示。
 完成标准：
 
 - [x] iOS 能从 Today 进入 Deep Dive 队列。
-- [ ] iOS 能看到新建 Deep Dive 的三种材料入口。
+- [x] iOS 能看到 Deep Dive 的三种材料入口。
 - [ ] 录屏路径 v1 明确。
 
 ### Day 4（2026-08-09）：iOS Deep Dive 详情页
 
 开发线：
 
-- [ ] Deep Dive 详情页只保留一个主材料。
-- [ ] 显示当前任务。
-- [ ] 显示阅读目标。
-- [ ] 显示选择理由。
-- [ ] 显示 30/60/90 分钟路径。
-- [ ] 显示完成标准。
+- [x] Deep Dive 详情页先显示材料生成入口，材料生成完成后再显示主文献、候选文献和补充材料。
+- [x] 显示当前任务。
+- [x] 显示阅读目标。
+- [x] 显示选择理由。
+- [x] 显示预计用时。
+- [!] 30/60/90 分钟路径和完成标准仍未完整结构化展示。
 - [ ] 上述信息块不做伪点击入口，避免层级混乱。
 
 文档 / PPT / PDF 线：
@@ -153,20 +154,20 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 完成标准：
 
-- [ ] iOS Deep Dive 详情页可展示。
+- [x] iOS Deep Dive 详情页可展示。
 - [ ] Agent 能力叙事成页。
 
 ### Day 5（2026-08-10）：iOS Check-in + Agent Guidance
 
 开发线：
 
-- [ ] Check-in 放在完成标准下面的按钮中，不裸露在外层。
-- [ ] Agent Guidance 放在完成标准下面的按钮中。
-- [ ] Agent Guidance 能生成 Check-in 草稿。
-- [ ] 用户可修改 Agent 生成的 Summary。
-- [ ] 用户可修改 Agent 生成的 Key insight。
-- [ ] 用户可修改 Agent 生成的 Next action。
-- [ ] 保存后写入 History。
+- [x] Check-in 放在完成标准下面的按钮中，不裸露在外层。
+- [x] Agent Guidance 放在完成标准下面的按钮中。
+- [x] Agent Guidance 能生成 Check-in 草稿。
+- [x] 用户可修改 Agent 生成的 Summary。
+- [x] 用户可修改 Agent 生成的 Key insight。
+- [x] 用户可修改 Agent 生成的 Next action。
+- [x] 保存后写入 History。
 
 文档 / PPT / PDF 线：
 
@@ -177,7 +178,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 完成标准：
 
-- [ ] 主闭环跑通：Deep Dive -> Agent draft -> Check-in -> History。
+- [x] 主闭环跑通：Deep Dive -> Agent draft -> Check-in -> History。
 - [ ] closed-loop evidence 页面有初稿。
 
 ### Day 6（2026-08-11）：iOS 计划 / 我的
@@ -329,14 +330,14 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 必须做：
 
-- [ ] iOS 原生 Today 能连接 GOAI/FastAPI 后端。
-- [ ] iOS 原生 Deep Dive 队列页。
-- [ ] iOS 原生新建 Deep Dive：PDF metadata / URL / 手动材料卡。
-- [ ] iOS 原生 Deep Dive 详情页：一个主材料 + 推荐理由 + 时间路径 + 完成标准。
-- [ ] iOS 原生 Agent Guidance：生成 Check-in 草稿。
-- [ ] iOS 原生 Check-in：用户可修改并写入 History。
-- [ ] iOS 原生 History 显示完成记录。
-- [ ] iOS 原生计划/我的展示用户上下文。
+- [x] iOS 原生 Today 能连接 GOAI/FastAPI 后端。
+- [x] iOS 原生 Deep Dive 队列页。
+- [x] iOS 原生 Deep Dive 材料生成入口：Agent 检索 / URL / 个人上传。
+- [x] iOS 原生 Deep Dive 详情页：材料生成后显示主文献、候选文献、推荐理由和阅读入口。
+- [x] iOS 原生 Agent Guidance：生成 Check-in 草稿。
+- [x] iOS 原生 Check-in：用户可修改并写入 History。
+- [x] iOS 原生 History 显示完成记录。
+- [x] iOS 原生计划/我的展示用户上下文。
 
 轻量做：
 
@@ -437,10 +438,28 @@ PPT/PDF 建议页：
 - [x] 新增 `SessionQueueView`：展示进行中 / 未完成 session，已完成记录仍交给 History。
 - [x] `SessionQueueView` 增加新建同类 session 按钮，当前版本通过 `POST /api/sessions/mock?date=...` 生成并保存示例 session。
 - [x] 队列层覆盖 Radar、Deep Dive、Weekly Studio、Opportunity Alignment；其中 Deep Dive 对应 Day3 队列页的前半部分。
-- [!] 尚未实现 Deep Dive 新建时的 PDF metadata / URL / 手动材料卡三种材料入口。
+- [x] Deep Dive 工作区新增 `材料生成` 入口：Agent 检索、URL、个人上传统一进入同一材料生成 sheet。
+- [x] Agent 检索默认 `Agent 自动生成`，也支持 `输入检索主题`。
+- [!] 真实 PDF 上传、URL 正文抓取和公开源检索尚未实现；当前先保存材料 metadata / 检索需求。
 - [x] 未完成队列中的 session 行增加 `第 N 个 · 日期` 标识，解决多个同类型未完成项难以区分的问题。
 - [x] 具体 workspace 增加右上角 `完成/归档` 入口。
 - [x] `完成/归档` 表单支持填写用时、简单总结、关键收获和下一步。
 - [x] 保存归档调用 `POST /api/sessions/{session_id}/completion/confirm`，写入 History，并让 completed session 从未完成队列中过滤掉。
 - [x] 后端 completion smoke 通过：生成 Deep Dive session 后归档，session/check-in 均返回 `completed`。
 - [!] Agent 对话当前仍是 mock：后端 `ChatService` 直接使用 `MockLLMService()`，尚未按 `llm_provider` 切换真实 LLM。
+
+### 2026-08-07
+
+- [x] Deep Dive 研究页新增材料生成状态门槛：进入工作区后先只显示 `材料生成`，生成完成后才显示主文献、候选文献和补充材料。
+- [x] `材料生成` sheet 默认进入 Agent 检索，并支持 `Agent 自动生成` / `输入检索主题` 两种模式。
+- [x] URL、Agent 检索需求和个人上传入口统一进入材料生成 sheet；当前保存到 `/api/user-context/materials`。
+- [x] 归档入口调整为材料生成后才显示，并统一为和 `材料生成` 一致的标准 List `Label` 样式。
+- [x] 论文详情页调整阅读流程：先进入 PDF 阅读器 / Agent 讨论，再点击 `Agent 自动读取并提取关键段落`，点击后才显示阅读章节、精选段落和关键图。
+- [x] `我的笔记` 从内联输入改成入口卡片 `写入笔记`，弹出 sheet 后支持 `自己编辑` 和 `Agent 生成初稿` 两种方式。
+- [x] 修复 Codemagic / Xcode build 中两类 SwiftUI `Section + footer` initializer 编译错误。
+- [x] 后端默认 tunnel 多次随测试更新，当前默认 URL 为 `https://mounting-harvard-bicycle-grove.trycloudflare.com`，仍保留 `UserDefaults` 覆盖和旧默认 URL 迁移。
+- [!] 本机仍无 `xcodebuild`，iOS 编译验证依赖 Web/Codemagic build log。
+- [x] Deep Dive 材料生成后新增 `完成标准` 区块，优先读取 session completion criteria；为空时使用 Deep Dive 默认完成标准。
+- [x] Deep Dive 材料生成后新增 `30 / 60 / 90 分钟路径`，用于展示不同时间预算下的阅读收束方式。
+- [x] Deep Dive 完成标准下新增 `Agent Guidance` 与 `Check-in / 归档` 两个主路径按钮。
+- [x] `完成/归档` sheet 新增 `自己编辑 / Agent 生成初稿`，Agent 草稿会填充 Summary、Key insight 和 Next action，用户仍可修改后保存。

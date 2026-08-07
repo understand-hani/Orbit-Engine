@@ -3,7 +3,7 @@ import SwiftUI
 struct ResearchReaderView: View {
     let session: BaseSession
     let payload: ResearchFeederPayload
-    var onArchiveRequested: (() -> Void)?
+    var onArchiveRequested: ((CompletionStartMode) -> Void)?
 
     @State private var isShowingMaterialSheet = false
     @State private var hasGeneratedMaterials = false
@@ -57,13 +57,53 @@ struct ResearchReaderView: View {
                 }
 
                 Section {
+                    ForEach(completionCriteria) { criterion in
+                        Label {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(criterion.description)
+                                Text(criterion.required ? "必须完成" : "可选")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: criterionIcon(criterion.status))
+                        }
+                    }
+                } header: {
+                    Text("完成标准")
+                } footer: {
+                    Text("这些标准定义本次 Deep Dive 做到什么程度可以归档，避免阅读结束后不知道如何收束。")
+                }
+
+                Section("30 / 60 / 90 分钟路径") {
+                    TimePathRow(
+                        title: "30 分钟",
+                        detail: "读摘要、结论和方法图，写清楚问题、核心思路和是否相关。"
+                    )
+                    TimePathRow(
+                        title: "60 分钟",
+                        detail: "在 30 分钟基础上补读方法和实验，记录 2-3 个关键技术点。"
+                    )
+                    TimePathRow(
+                        title: "90 分钟",
+                        detail: "在 60 分钟基础上做横向比较，形成继续、跟踪或放弃判断。"
+                    )
+                }
+
+                Section {
                     Button {
-                        onArchiveRequested?()
+                        onArchiveRequested?(.agent)
                     } label: {
-                        Label("已完成，归档", systemImage: "checkmark.circle.fill")
+                        Label("Agent Guidance", systemImage: "sparkles")
+                    }
+
+                    Button {
+                        onArchiveRequested?(.manual)
+                    } label: {
+                        Label("Check-in / 归档", systemImage: "checkmark.circle.fill")
                     }
                 } footer: {
-                    Text("完成本次阅读后写入 History，并从未完成队列中移除。")
+                    Text("Agent Guidance 会先生成 Check-in 草稿；保存后写入 History，并从未完成队列中移除。")
                 }
             }
         }
@@ -91,6 +131,45 @@ struct ResearchReaderView: View {
             let isPrimary = paper.id == payload.readingPack.primaryPaperID
             let isCandidate = payload.readingPack.candidatePaperID.map { paper.id == $0 } ?? false
             return !isPrimary && !isCandidate
+        }
+    }
+
+    private var completionCriteria: [CompletionCriterion] {
+        if !session.completion.criteria.isEmpty {
+            return session.completion.criteria
+        }
+        return [
+            CompletionCriterion(
+                id: "understand_problem",
+                description: "说明这份材料解决的问题和核心输入输出。",
+                required: true,
+                status: "not_started"
+            ),
+            CompletionCriterion(
+                id: "capture_insight",
+                description: "记录一个对当前方向判断有价值的技术 insight。",
+                required: true,
+                status: "not_started"
+            ),
+            CompletionCriterion(
+                id: "decide_next_action",
+                description: "给出继续、跟踪或放弃判断，并写出下一步行动。",
+                required: true,
+                status: "not_started"
+            )
+        ]
+    }
+
+    private func criterionIcon(_ status: String) -> String {
+        switch status {
+        case "met":
+            return "checkmark.circle.fill"
+        case "in_progress":
+            return "circle.lefthalf.filled"
+        case "skipped":
+            return "minus.circle"
+        default:
+            return "circle"
         }
     }
 
@@ -145,6 +224,22 @@ struct ResearchReaderView: View {
 
     private func notes(for paper: Paper) -> PaperNotes? {
         paper.id == payload.readingPack.primaryPaperID ? payload.notes : nil
+    }
+}
+
+private struct TimePathRow: View {
+    let title: String
+    let detail: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.headline)
+            Text(detail)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
     }
 }
 

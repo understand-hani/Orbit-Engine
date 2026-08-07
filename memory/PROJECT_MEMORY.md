@@ -1,6 +1,6 @@
 # GOAI Project Memory
 
-Last updated: 2026-08-06
+Last updated: 2026-08-07
 
 This file is written for future Codex sessions so the GOAI competition work can resume without rediscovering context.
 
@@ -177,7 +177,31 @@ Generated in GOAI:
 
 ## 8. Next Work Recommendation
 
-Do top-level definition first, then build.
+Current Deep Dive iOS status:
+
+```text
+Today
+  -> Deep Dive queue
+  -> material generation
+  -> material detail / PDF / Agent discussion / note draft
+  -> completion criteria + 30/60/90 path
+  -> Agent Guidance draft
+  -> editable Check-in
+  -> History
+```
+
+Latest 2026-08-07 implementation notes:
+
+- Deep Dive now shows completion criteria after material generation. It uses backend session criteria when available and falls back to default Deep Dive criteria.
+- Deep Dive now shows a 30 / 60 / 90 minute path to explain different reading depths.
+- The completion area has explicit `Agent Guidance` and `Check-in / 归档` buttons.
+- `完成/归档` now supports `自己编辑 / Agent 生成初稿`; Agent draft fills Summary, Key insight, and Next action before the user confirms.
+- Completion saving still uses the existing backend endpoint `POST /api/sessions/{session_id}/completion/confirm`, which updates session status and writes the check-in to History.
+
+Next work recommendation:
+
+- Validate the iOS build through Codemagic/Appetize because the local machine has no `xcodebuild`.
+- Then prioritize demo-path polish and proposal screenshots, not real PDF upload or public-source crawling.
 
 Recommended next implementation direction:
 

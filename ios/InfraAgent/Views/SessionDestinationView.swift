@@ -1,5 +1,10 @@
 import SwiftUI
 
+enum CompletionStartMode {
+    case manual
+    case agent
+}
+
 struct SessionQueueView: View {
     let seedSession: BaseSession
 
@@ -126,6 +131,7 @@ struct SessionDestinationView: View {
     var onCompleted: ((BaseSession) -> Void)?
 
     @State private var isShowingCompletion = false
+    @State private var completionStartMode: CompletionStartMode = .manual
 
     var body: some View {
         Group {
@@ -135,7 +141,8 @@ struct SessionDestinationView: View {
             case .jdAnalysis:
                 JDIntelligenceView()
             case .researchFeeder(let payload):
-                ResearchReaderView(session: session, payload: payload) {
+                ResearchReaderView(session: session, payload: payload) { mode in
+                    completionStartMode = mode
                     isShowingCompletion = true
                 }
             }
@@ -143,6 +150,7 @@ struct SessionDestinationView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
+                    completionStartMode = .manual
                     isShowingCompletion = true
                 } label: {
                     Label("完成/归档", systemImage: "checkmark.circle")
@@ -150,7 +158,7 @@ struct SessionDestinationView: View {
             }
         }
         .sheet(isPresented: $isShowingCompletion) {
-            CompletionArchiveView(session: session) { completedSession in
+            CompletionArchiveView(session: session, initialMode: completionStartMode) { completedSession in
                 onCompleted?(completedSession)
                 isShowingCompletion = false
             }
@@ -160,13 +168,16 @@ struct SessionDestinationView: View {
 
 struct CompletionArchiveView: View {
     let session: BaseSession
+    let initialMode: CompletionStartMode
     let onCompleted: (BaseSession) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var durationMin = 30
+    @State private var draftMode = "manual"
     @State private var summary = ""
     @State private var keyInsight = ""
     @State private var nextAction = ""
+    @State private var didPrepareInitialDraft = false
     @State private var isSaving = false
     @State private var errorMessage: String?
 
@@ -178,6 +189,22 @@ struct CompletionArchiveView: View {
                 if let errorMessage {
                     Section {
                         ErrorBanner(message: errorMessage)
+                    }
+                }
+
+                Section("Check-in 方式") {
+                    Picker("Check-in 方式", selection: $draftMode) {
+                        Text("自己编辑").tag("manual")
+                        Text("Agent 生成初稿").tag("agent")
+                    }
+                    .pickerStyle(.segmented)
+
+                    if draftMode == "agent" {
+                        Button {
+                            generateAgentDraft()
+                        } label: {
+                            Label("生成 Check-in 草稿", systemImage: "sparkles")
+                        }
                     }
                 }
 
@@ -214,17 +241,69 @@ struct CompletionArchiveView: View {
                 }
             }
             .onAppear {
-                if summary.isEmpty {
-                    summary = "完成了 \(sessionDisplayTitle(session))：\(session.title)"
-                }
-                if keyInsight.isEmpty {
-                    keyInsight = "记录一个和当前目标相关的关键收获。"
-                }
-                if nextAction.isEmpty {
-                    nextAction = "根据本次结果决定继续、暂停或进入下一轮。"
-                }
+                prepareInitialDraftIfNeeded()
             }
         }
+    }
+
+    private func prepareInitialDraftIfNeeded() {
+        guard !didPrepareInitialDraft else {
+            return
+        }
+        didPrepareInitialDraft = true
+
+        switch initialMode {
+        case .agent:
+            draftMode = "agent"
+            generateAgentDraft()
+            return
+        case .manual:
+            break
+        }
+
+        fillManualPlaceholdersIfNeeded()
+    }
+
+    private func fillManualPlaceholdersIfNeeded() {
+        if summary.isEmpty {
+            summary = "完成了 \(sessionDisplayTitle(session))：\(session.title)"
+        }
+        if keyInsight.isEmpty {
+            keyInsight = "记录一个和当前目标相关的关键收获。"
+        }
+        if nextAction.isEmpty {
+            nextAction = "根据本次结果决定继续、暂停或进入下一轮。"
+        }
+    }
+
+    private func generateAgentDraft() {
+        switch session.payload {
+        case .researchFeeder(let payload):
+            let primaryTitle = payload.papers.first { $0.id == payload.readingPack.primaryPaperID }?.title
+                ?? payload.papers.first?.title
+                ?? "本次 Deep Dive 材料"
+            summary = "完成了 Deep Dive：围绕「\(primaryTitle)」梳理了材料目标、推荐理由和阅读重点。"
+            keyInsight = nonEmpty(payload.notes.coreIdea)
+                ?? nonEmpty(payload.readingPack.readingGoal)
+                ?? "本次材料的关键价值在于帮助判断它是否值得继续投入时间。"
+            nextAction = nonEmpty(payload.notes.nextAction)
+                ?? "根据本次阅读结果，决定继续精读、加入跟踪列表或归档为阶段性参考。"
+        case .techRadar:
+            summary = "完成了 Radar session：浏览并筛选了本次外部信号。"
+            keyInsight = "记录一个值得继续跟踪的技术、产品或市场变化。"
+            nextAction = "把高价值信号转入 Deep Dive 或下周继续跟踪。"
+        case .jdAnalysis:
+            summary = "完成了 Opportunity Alignment：对当前机会和能力差距做了初步判断。"
+            keyInsight = "记录一个影响方向选择或准备优先级的关键信号。"
+            nextAction = "决定继续观察、补能力，或暂时放弃该机会。"
+        }
+    }
+
+    private func nonEmpty(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
     }
 
     private func save() async {

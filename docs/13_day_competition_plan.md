@@ -795,3 +795,12 @@ Language learning
 - [x] 具体 workspace 增加 `完成/归档` 入口，提交用时、总结、关键收获和下一步后调用 completion confirm，写入 History 并从未完成队列中过滤。
 - [x] 后端 completion smoke 通过：session/check-in 均返回 `completed`。
 - [!] Agent 对话仍是 mock：当前后端 `ChatService` 固定使用 `MockLLMService()`，未接真实 LLM provider。
+
+### 2026-08-07
+
+- [x] iOS Deep Dive 材料生成后新增 `完成标准` 区块，优先展示后端 session completion criteria；缺省时使用 Deep Dive 默认完成标准。
+- [x] iOS Deep Dive 新增 `30 / 60 / 90 分钟路径`，用于解释不同时间预算下的阅读深度和归档标准。
+- [x] iOS Deep Dive 完成标准下新增 `Agent Guidance` 与 `Check-in / 归档` 两个主路径按钮。
+- [x] `完成/归档` sheet 新增 `自己编辑 / Agent 生成初稿` 选择，Agent 草稿填入 Summary、Key insight 和 Next action。
+- [x] 从 `Agent Guidance` 进入归档时会默认生成 Check-in 草稿；用户仍可修改后通过现有 completion confirm API 写入 History。
+- [!] 本机仍无 `xcodebuild`，本轮 SwiftUI 修改需要通过 Codemagic / Appetize 做编译和视觉验证。
