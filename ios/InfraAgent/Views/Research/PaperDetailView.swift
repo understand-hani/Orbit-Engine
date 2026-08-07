@@ -6,6 +6,9 @@ struct PaperDetailView: View {
     let reader: PaperReader?
     let notes: PaperNotes?
 
+    @State private var extractionStatus: String?
+    @State private var isExtracting = false
+
     var body: some View {
         List {
             Section("论文") {
@@ -29,6 +32,29 @@ struct PaperDetailView: View {
 
             Section("摘要") {
                 Text(paper.summary)
+            }
+
+            Section("Agent 阅读提取") {
+                Button {
+                    extractReadingSignals()
+                } label: {
+                    if isExtracting {
+                        Label("Agent 正在读取", systemImage: "hourglass")
+                    } else {
+                        Label("Agent 自动读取并提取关键段落", systemImage: "sparkles")
+                    }
+                }
+                .disabled(isExtracting)
+
+                if let extractionStatus {
+                    Text(extractionStatus)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("让 Agent 读取正文后，生成阅读章节、精选段落和关键图，后续讨论会围绕这些上下文展开。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if let reader {
@@ -123,5 +149,20 @@ struct PaperDetailView: View {
         }
         .navigationTitle("论文")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func extractReadingSignals() {
+        isExtracting = true
+        defer { isExtracting = false }
+
+        guard let reader else {
+            extractionStatus = "当前材料还没有可读取正文。下一步需要先完成 PDF/网页正文抓取，再提取章节、段落和关键图。"
+            return
+        }
+
+        let sectionCount = reader.sections.count
+        let passageCount = reader.selectedPassages.count
+        let figureCount = reader.keyFigures.count
+        extractionStatus = "已生成 \(sectionCount) 个阅读章节、\(passageCount) 个精选段落、\(figureCount) 个关键图。当前版本使用后端结构化阅读结果；下一步会改为真实读取正文后生成。"
     }
 }

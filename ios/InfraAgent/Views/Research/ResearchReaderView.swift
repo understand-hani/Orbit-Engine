@@ -5,6 +5,8 @@ struct ResearchReaderView: View {
     let payload: ResearchFeederPayload
     var onArchiveRequested: (() -> Void)?
 
+    @State private var isShowingMaterialSheet = false
+
     var body: some View {
         List {
             Section("目标") {
@@ -18,6 +20,20 @@ struct ResearchReaderView: View {
                 Text(payload.readingPack.selectionReason)
                     .font(.subheadline)
                 LabeledContent("预计用时", value: payload.readingPack.expectedFinishWindow)
+            }
+
+            Section("Deep Dive 材料入口") {
+                Button {
+                    isShowingMaterialSheet = true
+                } label: {
+                    Label("添加材料", systemImage: "plus.circle")
+                }
+
+                LabeledContent("Agent 检索", value: "按研究目标找论文、repo、技术文章")
+                LabeledContent("粘贴网址", value: "抓取网页或 PDF 链接后进入同一阅读流")
+                LabeledContent("个人上传", value: "PDF / 文档导入后统一管理")
+            } footer: {
+                Text("目标是把 Agent 自检索、用户上传和 URL 材料统一成一个材料库，再进入正文阅读、Agent 讨论和归档。")
             }
 
             if let primaryPaper {
@@ -54,6 +70,9 @@ struct ResearchReaderView: View {
             }
         }
         .navigationTitle("研究")
+        .sheet(isPresented: $isShowingMaterialSheet) {
+            DeepDiveMaterialSheet()
+        }
     }
 
     private var primaryPaper: Paper? {
@@ -127,4 +146,141 @@ struct ResearchReaderView: View {
     private func notes(for paper: Paper) -> PaperNotes? {
         paper.id == payload.readingPack.primaryPaperID ? payload.notes : nil
     }
+}
+
+private struct DeepDiveMaterialSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var selectedSource = "url"
+    @State private var title = ""
+    @State private var url = ""
+    @State private var summary = ""
+    @State private var message: String?
+    @State private var isSaving = false
+
+    private let api = DeepDiveMaterialAPI()
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("来源") {
+                    Picker("来源", selection: $selectedSource) {
+                        Text("粘贴网址").tag("url")
+                        Text("Agent 检索").tag("public_source")
+                        Text("个人上传").tag("pdf")
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                if selectedSource == "public_source" {
+                    Section("Agent 检索") {
+                        TextField("检索主题", text: $title)
+                        TextField("为什么现在需要它", text: $summary, axis: .vertical)
+                            .lineLimit(3...5)
+                        Text("当前版本先记录检索需求；下一步接入 arXiv/GitHub 搜索后，Agent 会把候选材料放回同一个入口。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } else if selectedSource == "pdf" {
+                    Section("个人上传") {
+                        TextField("材料标题", text: $title)
+                        TextField("材料说明", text: $summary, axis: .vertical)
+                            .lineLimit(3...5)
+                        Text("当前后端还没有二进制文件上传接口。这里先保留入口语义；真实 PDF 上传需要补文件上传、正文抽取和页码索引。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Section("粘贴网址") {
+                        TextField("标题", text: $title)
+                        TextField("https://...", text: $url)
+                            .keyboardType(.URL)
+                            .textInputAutocapitalization(.never)
+                        TextField("材料说明", text: $summary, axis: .vertical)
+                            .lineLimit(3...5)
+                    }
+                }
+
+                if let message {
+                    Section {
+                        Text(message)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("添加材料")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") {
+                        Task { await save() }
+                    }
+                    .disabled(isSaving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+
+    private func save() async {
+        isSaving = true
+        message = nil
+        defer { isSaving = false }
+
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        do {
+            _ = try await api.add(
+                DeepDiveMaterialCreate(
+                    title: trimmedTitle,
+                    sourceType: selectedSource,
+                    summary: trimmedSummary.isEmpty ? "待 Agent 读取后补全摘要。" : trimmedSummary,
+                    url: selectedSource == "url" && !trimmedURL.isEmpty ? trimmedURL : nil,
+                    relatedPlan: "Deep Dive"
+                )
+            )
+            message = "已保存到材料入口。"
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+}
+
+private struct DeepDiveMaterialAPI {
+    var client: APIClient?
+
+    private var resolvedClient: APIClient {
+        client ?? .shared
+    }
+
+    func add(_ request: DeepDiveMaterialCreate) async throws -> DeepDiveMaterialResponse {
+        try await resolvedClient.post("/api/user-context/materials", body: request)
+    }
+}
+
+private struct DeepDiveMaterialCreate: Encodable {
+    let title: String
+    let sourceType: String
+    let summary: String
+    let url: String?
+    let relatedPlan: String
+
+    enum CodingKeys: String, CodingKey {
+        case title
+        case sourceType = "source_type"
+        case summary
+        case url
+        case relatedPlan = "related_plan"
+    }
+}
+
+private struct DeepDiveMaterialResponse: Decodable {
+    let id: String
 }
