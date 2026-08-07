@@ -457,7 +457,7 @@ PPT/PDF 建议页：
 - [x] 论文详情页调整阅读流程：先进入 PDF 阅读器 / Agent 讨论，再点击 `Agent 自动读取并提取关键段落`，点击后才显示阅读章节、精选段落和关键图。
 - [x] `我的笔记` 从内联输入改成入口卡片 `写入笔记`，弹出 sheet 后支持 `自己编辑` 和 `Agent 生成初稿` 两种方式。
 - [x] 修复 Codemagic / Xcode build 中两类 SwiftUI `Section + footer` initializer 编译错误。
-- [x] 后端默认 tunnel 多次随测试更新，当前默认 URL 为 `https://mounting-harvard-bicycle-grove.trycloudflare.com`，仍保留 `UserDefaults` 覆盖和旧默认 URL 迁移。
+- [x] 后端默认 tunnel 多次随测试更新，当前默认 URL 为 `https://psychological-merger-cedar-qualifying.trycloudflare.com`，仍保留 `UserDefaults` 覆盖和旧默认 URL 迁移。
 - [!] 本机仍无 `xcodebuild`，iOS 编译验证依赖 Web/Codemagic build log。
 - [x] Deep Dive 材料生成后新增 `完成标准` 区块，优先读取 session completion criteria；为空时使用 Deep Dive 默认完成标准。
 - [x] Deep Dive 材料生成后新增 `30 / 60 / 90 分钟路径`，用于展示不同时间预算下的阅读收束方式。
