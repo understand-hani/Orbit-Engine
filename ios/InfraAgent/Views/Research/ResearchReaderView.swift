@@ -22,7 +22,7 @@ struct ResearchReaderView: View {
                 LabeledContent("预计用时", value: payload.readingPack.expectedFinishWindow)
             }
 
-            Section("Deep Dive 材料入口") {
+            Section {
                 Button {
                     isShowingMaterialSheet = true
                 } label: {
@@ -32,6 +32,8 @@ struct ResearchReaderView: View {
                 LabeledContent("Agent 检索", value: "按研究目标找论文、repo、技术文章")
                 LabeledContent("粘贴网址", value: "抓取网页或 PDF 链接后进入同一阅读流")
                 LabeledContent("个人上传", value: "PDF / 文档导入后统一管理")
+            } header: {
+                Text("Deep Dive 材料入口")
             } footer: {
                 Text("目标是把 Agent 自检索、用户上传和 URL 材料统一成一个材料库，再进入正文阅读、Agent 讨论和归档。")
             }
