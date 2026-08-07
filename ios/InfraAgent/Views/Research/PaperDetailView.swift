@@ -138,13 +138,15 @@ struct PaperDetailView: View {
                 }
             }
 
-            Section("我的笔记") {
+            Section {
                 TextField("核心理解", text: $noteCoreIdea, axis: .vertical)
                     .lineLimit(2...5)
                 TextField("下一步", text: $noteNextAction, axis: .vertical)
                     .lineLimit(2...4)
                 TextField("和当前计划的关系", text: $noteRelationToPlan, axis: .vertical)
                     .lineLimit(2...5)
+            } header: {
+                Text("我的笔记")
             } footer: {
                 Text("这里由用户记录阅读判断；Agent 可以提供初稿或讨论输入，但不替代你的最终笔记。")
             }
