@@ -5,6 +5,13 @@ enum CompletionStartMode {
     case agent
 }
 
+struct CheckinSourceContext {
+    let sourceTitle: String
+    let sourceURL: String?
+    let sourceSummary: String?
+    let userNotes: String?
+}
+
 struct SessionQueueView: View {
     let seedSession: BaseSession
 
@@ -132,6 +139,7 @@ struct SessionDestinationView: View {
 
     @State private var isShowingCompletion = false
     @State private var completionStartMode: CompletionStartMode = .manual
+    @State private var checkinSourceContext: CheckinSourceContext?
 
     var body: some View {
         Group {
@@ -141,8 +149,9 @@ struct SessionDestinationView: View {
             case .jdAnalysis:
                 JDIntelligenceView()
             case .researchFeeder(let payload):
-                ResearchReaderView(session: session, payload: payload) { mode in
+                ResearchReaderView(session: session, payload: payload) { mode, context in
                     completionStartMode = mode
+                    checkinSourceContext = context
                     isShowingCompletion = true
                 }
             }
@@ -151,6 +160,7 @@ struct SessionDestinationView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     completionStartMode = .manual
+                    checkinSourceContext = nil
                     isShowingCompletion = true
                 } label: {
                     Label("完成/归档", systemImage: "checkmark.circle")
@@ -158,7 +168,7 @@ struct SessionDestinationView: View {
             }
         }
         .sheet(isPresented: $isShowingCompletion) {
-            CompletionArchiveView(session: session, initialMode: completionStartMode) { completedSession in
+            CompletionArchiveView(session: session, initialMode: completionStartMode, sourceContext: checkinSourceContext) { completedSession in
                 onCompleted?(completedSession)
                 isShowingCompletion = false
             }
@@ -169,6 +179,7 @@ struct SessionDestinationView: View {
 struct CompletionArchiveView: View {
     let session: BaseSession
     let initialMode: CompletionStartMode
+    let sourceContext: CheckinSourceContext?
     let onCompleted: (BaseSession) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -218,6 +229,24 @@ struct CompletionArchiveView: View {
                         .lineLimit(2...4)
                 }
 
+                if let sourceContext {
+                    Section("回看线索") {
+                        Text(sourceContext.sourceTitle)
+                        if let sourceURL = sourceContext.sourceURL, let url = URL(string: sourceURL) {
+                            Link("打开网页", destination: url)
+                        }
+                        if let sourceSummary = nonEmpty(sourceContext.sourceSummary) {
+                            Text(sourceSummary)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let userNotes = nonEmpty(sourceContext.userNotes) {
+                            Text(userNotes)
+                                .font(.subheadline)
+                        }
+                    }
+                }
+
                 Section("去向") {
                     LabeledContent("状态", value: "completed")
                     Text("保存后会写入 History；返回队列页后，该 session 不再出现在未完成列表中。")
@@ -259,20 +288,6 @@ struct CompletionArchiveView: View {
             return
         case .manual:
             break
-        }
-
-        fillManualPlaceholdersIfNeeded()
-    }
-
-    private func fillManualPlaceholdersIfNeeded() {
-        if summary.isEmpty {
-            summary = "完成了 \(sessionDisplayTitle(session))：\(session.title)"
-        }
-        if keyInsight.isEmpty {
-            keyInsight = "记录一个和当前目标相关的关键收获。"
-        }
-        if nextAction.isEmpty {
-            nextAction = "根据本次结果决定继续、暂停或进入下一轮。"
         }
     }
 
@@ -319,7 +334,11 @@ struct CompletionArchiveView: View {
                     status: "completed",
                     summary: summary,
                     keyInsight: keyInsight,
-                    nextAction: nextAction
+                    nextAction: nextAction,
+                    sourceTitle: sourceContext?.sourceTitle,
+                    sourceURL: sourceContext?.sourceURL,
+                    sourceSummary: sourceContext?.sourceSummary,
+                    userNotes: sourceContext?.userNotes
                 )
             )
             onCompleted(response.session)

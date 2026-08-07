@@ -3,10 +3,11 @@ import SwiftUI
 struct ResearchReaderView: View {
     let session: BaseSession
     let payload: ResearchFeederPayload
-    var onArchiveRequested: ((CompletionStartMode) -> Void)?
+    var onArchiveRequested: ((CompletionStartMode, CheckinSourceContext?) -> Void)?
 
     @State private var isShowingMaterialSheet = false
     @State private var hasGeneratedMaterials = false
+    @State private var userNotesByPaperID: [String: UserPaperNote] = [:]
 
     var body: some View {
         List {
@@ -67,6 +68,7 @@ struct ResearchReaderView: View {
                             }
                         } icon: {
                             Image(systemName: criterionIcon(criterion.status))
+                                .foregroundStyle(criterion.status == "met" ? .green : .secondary)
                         }
                     }
                 } header: {
@@ -92,18 +94,12 @@ struct ResearchReaderView: View {
 
                 Section {
                     Button {
-                        onArchiveRequested?(.agent)
-                    } label: {
-                        Label("Agent Guidance", systemImage: "sparkles")
-                    }
-
-                    Button {
-                        onArchiveRequested?(.manual)
+                        onArchiveRequested?(.manual, primaryCheckinContext)
                     } label: {
                         Label("Check-in / 归档", systemImage: "checkmark.circle.fill")
                     }
                 } footer: {
-                    Text("Agent Guidance 会先生成 Check-in 草稿；保存后写入 History，并从未完成队列中移除。")
+                    Text("归档会写入 History，并保存材料标题、链接、主旨和你写下的笔记，方便之后回看。")
                 }
             }
         }
@@ -163,13 +159,13 @@ struct ResearchReaderView: View {
     private func criterionIcon(_ status: String) -> String {
         switch status {
         case "met":
-            return "checkmark.circle.fill"
+            return "checkmark.seal.fill"
         case "in_progress":
-            return "circle.lefthalf.filled"
+            return "hourglass"
         case "skipped":
-            return "minus.circle"
+            return "minus"
         default:
-            return "circle"
+            return "flag"
         }
     }
 
@@ -179,8 +175,11 @@ struct ResearchReaderView: View {
                 session: session,
                 paper: paper,
                 reader: reader(for: paper),
-                notes: notes(for: paper)
-            )
+                notes: notes(for: paper),
+                userNote: userNotesByPaperID[paper.id]
+            ) { note in
+                userNotesByPaperID[paper.id] = note
+            }
         } label: {
             VStack(alignment: .leading, spacing: 8) {
                 Text(paper.title)
@@ -224,6 +223,26 @@ struct ResearchReaderView: View {
 
     private func notes(for paper: Paper) -> PaperNotes? {
         paper.id == payload.readingPack.primaryPaperID ? payload.notes : nil
+    }
+
+    private var primaryCheckinContext: CheckinSourceContext? {
+        guard let primaryPaper else {
+            return nil
+        }
+        let note = userNotesByPaperID[primaryPaper.id]
+        return CheckinSourceContext(
+            sourceTitle: primaryPaper.title,
+            sourceURL: primaryPaper.url?.absoluteString,
+            sourceSummary: nonEmpty(payload.notes.coreIdea) ?? nonEmpty(primaryPaper.summary),
+            userNotes: note?.combinedText
+        )
+    }
+
+    private func nonEmpty(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
     }
 }
 

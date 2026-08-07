@@ -23,6 +23,10 @@ class Checkin(BaseModel):
     summary: str
     key_insight: str = ""
     next_action: str = ""
+    source_title: str = ""
+    source_url: str = ""
+    source_summary: str = ""
+    user_notes: str = ""
     created_at: datetime
 
 
@@ -35,4 +39,7 @@ class CheckinCreate(BaseModel):
     summary: str
     key_insight: str = ""
     next_action: str = ""
-
+    source_title: str = ""
+    source_url: str = ""
+    source_summary: str = ""
+    user_notes: str = ""

@@ -28,6 +28,10 @@ def test_confirm_completion_updates_session_and_creates_checkin():
                 summary="读完一部分材料并记录了下一步。",
                 key_insight="样例洞察。",
                 next_action="继续补读。",
+                source_title="Boundless Agents",
+                source_url="https://example.com/paper",
+                source_summary="论文主旨摘要。",
+                user_notes="用户自己的阅读笔记。",
             ),
         )
 
@@ -36,6 +40,10 @@ def test_confirm_completion_updates_session_and_creates_checkin():
         checkin = result["checkin"]
         assert updated_session.completion.user_confirmed_status == CompletionSuggestion.partial
         assert checkin.session_id == session.id
+        assert checkin.source_title == "Boundless Agents"
+        assert checkin.source_url == "https://example.com/paper"
+        assert checkin.source_summary == "论文主旨摘要。"
+        assert checkin.user_notes == "用户自己的阅读笔记。"
         assert len(checkin_service.list_checkins(session.date.isoformat())) == 1
     finally:
         if original_path is None:

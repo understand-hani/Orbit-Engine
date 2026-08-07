@@ -10,6 +10,10 @@ struct Checkin: Codable, Identifiable {
     let summary: String
     let keyInsight: String
     let nextAction: String
+    let sourceTitle: String?
+    let sourceURL: String?
+    let sourceSummary: String?
+    let userNotes: String?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -22,6 +26,10 @@ struct Checkin: Codable, Identifiable {
         case summary
         case keyInsight = "key_insight"
         case nextAction = "next_action"
+        case sourceTitle = "source_title"
+        case sourceURL = "source_url"
+        case sourceSummary = "source_summary"
+        case userNotes = "user_notes"
         case createdAt = "created_at"
     }
 }
@@ -35,6 +43,10 @@ struct CheckinCreate: Codable {
     let summary: String
     let keyInsight: String
     let nextAction: String
+    let sourceTitle: String?
+    let sourceURL: String?
+    let sourceSummary: String?
+    let userNotes: String?
 
     enum CodingKeys: String, CodingKey {
         case sessionID = "session_id"
@@ -45,6 +57,10 @@ struct CheckinCreate: Codable {
         case summary
         case keyInsight = "key_insight"
         case nextAction = "next_action"
+        case sourceTitle = "source_title"
+        case sourceURL = "source_url"
+        case sourceSummary = "source_summary"
+        case userNotes = "user_notes"
     }
 }
 
@@ -54,6 +70,10 @@ struct CompletionConfirmRequest: Codable {
     let summary: String
     let keyInsight: String
     let nextAction: String
+    let sourceTitle: String?
+    let sourceURL: String?
+    let sourceSummary: String?
+    let userNotes: String?
 
     enum CodingKeys: String, CodingKey {
         case durationMin = "duration_min"
@@ -61,6 +81,10 @@ struct CompletionConfirmRequest: Codable {
         case summary
         case keyInsight = "key_insight"
         case nextAction = "next_action"
+        case sourceTitle = "source_title"
+        case sourceURL = "source_url"
+        case sourceSummary = "source_summary"
+        case userNotes = "user_notes"
     }
 }
 

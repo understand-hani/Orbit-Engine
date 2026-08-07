@@ -5,6 +5,8 @@ struct PaperDetailView: View {
     let paper: Paper
     let reader: PaperReader?
     let notes: PaperNotes?
+    let userNote: UserPaperNote?
+    var onNoteSaved: ((UserPaperNote) -> Void)?
 
     @State private var extractionStatus: String?
     @State private var hasExtractedReadingSignals = false
@@ -168,7 +170,9 @@ struct PaperDetailView: View {
                 coreIdea: $noteCoreIdea,
                 nextAction: $noteNextAction,
                 relationToPlan: $noteRelationToPlan
-            )
+            ) { note in
+                onNoteSaved?(note)
+            }
         }
     }
 
@@ -177,9 +181,9 @@ struct PaperDetailView: View {
             return
         }
         didLoadNoteDraft = true
-        noteCoreIdea = notes?.coreIdea ?? ""
-        noteNextAction = notes?.nextAction ?? ""
-        noteRelationToPlan = notes?.relationToMyPlan ?? ""
+        noteCoreIdea = userNote?.coreIdea ?? ""
+        noteNextAction = userNote?.nextAction ?? ""
+        noteRelationToPlan = userNote?.relationToPlan ?? ""
     }
 
     private func extractReadingSignals() {
@@ -199,8 +203,30 @@ struct PaperDetailView: View {
     }
 }
 
+struct UserPaperNote {
+    let coreIdea: String
+    let nextAction: String
+    let relationToPlan: String
+
+    var combinedText: String {
+        [
+            labeledLine("核心理解", coreIdea),
+            labeledLine("下一步", nextAction),
+            labeledLine("和当前计划的关系", relationToPlan)
+        ]
+        .compactMap { $0 }
+        .joined(separator: "\n")
+    }
+
+    private func labeledLine(_ label: String, _ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : "\(label)：\(trimmed)"
+    }
+}
+
 private struct PaperNoteSheet: View {
     let notes: PaperNotes?
+    var onSave: (UserPaperNote) -> Void
 
     @Binding var coreIdea: String
     @Binding var nextAction: String
@@ -247,6 +273,13 @@ private struct PaperNoteSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") {
+                        onSave(
+                            UserPaperNote(
+                                coreIdea: coreIdea,
+                                nextAction: nextAction,
+                                relationToPlan: relationToPlan
+                            )
+                        )
                         dismiss()
                     }
                 }

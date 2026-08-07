@@ -24,6 +24,12 @@ struct DailyHistoryView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(checkin.summary)
                                 .font(.headline)
+                            if let sourceTitle = nonEmpty(checkin.sourceTitle) {
+                                Text(sourceTitle)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
                             Text("\(checkin.taskType.rawValue) · \(checkin.status) · \(checkin.durationMin) 分钟")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -33,5 +39,12 @@ struct DailyHistoryView: View {
             }
         }
         .navigationTitle(date)
+    }
+
+    private func nonEmpty(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
     }
 }

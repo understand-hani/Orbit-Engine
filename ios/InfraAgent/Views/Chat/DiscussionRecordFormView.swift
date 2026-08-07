@@ -101,7 +101,11 @@ struct DiscussionRecordFormView: View {
                     status: "partial",
                     summary: "讨论记录：\(summary)",
                     keyInsight: keyInsight,
-                    nextAction: nextAction
+                    nextAction: nextAction,
+                    sourceTitle: nil,
+                    sourceURL: nil,
+                    sourceSummary: nil,
+                    userNotes: nil
                 )
             )
             message = "已保存到历史"

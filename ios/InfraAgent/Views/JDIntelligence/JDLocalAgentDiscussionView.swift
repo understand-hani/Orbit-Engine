@@ -112,7 +112,11 @@ struct JDLocalAgentDiscussionView: View {
                     status: "partial",
                     summary: "JD Agent 讨论记录",
                     keyInsight: lastAgentMessage,
-                    nextAction: transcript
+                    nextAction: transcript,
+                    sourceTitle: nil,
+                    sourceURL: nil,
+                    sourceSummary: nil,
+                    userNotes: nil
                 )
             )
             saveMessage = "已保存到历史"

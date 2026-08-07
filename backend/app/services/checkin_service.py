@@ -61,6 +61,10 @@ class CheckinService:
                 summary=request.summary,
                 key_insight=request.key_insight,
                 next_action=request.next_action,
+                source_title=request.source_title,
+                source_url=request.source_url,
+                source_summary=request.source_summary,
+                user_notes=request.user_notes,
             )
         )
         return {"session": updated_session, "checkin": checkin}
