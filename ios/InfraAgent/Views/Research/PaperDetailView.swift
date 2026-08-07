@@ -167,12 +167,13 @@ struct PaperDetailView: View {
         .sheet(isPresented: $isShowingNoteSheet) {
             PaperNoteSheet(
                 notes: notes,
+                onSave: { note in
+                    onNoteSaved?(note)
+                },
                 coreIdea: $noteCoreIdea,
                 nextAction: $noteNextAction,
                 relationToPlan: $noteRelationToPlan
-            ) { note in
-                onNoteSaved?(note)
-            }
+            )
         }
     }
 
