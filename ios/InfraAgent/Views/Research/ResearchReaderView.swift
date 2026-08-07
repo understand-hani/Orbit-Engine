@@ -55,19 +55,16 @@ struct ResearchReaderView: View {
                         }
                     }
                 }
-            }
 
-            Section {
-                Button {
-                    onArchiveRequested?()
-                } label: {
-                    Label("已完成，归档", systemImage: "checkmark.circle.fill")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 8)
+                Section {
+                    Button {
+                        onArchiveRequested?()
+                    } label: {
+                        Label("已完成，归档", systemImage: "checkmark.circle.fill")
+                    }
+                } footer: {
+                    Text("完成本次阅读后写入 History，并从未完成队列中移除。")
                 }
-            } footer: {
-                Text("完成本次阅读后写入 History，并从未完成队列中移除。")
             }
         }
         .navigationTitle("研究")
