@@ -51,30 +51,28 @@ struct SessionQueueView: View {
                     )
                 } else {
                     ForEach(Array(activeSessions.enumerated()), id: \.element.id) { index, session in
-                        HStack(alignment: .center, spacing: 12) {
-                            NavigationLink {
-                                SessionDestinationView(session: session) { completedSession in
-                                    updateSession(completedSession)
-                                }
-                            } label: {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("\(sessionDisplayTitle(session)) · \(instanceLabel(for: session, index: index))")
-                                        .font(.headline)
-                                    Text(session.subtitle)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(3)
-                                    TagRow(tags: [session.date, sessionDisplayType(session), session.status.rawValue])
-                                }
-                                .padding(.vertical, 4)
+                        NavigationLink {
+                            SessionDestinationView(session: session) { completedSession in
+                                updateSession(completedSession)
                             }
-
+                        } label: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("\(sessionDisplayTitle(session)) · \(instanceLabel(for: session, index: index))")
+                                    .font(.headline)
+                                Text(session.subtitle)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(3)
+                                TagRow(tags: [session.date, sessionDisplayType(session), session.status.rawValue])
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 Task { await deleteSession(session) }
                             } label: {
-                                Image(systemName: deletingSessionIDs.contains(session.id) ? "hourglass" : "trash")
+                                Label("删除", systemImage: "trash")
                             }
-                            .buttonStyle(.borderless)
                             .disabled(deletingSessionIDs.contains(session.id))
                         }
                     }
@@ -100,7 +98,7 @@ struct SessionQueueView: View {
         }
         .navigationTitle(sessionDisplayTitle(seedSession))
         .onAppear {
-            if sessions.isEmpty {
+            if sessions.isEmpty && isActive(seedSession) {
                 sessions = [seedSession]
             }
         }
@@ -152,11 +150,17 @@ struct SessionQueueView: View {
     }
 
     private var activeSessions: [BaseSession] {
-        sessions.filter { $0.status != .completed && $0.status != .archived }
+        sessions.filter(isActive)
     }
 
     private func instanceLabel(for session: BaseSession, index: Int) -> String {
         "第 \(index + 1) 个 · \(session.date)"
+    }
+
+    private func isActive(_ session: BaseSession) -> Bool {
+        session.status != .completed &&
+            session.status != .archived &&
+            session.status != .skipped
     }
 }
 

@@ -41,20 +41,20 @@ def get_sessions_by_date(target_date: date = Query(alias="date")) -> List[BaseSe
     return feed_service.get_sessions_by_date(target_date)
 
 
-@router.get("/sessions/{session_id}", response_model=BaseSession)
-def get_session(session_id: str) -> BaseSession:
-    session = feed_service.get_session(session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return session
-
-
 @router.delete("/sessions/{session_id}", status_code=204)
 def delete_session(session_id: str) -> Response:
     deleted = feed_service.delete_session(session_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Session not found")
     return Response(status_code=204)
+
+
+@router.get("/sessions/{session_id}", response_model=BaseSession)
+def get_session(session_id: str) -> BaseSession:
+    session = feed_service.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
 
 @router.post("/sessions/{session_id}/jd-analysis", response_model=BaseSession)

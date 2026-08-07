@@ -52,7 +52,6 @@ def test_confirm_completion_updates_session_and_creates_checkin():
             os.environ["DATABASE_PATH"] = original_path
         get_settings.cache_clear()
 
-
 def test_delete_session_removes_saved_session():
     original_path = os.environ.get("DATABASE_PATH")
     db_path = Path(tempfile.mkdtemp()) / "infra_session_delete_test.db"
