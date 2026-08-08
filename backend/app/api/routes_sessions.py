@@ -58,6 +58,14 @@ def delete_session_via_post(session_id: str) -> Response:
     return Response(status_code=204)
 
 
+@router.post("/sessions/{session_id}/archive", status_code=204)
+def archive_session(session_id: str) -> Response:
+    archived = feed_service.archive_session(session_id)
+    if not archived:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return Response(status_code=204)
+
+
 @router.post("/sessions/{session_id}/research/selected-materials", response_model=BaseSession)
 def save_selected_research_materials(
     session_id: str, materials: List[ConfirmedResearchMaterial]

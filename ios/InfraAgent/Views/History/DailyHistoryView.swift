@@ -53,9 +53,9 @@ struct DailyHistoryView: View {
         case "completed":
             return "已完成"
         case "skipped":
-            return "已跳过"
+            return "已丢弃"
         case "archived":
-            return "已归档"
+            return "已暂存"
         case "partial":
             return "未完成归档"
         default:

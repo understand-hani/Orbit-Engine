@@ -17,7 +17,8 @@ struct SessionQueueView: View {
 
     @State private var sessions: [BaseSession] = []
     @State private var isCreating = false
-    @State private var deletingSessionIDs: Set<String> = []
+    @State private var processingSessionIDs: Set<String> = []
+    @State private var pendingDiscardSession: BaseSession?
     @State private var errorMessage: String?
 
     private let sessionAPI = SessionAPI()
@@ -47,7 +48,7 @@ struct SessionQueueView: View {
                     EmptyStateView(
                         title: "暂无未完成工作区",
                         systemImage: "tray",
-                        message: "已完成、已跳过或已归档的记录会进入归档区。"
+                        message: "已完成、已丢弃或已暂存的记录会进入归档区。"
                     )
                 } else {
                     ForEach(Array(activeSessions.enumerated()), id: \.element.id) { index, session in
@@ -69,11 +70,19 @@ struct SessionQueueView: View {
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
-                                Task { await deleteSession(session) }
+                                pendingDiscardSession = session
                             } label: {
-                                Label("跳过", systemImage: "archivebox")
+                                Label("丢弃", systemImage: "trash")
                             }
-                            .disabled(deletingSessionIDs.contains(session.id))
+                            .disabled(processingSessionIDs.contains(session.id))
+
+                            Button {
+                                Task { await archiveSession(session) }
+                            } label: {
+                                Label("暂存", systemImage: "archivebox")
+                            }
+                            .tint(.orange)
+                            .disabled(processingSessionIDs.contains(session.id))
                         }
                     }
                 }
@@ -101,6 +110,18 @@ struct SessionQueueView: View {
             if sessions.isEmpty && isActive(seedSession) {
                 sessions = [seedSession]
             }
+        }
+        .confirmationDialog(
+            "丢弃这个工作区？",
+            item: $pendingDiscardSession,
+            titleVisibility: .visible
+        ) { session in
+            Button("丢弃", role: .destructive) {
+                Task { await discardSession(session) }
+            }
+            Button("取消", role: .cancel) {}
+        } message: { _ in
+            Text("丢弃后会从未完成队列移除，并在归档中标记为已丢弃。")
         }
     }
 
@@ -130,13 +151,26 @@ struct SessionQueueView: View {
         }
     }
 
-    private func deleteSession(_ session: BaseSession) async {
-        deletingSessionIDs.insert(session.id)
+    private func discardSession(_ session: BaseSession) async {
+        processingSessionIDs.insert(session.id)
         errorMessage = nil
-        defer { deletingSessionIDs.remove(session.id) }
+        defer { processingSessionIDs.remove(session.id) }
 
         do {
             try await sessionAPI.delete(id: session.id)
+            sessions.removeAll { $0.id == session.id }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func archiveSession(_ session: BaseSession) async {
+        processingSessionIDs.insert(session.id)
+        errorMessage = nil
+        defer { processingSessionIDs.remove(session.id) }
+
+        do {
+            try await sessionAPI.archive(id: session.id)
             sessions.removeAll { $0.id == session.id }
         } catch {
             errorMessage = error.localizedDescription

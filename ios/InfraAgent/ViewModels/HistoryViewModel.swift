@@ -24,15 +24,25 @@ final class HistoryViewModel: ObservableObject {
         }
     }
 
+    var archivedCheckins: [Checkin] {
+        checkins
+            .filter { $0.status == "archived" }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
     var groupedDates: [String] {
-        Dictionary(grouping: checkins, by: \.date)
+        Dictionary(grouping: timelineCheckins, by: \.date)
             .keys
             .sorted(by: >)
     }
 
     func checkins(on date: String) -> [Checkin] {
-        checkins
+        timelineCheckins
             .filter { $0.date == date }
             .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private var timelineCheckins: [Checkin] {
+        checkins.filter { $0.status != "archived" }
     }
 }

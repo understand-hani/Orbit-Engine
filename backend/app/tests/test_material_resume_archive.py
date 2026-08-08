@@ -48,6 +48,20 @@ def test_material_resume_archive_services():
         )
         assert updated_research is not None
         assert updated_research.payload.selected_materials[0].paper_id == papers[0].id
+        recovered_research = feed.save_selected_materials(
+            "session_2026-08-08_research_feeder",
+            [
+                ConfirmedResearchMaterial(
+                    id="manual_material",
+                    title="用户确认材料",
+                    summary="从材料生成入口确认的材料。",
+                    source_type="url",
+                )
+            ],
+        )
+        assert recovered_research is not None
+        assert recovered_research.id == "session_2026-08-08_research_feeder"
+        assert recovered_research.payload.selected_materials[0].id == "manual_material"
 
         profile = resume.create(
             ResumeProfileCreate(

@@ -35,6 +35,10 @@ struct SessionAPI {
         try await resolvedClient.postNoContent("/api/sessions/\(id)/delete")
     }
 
+    func archive(id: String) async throws {
+        try await resolvedClient.postNoContent("/api/sessions/\(id)/archive")
+    }
+
     func saveSelectedResearchMaterials(
         sessionID: String,
         materials: [ConfirmedResearchMaterial]

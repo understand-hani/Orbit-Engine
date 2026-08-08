@@ -78,3 +78,30 @@ def test_delete_session_marks_session_skipped_and_creates_checkin():
         else:
             os.environ["DATABASE_PATH"] = original_path
         get_settings.cache_clear()
+
+
+def test_archive_session_marks_session_archived_and_creates_checkin():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_session_archive_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        feed_service = FeedService()
+        checkin_service = CheckinService()
+
+        session = feed_service.generate_and_save_mock_session()
+
+        assert feed_service.archive_session(session.id) is True
+        updated_session = feed_service.get_session(session.id)
+        assert updated_session is not None
+        assert updated_session.status.value == "archived"
+        checkins = checkin_service.list_checkins(session.date.isoformat())
+        assert len(checkins) == 1
+        assert checkins[0].status.value == "archived"
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()

@@ -83,26 +83,47 @@ class FeedService:
         )
         self.sessions.save(updated_session)
 
-        self.checkins.save(
-            Checkin(
-                id=f"checkin_{uuid4().hex[:12]}",
-                session_id=session.id,
-                date=session.date,
-                task_type=session.task_type,
-                duration_min=0,
-                status=CheckinStatus.skipped,
-                summary=f"已跳过并归档：{session.title}",
-                key_insight="",
-                next_action="需要时可重新新建同类工作区。",
-                created_at=archived_at,
-            )
+        self._save_session_marker(
+            session=session,
+            status=CheckinStatus.skipped,
+            summary=f"已丢弃：{session.title}",
+            next_action="该工作区已从当前队列移除。",
+            created_at=archived_at,
+        )
+        return True
+
+    def archive_session(self, session_id: str) -> bool:
+        session = self.sessions.get_by_id(session_id)
+        if session is None:
+            return False
+        if session.status in {
+            SessionStatus.completed,
+            SessionStatus.skipped,
+            SessionStatus.archived,
+        }:
+            return True
+
+        archived_at = datetime.now(timezone.utc)
+        updated_session = session.model_copy(
+            update={
+                "status": SessionStatus.archived,
+                "updated_at": archived_at,
+            }
+        )
+        self.sessions.save(updated_session)
+        self._save_session_marker(
+            session=session,
+            status=CheckinStatus.archived,
+            summary=f"已暂存：{session.title}",
+            next_action="以后可以从归档区找回并继续。",
+            created_at=archived_at,
         )
         return True
 
     def save_selected_materials(
         self, session_id: str, materials: list[ConfirmedResearchMaterial]
     ) -> Optional[BaseSession]:
-        session = self.sessions.get_by_id(session_id)
+        session = self.sessions.get_by_id(session_id) or self._recover_missing_research_session(session_id)
         if session is None or not isinstance(session.payload, ResearchFeederPayload):
             return None
 
@@ -114,6 +135,45 @@ class FeedService:
             }
         )
         return self.sessions.save(updated_session)
+
+    def _recover_missing_research_session(self, session_id: str) -> Optional[BaseSession]:
+        prefix = "session_"
+        suffix = "_research_feeder"
+        if not session_id.startswith(prefix) or suffix not in session_id:
+            return None
+
+        date_value = session_id.removeprefix(prefix).split(suffix, maxsplit=1)[0]
+        try:
+            target_date = date.fromisoformat(date_value)
+        except ValueError:
+            return None
+
+        session = self.generate_mock_session(target_date)
+        session = session.model_copy(update={"id": session_id})
+        return self.sessions.save(session)
+
+    def _save_session_marker(
+        self,
+        session: BaseSession,
+        status: CheckinStatus,
+        summary: str,
+        next_action: str,
+        created_at: datetime,
+    ) -> None:
+        self.checkins.save(
+            Checkin(
+                id=f"checkin_{uuid4().hex[:12]}",
+                session_id=session.id,
+                date=session.date,
+                task_type=session.task_type,
+                duration_min=0,
+                status=status,
+                summary=summary,
+                key_insight="",
+                next_action=next_action,
+                created_at=created_at,
+            )
+        )
 
     def get_or_create_mock_session(self, target_date: Optional[date] = None) -> BaseSession:
         day = target_date or date.today()

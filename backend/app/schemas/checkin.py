@@ -11,6 +11,7 @@ class CheckinStatus(str, Enum):
     completed = "completed"
     partial = "partial"
     skipped = "skipped"
+    archived = "archived"
 
 
 class Checkin(BaseModel):
