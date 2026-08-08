@@ -6,7 +6,7 @@ from pathlib import Path
 from app.config import get_settings
 from app.db.migrations import init_db
 from app.schemas.common import SessionStatus, TaskType
-from app.schemas.completion import CompletionConfirmRequest, CompletionSuggestion
+from app.schemas.completion import CompletionConfirmRequest, CompletionDraftRequest, CompletionSuggestion
 from app.services.checkin_service import CheckinService
 from app.services.feed_service import FeedService
 
@@ -52,6 +52,49 @@ def test_confirm_completion_updates_session_and_creates_checkin():
             os.environ.pop("DATABASE_PATH", None)
         else:
             os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
+def test_draft_completion_returns_mock_or_llm_backed_fields():
+    original_path = os.environ.get("DATABASE_PATH")
+    original_provider = os.environ.get("LLM_PROVIDER")
+    original_key = os.environ.get("OPENROUTER_API_KEY")
+    db_path = Path(tempfile.mkdtemp()) / "infra_completion_draft_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    os.environ["LLM_PROVIDER"] = "openrouter"
+    os.environ.pop("OPENROUTER_API_KEY", None)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        session = FeedService().generate_and_save_mock_session(task_type=TaskType.research_feeder)
+        draft = CheckinService().draft_completion(
+            session.id,
+            CompletionDraftRequest(
+                duration_min=30,
+                source_title="测试材料",
+                source_summary="材料摘要。",
+                user_notes="用户笔记。",
+            ),
+        )
+
+        assert draft is not None
+        assert draft.summary
+        assert draft.key_insight
+        assert draft.next_action
+        assert draft.provider == "mock"
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        if original_provider is None:
+            os.environ.pop("LLM_PROVIDER", None)
+        else:
+            os.environ["LLM_PROVIDER"] = original_provider
+        if original_key is None:
+            os.environ.pop("OPENROUTER_API_KEY", None)
+        else:
+            os.environ["OPENROUTER_API_KEY"] = original_key
         get_settings.cache_clear()
 
 def test_delete_session_marks_session_skipped_without_checkin():

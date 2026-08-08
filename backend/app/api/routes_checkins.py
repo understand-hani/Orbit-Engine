@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query, Response
 
 from app.schemas.checkin import Checkin, CheckinCreate
-from app.schemas.completion import CompletionConfirmRequest
+from app.schemas.completion import CompletionConfirmRequest, CompletionDraftRequest, CompletionDraftResponse
 from app.services.checkin_service import CheckinService
 
 
@@ -41,6 +41,17 @@ def delete_checkin(checkin_id: str) -> Response:
 @router.post("/sessions/{session_id}/completion/confirm")
 def confirm_session_completion(session_id: str, request: CompletionConfirmRequest) -> Dict[str, object]:
     result = checkin_service.confirm_completion(session_id, request)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return result
+
+
+@router.post("/sessions/{session_id}/completion/draft", response_model=CompletionDraftResponse)
+def draft_session_completion(
+    session_id: str,
+    request: CompletionDraftRequest,
+) -> CompletionDraftResponse:
+    result = checkin_service.draft_completion(session_id, request)
     if result is None:
         raise HTTPException(status_code=404, detail="Session not found")
     return result

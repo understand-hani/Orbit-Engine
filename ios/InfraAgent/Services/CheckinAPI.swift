@@ -30,4 +30,8 @@ struct CheckinAPI {
     func confirmCompletion(sessionID: String, request: CompletionConfirmRequest) async throws -> CompletionConfirmResponse {
         try await resolvedClient.post("/api/sessions/\(sessionID)/completion/confirm", body: request)
     }
+
+    func draftCompletion(sessionID: String, request: CompletionDraftRequest) async throws -> CompletionDraftResponse {
+        try await resolvedClient.post("/api/sessions/\(sessionID)/completion/draft", body: request)
+    }
 }

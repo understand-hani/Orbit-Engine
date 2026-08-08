@@ -88,6 +88,36 @@ struct CompletionConfirmRequest: Codable {
     }
 }
 
+struct CompletionDraftRequest: Codable {
+    let durationMin: Int
+    let sourceTitle: String?
+    let sourceURL: String?
+    let sourceSummary: String?
+    let userNotes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case durationMin = "duration_min"
+        case sourceTitle = "source_title"
+        case sourceURL = "source_url"
+        case sourceSummary = "source_summary"
+        case userNotes = "user_notes"
+    }
+}
+
+struct CompletionDraftResponse: Codable {
+    let summary: String
+    let keyInsight: String
+    let nextAction: String
+    let provider: String
+
+    enum CodingKeys: String, CodingKey {
+        case summary
+        case keyInsight = "key_insight"
+        case nextAction = "next_action"
+        case provider
+    }
+}
+
 struct CompletionConfirmResponse: Codable {
     let session: BaseSession
     let checkin: Checkin

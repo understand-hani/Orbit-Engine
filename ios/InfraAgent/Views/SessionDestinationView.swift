@@ -472,6 +472,7 @@ struct CompletionArchiveView: View {
     @State private var keyInsight = ""
     @State private var nextAction = ""
     @State private var didPrepareInitialDraft = false
+    @State private var isGeneratingDraft = false
     @State private var isSaving = false
     @State private var errorMessage: String?
 
@@ -495,10 +496,15 @@ struct CompletionArchiveView: View {
 
                     if draftMode == "agent" {
                         Button {
-                            generateAgentDraft()
+                            Task { await generateAgentDraft() }
                         } label: {
-                            Label("生成 Check-in 草稿", systemImage: "sparkles")
+                            if isGeneratingDraft {
+                                Label("正在生成草稿", systemImage: "hourglass")
+                            } else {
+                                Label("生成 Check-in 草稿", systemImage: "sparkles")
+                            }
                         }
+                        .disabled(isGeneratingDraft)
                     }
                 }
 
@@ -567,21 +573,48 @@ struct CompletionArchiveView: View {
         switch initialMode {
         case .agent:
             draftMode = "agent"
-            generateAgentDraft()
+            Task { await generateAgentDraft() }
             return
         case .manual:
             break
         }
     }
 
-    private func generateAgentDraft() {
+    private func generateAgentDraft() async {
+        isGeneratingDraft = true
+        errorMessage = nil
+        defer { isGeneratingDraft = false }
+
+        do {
+            let draft = try await checkinAPI.draftCompletion(
+                sessionID: session.id,
+                request: CompletionDraftRequest(
+                    durationMin: durationMin,
+                    sourceTitle: sourceContext?.sourceTitle,
+                    sourceURL: sourceContext?.sourceURL,
+                    sourceSummary: sourceContext?.sourceSummary,
+                    userNotes: sourceContext?.userNotes
+                )
+            )
+            summary = draft.summary
+            keyInsight = draft.keyInsight
+            nextAction = draft.nextAction
+        } catch {
+            generateLocalFallbackDraft()
+            errorMessage = "Agent 草稿接口失败，已使用本地草稿：\(error.localizedDescription)"
+        }
+    }
+
+    private func generateLocalFallbackDraft() {
         switch session.payload {
         case .researchFeeder(let payload):
-            let primaryTitle = payload.papers.first { $0.id == payload.readingPack.primaryPaperID }?.title
+            let primaryTitle = sourceContext?.sourceTitle
+                ?? payload.papers.first { $0.id == payload.readingPack.primaryPaperID }?.title
                 ?? payload.papers.first?.title
                 ?? "本次 Deep Dive 材料"
             summary = "完成了 Deep Dive：围绕「\(primaryTitle)」梳理了材料目标、推荐理由和阅读重点。"
             keyInsight = nonEmpty(payload.notes.coreIdea)
+                ?? nonEmpty(sourceContext?.sourceSummary)
                 ?? nonEmpty(payload.readingPack.readingGoal)
                 ?? "本次材料的关键价值在于帮助判断它是否值得继续投入时间。"
             nextAction = nonEmpty(payload.notes.nextAction)

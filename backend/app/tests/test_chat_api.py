@@ -34,6 +34,44 @@ def test_create_thread_and_send_mock_message():
         get_settings.cache_clear()
 
 
+def test_chat_openrouter_mode_falls_back_without_api_key():
+    original_path = os.environ.get("DATABASE_PATH")
+    original_provider = os.environ.get("LLM_PROVIDER")
+    original_key = os.environ.get("OPENROUTER_API_KEY")
+    db_path = Path(tempfile.mkdtemp()) / "infra_chat_openrouter_fallback_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    os.environ["LLM_PROVIDER"] = "openrouter"
+    os.environ.pop("OPENROUTER_API_KEY", None)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        session = FeedService().generate_and_save_mock_session()
+        chat_service = ChatService()
+        thread = chat_service.create_thread(
+            AIChatThreadCreate(session_id=session.id, context_refs=[session.id])
+        )
+        assert thread is not None
+
+        response = chat_service.send_message(thread.id, "请解释这篇材料的阅读重点")
+
+        assert response is not None
+        assert "Mock fallback" in response.assistant_message.content
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        if original_provider is None:
+            os.environ.pop("LLM_PROVIDER", None)
+        else:
+            os.environ["LLM_PROVIDER"] = original_provider
+        if original_key is None:
+            os.environ.pop("OPENROUTER_API_KEY", None)
+        else:
+            os.environ["OPENROUTER_API_KEY"] = original_key
+        get_settings.cache_clear()
+
+
 def test_summarize_thread_returns_mock_history_draft():
     original_path = os.environ.get("DATABASE_PATH")
     db_path = Path(tempfile.mkdtemp()) / "infra_chat_summary_test.db"

@@ -11,14 +11,22 @@ from app.schemas.chat import (
     AIChatThreadCreate,
     ChatRole,
 )
-from app.services.llm_service import MockLLMService
+from app.services.llm_service import (
+    DEEP_DIVE_DISCUSSION_SYSTEM_PROMPT,
+    JD_DISCUSSION_SYSTEM_PROMPT,
+    MockLLMService,
+    OpenRouterChatService,
+)
+from app.config import get_settings
 
 
 class ChatService:
     def __init__(self) -> None:
         self.chats = ChatRepository()
         self.sessions = SessionRepository()
-        self.llm = MockLLMService()
+        self.settings = get_settings()
+        self.mock_llm = MockLLMService()
+        self.openrouter = OpenRouterChatService()
 
     def create_thread(self, request: AIChatThreadCreate) -> Optional[AIChatThread]:
         session = self.sessions.get_by_id(request.session_id)
@@ -56,7 +64,7 @@ class ChatService:
         assistant_message = AIChatMessage(
             id=f"msg_{uuid4().hex[:12]}",
             role=ChatRole.assistant,
-            content=self.llm.reply(thread.task_type, content),
+            content=self._reply(thread, content),
             created_at=datetime.now(timezone.utc),
         )
         updated_thread = thread.model_copy(
@@ -86,6 +94,33 @@ class ChatService:
         latest_assistant = assistant_messages[-1] if assistant_messages else "No agent answer yet."
         context_label = ", ".join(thread.context_refs) if thread.context_refs else "current material"
 
+        if self.settings.llm_provider == "openrouter":
+            try:
+                summary_text = self.openrouter.generate_text(
+                    system_prompt=self._system_prompt_for(thread),
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": (
+                                "请把以下 Deep Dive 讨论整理成可归档的 check-in 草稿，"
+                                "包含简短总结、关键收获和下一步。\n"
+                                f"用户消息：{user_messages}\nAgent 回复：{assistant_messages}"
+                            ),
+                        }
+                    ],
+                )
+                return AIChatSummary(
+                    thread_id=thread.id,
+                    session_id=thread.session_id,
+                    suggested_title=f"Discussion note: {thread.task_type.value}",
+                    summary=summary_text,
+                    key_insights=[summary_text],
+                    action_items=["把该讨论结果并入本次 Deep Dive check-in 或后续阅读计划。"],
+                    context_refs=thread.context_refs,
+                )
+            except Exception:
+                pass
+
         return AIChatSummary(
             thread_id=thread.id,
             session_id=thread.session_id,
@@ -104,3 +139,50 @@ class ChatService:
             ],
             context_refs=thread.context_refs,
         )
+
+    def _reply(self, thread: AIChatThread, content: str) -> str:
+        if self.settings.llm_provider != "openrouter":
+            return self.mock_llm.reply(thread.task_type, content)
+
+        try:
+            return self.openrouter.generate_text(
+                system_prompt=self._system_prompt_for(thread),
+                messages=self._messages_for(thread, content),
+            )
+        except Exception as exc:
+            return (
+                f"Mock fallback（OpenRouter 调用失败：{self._format_openrouter_error(exc)}）："
+                f"{self.mock_llm.reply(thread.task_type, content)}"
+            )
+
+    def _system_prompt_for(self, thread: AIChatThread) -> str:
+        if thread.task_type.value == "jd_analysis":
+            return JD_DISCUSSION_SYSTEM_PROMPT
+        return DEEP_DIVE_DISCUSSION_SYSTEM_PROMPT
+
+    def _messages_for(self, thread: AIChatThread, content: str) -> list[dict[str, str]]:
+        messages = [
+            {
+                "role": "assistant" if message.role == ChatRole.assistant else "user",
+                "content": message.content,
+            }
+            for message in thread.messages[-8:]
+            if message.role in {ChatRole.user, ChatRole.assistant}
+        ]
+        if thread.context_refs:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"上下文引用：{', '.join(thread.context_refs)}",
+                }
+            )
+        messages.append({"role": "user", "content": content})
+        return messages
+
+    def _format_openrouter_error(self, exc: Exception) -> str:
+        text = str(exc)
+        if "429" in text or "Too Many Requests" in text:
+            return "429 rate limit or quota issue"
+        if "OPENROUTER_API_KEY" in text:
+            return "missing OPENROUTER_API_KEY"
+        return text[:180]

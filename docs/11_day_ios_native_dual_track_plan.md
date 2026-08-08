@@ -120,6 +120,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] 如果当天 scheduled Deep Dive 已完成归档，空列表状态中仍应提供明确的 `新建一个 Deep Dive` 入口，避免用户不知道如何继续。
 - [x] `新建 Deep Dive` 需要避免因为已完成 session 占用日期或本地去重，导致点击后“看起来没反应”。
 - [x] Deep Dive 工作区新增 `材料生成` 入口。
+- [ ] 修复 Deep Dive 暂存标题一致性：进行中 / 未完成卡片无论序号是 `-1`、`-2` 还是更大，暂存后在归档页 `暂存` 区必须显示同一个 `session.title` 和原序号；不能 fallback 成 `Deep Dive-日期-1`，也不能在移动状态时重新命名。
 - [x] 材料生成入口支持 Agent 检索、URL 登记、个人上传三类来源的前端选择。
 - [x] Agent 检索支持 `Agent 自动生成` 和 `输入检索主题` 两种模式。
 - [x] 材料生成结果可写入现有 `/api/user-context/materials`。
@@ -479,3 +480,7 @@ PPT/PDF 建议页：
 - [x] Deep Dive 材料生成后新增 `30 / 60 / 90 分钟路径`，用于展示不同时间预算下的阅读收束方式。
 - [x] Deep Dive 完成标准下新增 `Agent Guidance` 与 `Check-in / 归档` 两个主路径按钮。
 - [x] `完成/归档` sheet 新增 `自己编辑 / Agent 生成初稿`，Agent 草稿会填充 Summary、Key insight 和 Next action，用户仍可修改后保存。
+
+### 2026-08-08
+
+- [!] Deep Dive 暂存标题一致性仍未验收通过：用户反馈进行中 / 未完成卡片暂存后，在归档页 `暂存` 区仍显示为 `Deep Dive-日期-1`，与原卡片序号不一致。下一轮需先重走真实 iOS 流程或加端到端可观测日志，确认后端 session title、checkin summary、iOS HistoryView 展示源三者完全一致。

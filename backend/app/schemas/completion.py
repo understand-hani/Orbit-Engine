@@ -51,3 +51,18 @@ class CompletionConfirmRequest(BaseModel):
     source_url: str = ""
     source_summary: str = ""
     user_notes: str = ""
+
+
+class CompletionDraftRequest(BaseModel):
+    duration_min: int = 30
+    source_title: str = ""
+    source_url: str = ""
+    source_summary: str = ""
+    user_notes: str = ""
+
+
+class CompletionDraftResponse(BaseModel):
+    summary: str
+    key_insight: str
+    next_action: str
+    provider: str = "mock"

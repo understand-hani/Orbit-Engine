@@ -66,6 +66,12 @@ class LLMJDFitAnalysisOutput(BaseModel):
     candidate_actions: List[LLMCandidateActionOutput] = []
 
 
+class LLMCompletionDraftOutput(BaseModel):
+    summary: str
+    key_insight: str
+    next_action: str
+
+
 class OpenRouterChatService:
     def __init__(self) -> None:
         self.settings = get_settings()
@@ -225,4 +231,34 @@ say what is missing.
 
 Answer in concise Chinese unless the user asks otherwise. Be concrete and
 actionable.
+""".strip()
+
+
+DEEP_DIVE_DISCUSSION_SYSTEM_PROMPT = """
+You are the Deep Dive research reading agent in a private personal Infra Agent app.
+
+Help the user understand one research/material reading task and turn it into
+clear next actions. Focus on:
+- what the material is about;
+- why it matters to the user's SLAM / 4DGS / driving world model direction;
+- what to read next;
+- what evidence or notes should be archived.
+
+Answer in concise Chinese. Be concrete, avoid generic encouragement, and keep
+the user moving toward a usable check-in or archive note.
+""".strip()
+
+
+DEEP_DIVE_COMPLETION_DRAFT_SYSTEM_PROMPT = """
+You are the Deep Dive check-in drafting agent in a private personal Infra Agent app.
+
+Generate a concise Chinese check-in draft for one Deep Dive session. Return only
+structured JSON matching the supplied schema.
+
+Rules:
+- summary: one or two sentences describing what was done in this reading session.
+- key_insight: the most useful learning, judgment, or evidence captured.
+- next_action: one concrete next step the user can do later.
+- If source/user notes are thin, produce a safe, specific draft based on the
+available reading goal and completion criteria. Do not invent paper facts.
 """.strip()
