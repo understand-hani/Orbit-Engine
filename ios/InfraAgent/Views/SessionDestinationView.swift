@@ -19,6 +19,7 @@ struct SessionQueueView: View {
     @State private var isCreating = false
     @State private var processingSessionIDs: Set<String> = []
     @State private var pendingDiscardSession: BaseSession?
+    @State private var isShowingDiscardConfirmation = false
     @State private var errorMessage: String?
 
     private let sessionAPI = SessionAPI()
@@ -71,6 +72,7 @@ struct SessionQueueView: View {
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 pendingDiscardSession = session
+                                isShowingDiscardConfirmation = true
                             } label: {
                                 Label("丢弃", systemImage: "trash")
                             }
@@ -113,14 +115,16 @@ struct SessionQueueView: View {
         }
         .confirmationDialog(
             "丢弃这个工作区？",
-            item: $pendingDiscardSession,
+            isPresented: $isShowingDiscardConfirmation,
             titleVisibility: .visible
-        ) { session in
+        ) {
             Button("丢弃", role: .destructive) {
-                Task { await discardSession(session) }
+                if let pendingDiscardSession {
+                    Task { await discardSession(pendingDiscardSession) }
+                }
             }
             Button("取消", role: .cancel) {}
-        } message: { _ in
+        } message: {
             Text("丢弃后会从未完成队列移除，并在归档中标记为已丢弃。")
         }
     }
