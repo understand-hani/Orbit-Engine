@@ -15,4 +15,7 @@ def health() -> Dict[str, str]:
         "status": "ok",
         "app": settings.app_name,
         "env": settings.app_env,
+        "llm_provider": settings.llm_provider,
+        "openrouter_configured": str(bool(settings.openrouter_api_key)).lower(),
+        "openrouter_model": settings.openrouter_model,
     }
