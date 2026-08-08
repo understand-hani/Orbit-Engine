@@ -4,6 +4,7 @@ import Foundation
 @MainActor
 final class HistoryViewModel: ObservableObject {
     @Published private(set) var checkins: [Checkin] = []
+    @Published private(set) var archivedSessionsByID: [String: BaseSession] = [:]
     @Published private(set) var errorMessage: String?
     @Published private(set) var isLoading = false
 
@@ -19,7 +20,9 @@ final class HistoryViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         do {
-            checkins = try await checkinAPI.list()
+            let loadedCheckins = try await checkinAPI.list()
+            checkins = loadedCheckins
+            archivedSessionsByID = await loadArchivedSessions(for: loadedCheckins)
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -49,6 +52,7 @@ final class HistoryViewModel: ObservableObject {
             try await sessionAPI.delete(id: checkin.sessionID)
             try await checkinAPI.delete(id: checkin.id)
             checkins.removeAll { $0.id == checkin.id }
+            archivedSessionsByID.removeValue(forKey: checkin.sessionID)
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -60,13 +64,32 @@ final class HistoryViewModel: ObservableObject {
             _ = try await sessionAPI.restore(id: checkin.sessionID)
             try await checkinAPI.delete(id: checkin.id)
             checkins.removeAll { $0.id == checkin.id }
+            archivedSessionsByID.removeValue(forKey: checkin.sessionID)
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
+    func archivedSessionTitle(for checkin: Checkin) -> String? {
+        archivedSessionsByID[checkin.sessionID]?.title
+    }
+
     private var timelineCheckins: [Checkin] {
         checkins.filter { $0.status == "completed" }
+    }
+
+    private func loadArchivedSessions(for checkins: [Checkin]) async -> [String: BaseSession] {
+        let archivedCheckins = checkins.filter { $0.status == "archived" }
+        var sessionsByID: [String: BaseSession] = [:]
+        for checkin in archivedCheckins {
+            guard sessionsByID[checkin.sessionID] == nil else {
+                continue
+            }
+            if let session = try? await sessionAPI.session(id: checkin.sessionID) {
+                sessionsByID[checkin.sessionID] = session
+            }
+        }
+        return sessionsByID
     }
 }

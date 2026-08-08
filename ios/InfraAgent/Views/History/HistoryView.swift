@@ -79,15 +79,23 @@ struct HistoryView: View {
     private func archivedTitle(for checkin: Checkin) -> String {
         let displayDate = checkin.date.replacingOccurrences(of: "-", with: "/")
         let prefix = "Deep Dive-\(displayDate)-"
+        if let sessionTitle = viewModel.archivedSessionTitle(for: checkin),
+           sessionTitle.hasPrefix(prefix) {
+            return sessionTitle
+        }
+        let legacySessionPrefix = "Deep Dive-\(checkin.date)-"
+        if let sessionTitle = viewModel.archivedSessionTitle(for: checkin),
+           sessionTitle.hasPrefix(legacySessionPrefix) {
+            return sessionTitle.replacingOccurrences(of: legacySessionPrefix, with: prefix)
+        }
         if checkin.summary.contains(prefix),
            let range = checkin.summary.range(of: prefix) {
             return String(checkin.summary[range.lowerBound...])
         }
-        let legacyPrefix = "Deep Dive-\(checkin.date)-"
-        if checkin.summary.contains(legacyPrefix),
-           let range = checkin.summary.range(of: legacyPrefix) {
+        if checkin.summary.contains(legacySessionPrefix),
+           let range = checkin.summary.range(of: legacySessionPrefix) {
             return String(checkin.summary[range.lowerBound...])
-                .replacingOccurrences(of: legacyPrefix, with: prefix)
+                .replacingOccurrences(of: legacySessionPrefix, with: prefix)
         }
         return "\(prefix)1"
     }
