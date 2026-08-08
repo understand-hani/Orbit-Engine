@@ -4,6 +4,7 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.db.migrations import init_db
+from app.schemas.common import SessionStatus
 from app.schemas.completion import CompletionConfirmRequest, CompletionSuggestion
 from app.services.checkin_service import CheckinService
 from app.services.feed_service import FeedService
@@ -141,6 +142,40 @@ def test_research_session_default_title_and_rename_rejects_duplicate():
         get_settings.cache_clear()
 
 
+def test_research_session_title_sequence_counts_archived_duplicates():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_session_duplicate_sequence_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        feed_service = FeedService()
+
+        first = feed_service.generate_and_save_mock_session()
+        second = feed_service.generate_and_save_mock_session(first.date)
+        title_date = first.date.strftime("%Y/%m/%d")
+        duplicate_archived = feed_service.generate_mock_session(first.date).model_copy(
+            update={
+                "id": "duplicate_archived",
+                "title": f"Deep Dive-{title_date}-1",
+                "status": SessionStatus.archived,
+            }
+        )
+        feed_service.sessions.save(duplicate_archived)
+
+        next_after_duplicate = feed_service.generate_and_save_mock_session(first.date)
+
+        assert first.title == f"Deep Dive-{title_date}-1"
+        assert second.title == f"Deep Dive-{title_date}-2"
+        assert next_after_duplicate.title == f"Deep Dive-{title_date}-3"
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
 def test_archive_session_marks_session_archived_and_creates_checkin():
     original_path = os.environ.get("DATABASE_PATH")
     db_path = Path(tempfile.mkdtemp()) / "infra_session_archive_test.db"
@@ -167,6 +202,51 @@ def test_archive_session_marks_session_archived_and_creates_checkin():
         assert restored_session is not None
         assert restored_session.status.value == "active"
         assert restored_session.title == f"Deep Dive-{title_date}-1"
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
+def test_today_generates_next_title_after_terminal_archive_or_completion():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_session_today_sequence_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        feed_service = FeedService()
+        checkin_service = CheckinService()
+
+        archived = feed_service.generate_and_save_mock_session()
+        title_date = archived.date.strftime("%Y/%m/%d")
+        assert archived.title == f"Deep Dive-{title_date}-1"
+        assert feed_service.archive_session(archived.id) is True
+
+        after_archive = feed_service.get_or_create_mock_session(archived.date)
+        assert after_archive.title == f"Deep Dive-{title_date}-2"
+
+        result = checkin_service.confirm_completion(
+            after_archive.id,
+            CompletionConfirmRequest(
+                duration_min=30,
+                status=CompletionSuggestion.completed,
+                summary="完成阅读。",
+                key_insight="记录重点。",
+                next_action="进入下一张。",
+            ),
+        )
+        assert result is not None
+
+        after_completion = feed_service.get_or_create_mock_session(archived.date)
+        assert after_completion.title == f"Deep Dive-{title_date}-3"
+
+        assert feed_service.delete_session(after_completion.id) is True
+        after_delete = feed_service.get_or_create_mock_session(archived.date)
+        assert after_delete.id == after_completion.id
+        assert after_delete.status == SessionStatus.skipped
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)

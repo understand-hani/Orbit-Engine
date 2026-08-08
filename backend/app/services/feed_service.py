@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime, timezone
 from typing import Optional
 from uuid import uuid4
@@ -203,7 +204,7 @@ class FeedService:
             for item in existing
             if item.status != SessionStatus.skipped and (not exclude_self or item.id != session.id)
         }
-        sequence = 1
+        sequence = self._next_title_sequence(session, existing, exclude_self)
         title = f"{self._title_prefix(session)}{sequence}"
         while title in used_titles:
             sequence += 1
@@ -214,6 +215,33 @@ class FeedService:
         if session.task_type == TaskType.research_feeder:
             return f"Deep Dive-{session.date.strftime('%Y/%m/%d')}-"
         return f"{session.title}-{session.date.isoformat()}-"
+
+    def _next_title_sequence(
+        self,
+        session: BaseSession,
+        existing: list[BaseSession],
+        exclude_self: bool,
+    ) -> int:
+        if session.task_type != TaskType.research_feeder:
+            return 1
+
+        date_slash = session.date.strftime("%Y/%m/%d")
+        date_dash = session.date.isoformat()
+        pattern = re.compile(rf"^Deep Dive-(?:{re.escape(date_slash)}|{re.escape(date_dash)})-(\d+)$")
+        used_sequences = set()
+        for item in existing:
+            if item.status == SessionStatus.skipped:
+                continue
+            if exclude_self and item.id == session.id:
+                continue
+            match = pattern.match(item.title)
+            if match:
+                used_sequences.add(int(match.group(1)))
+
+        sequence = 1
+        while sequence in used_sequences:
+            sequence += 1
+        return sequence
 
     def _save_session_marker(
         self,
@@ -247,7 +275,7 @@ class FeedService:
                 return self.sessions.save(titled_existing)
             return titled_existing
         latest = self.sessions.get_latest_by_date(day.isoformat())
-        if latest is not None:
+        if latest is not None and latest.status == SessionStatus.skipped:
             return latest
         return self.generate_and_save_mock_session(day)
 
