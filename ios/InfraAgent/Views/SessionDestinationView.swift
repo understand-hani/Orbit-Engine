@@ -120,9 +120,8 @@ struct SessionQueueView: View {
         }
         .navigationTitle(sessionDisplayTitle(seedSession))
         .onAppear {
-            if sessions.isEmpty && isActive(seedSession) {
-                sessions = [seedSession]
-            }
+            reconcileSeedSession()
+            Task { await refreshSeedSessionStatus() }
         }
         .confirmationDialog(
             "丢弃这个工作区？",
@@ -165,10 +164,35 @@ struct SessionQueueView: View {
     }
 
     private func updateSession(_ session: BaseSession) {
+        if !isActive(session) {
+            sessions.removeAll { $0.id == session.id }
+            return
+        }
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
             sessions[index] = session
         } else {
             sessions.insert(session, at: 0)
+        }
+    }
+
+    private func reconcileSeedSession() {
+        sessions.removeAll { !isActive($0) }
+        if sessions.isEmpty && isActive(seedSession) {
+            sessions = [seedSession]
+        }
+    }
+
+    private func refreshSeedSessionStatus() async {
+        guard isActive(seedSession) else {
+            sessions.removeAll { $0.id == seedSession.id }
+            return
+        }
+
+        do {
+            let latestSession = try await sessionAPI.session(id: seedSession.id)
+            updateSession(latestSession)
+        } catch {
+            sessions.removeAll { $0.id == seedSession.id }
         }
     }
 
