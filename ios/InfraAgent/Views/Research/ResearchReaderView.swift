@@ -4,10 +4,14 @@ struct ResearchReaderView: View {
     let session: BaseSession
     let payload: ResearchFeederPayload
     var onArchiveRequested: ((CompletionStartMode, CheckinSourceContext?) -> Void)?
+    var onSourceContextChanged: ((CheckinSourceContext?) -> Void)?
 
     @State private var isShowingMaterialSheet = false
     @State private var confirmedMaterials: [ConfirmedResearchMaterial] = []
     @State private var userNotesByPaperID: [String: UserPaperNote] = [:]
+    @State private var didLoadPersistedMaterials = false
+
+    private let sessionAPI = SessionAPI()
 
     var body: some View {
         List {
@@ -87,20 +91,46 @@ struct ResearchReaderView: View {
                         Label("Check-in / 归档", systemImage: "checkmark.circle.fill")
                     }
                 } footer: {
-                    Text("归档会写入 History，并保存材料标题、链接、主旨和你写下的笔记，方便之后回看。")
+                    Text("归档会保存材料标题、链接、主旨和你写下的笔记，方便之后回看。")
                 }
             }
         }
         .navigationTitle("研究")
+        .task {
+            await loadPersistedMaterialsIfNeeded()
+        }
         .sheet(isPresented: $isShowingMaterialSheet) {
-            DeepDiveMaterialSheet(payload: payload) { materials in
+            DeepDiveMaterialSheet(sessionID: session.id, payload: payload) { materials in
                 confirmedMaterials = materials
+                onSourceContextChanged?(checkinContext(for: materials))
             }
         }
     }
 
     private var primaryPaper: Paper? {
         payload.papers.first { $0.id == payload.readingPack.primaryPaperID } ?? payload.papers.first
+    }
+
+    private func loadPersistedMaterialsIfNeeded() async {
+        guard !didLoadPersistedMaterials, confirmedMaterials.isEmpty else {
+            return
+        }
+        didLoadPersistedMaterials = true
+
+        if let persistedMaterials = payload.selectedMaterials, !persistedMaterials.isEmpty {
+            confirmedMaterials = persistedMaterials
+            onSourceContextChanged?(checkinContext(for: persistedMaterials))
+            return
+        }
+
+        guard let latestSession = try? await sessionAPI.session(id: session.id),
+              case .researchFeeder(let latestPayload) = latestSession.payload,
+              let latestMaterials = latestPayload.selectedMaterials,
+              !latestMaterials.isEmpty else {
+            return
+        }
+        confirmedMaterials = latestMaterials
+        onSourceContextChanged?(checkinContext(for: latestMaterials))
     }
 
     private var candidatePaper: Paper? {
@@ -221,7 +251,11 @@ struct ResearchReaderView: View {
     }
 
     private var primaryCheckinContext: CheckinSourceContext? {
-        guard let material = confirmedMaterials.first else {
+        checkinContext(for: confirmedMaterials)
+    }
+
+    private func checkinContext(for materials: [ConfirmedResearchMaterial]) -> CheckinSourceContext? {
+        guard let material = materials.first else {
             return nil
         }
         let note = material.paperID.flatMap { userNotesByPaperID[$0] }
@@ -256,13 +290,22 @@ struct ResearchReaderView: View {
     }
 }
 
-struct ConfirmedResearchMaterial: Identifiable {
+struct ConfirmedResearchMaterial: Codable, Identifiable {
     let id: String
     let paperID: String?
     let title: String
     let summary: String
     let url: String?
     let sourceType: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case paperID = "paper_id"
+        case title
+        case summary
+        case url
+        case sourceType = "source_type"
+    }
 }
 
 private struct MaterialCandidate: Identifiable {
@@ -286,6 +329,7 @@ private struct MaterialCandidate: Identifiable {
 }
 
 private struct DeepDiveMaterialSheet: View {
+    let sessionID: String
     let payload: ResearchFeederPayload
     let onGenerated: ([ConfirmedResearchMaterial]) -> Void
 
@@ -454,7 +498,9 @@ private struct DeepDiveMaterialSheet: View {
                     relatedPlan: "Deep Dive"
                 )
             )
-            onGenerated([selected.confirmed])
+            let confirmed = [selected.confirmed]
+            _ = try await api.saveSelectedMaterials(sessionID: sessionID, materials: confirmed)
+            onGenerated(confirmed)
             dismiss()
         } catch {
             message = error.localizedDescription
@@ -523,6 +569,16 @@ private struct DeepDiveMaterialAPI {
 
     func add(_ request: DeepDiveMaterialCreate) async throws -> DeepDiveMaterialResponse {
         try await resolvedClient.post("/api/user-context/materials", body: request)
+    }
+
+    func saveSelectedMaterials(
+        sessionID: String,
+        materials: [ConfirmedResearchMaterial]
+    ) async throws -> BaseSession {
+        try await resolvedClient.post(
+            "/api/sessions/\(sessionID)/research/selected-materials",
+            body: materials
+        )
     }
 }
 

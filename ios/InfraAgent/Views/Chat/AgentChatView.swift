@@ -21,11 +21,11 @@ struct AgentChatView: View {
                 }
 
                 if let thread, !thread.messages.isEmpty {
-                    Section("历史") {
+                    Section("归档") {
                         Button {
                             isSavingDiscussion = true
                         } label: {
-                            Label("保存讨论到历史", systemImage: "tray.and.arrow.down")
+                            Label("保存讨论到归档", systemImage: "tray.and.arrow.down")
                         }
                     }
                 }

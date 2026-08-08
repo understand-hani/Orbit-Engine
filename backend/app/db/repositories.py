@@ -81,6 +81,23 @@ class SessionRepository:
         sessions = self.get_by_date(date_value)
         return sessions[0] if sessions else None
 
+    def get_latest_active_by_date(self, date_value: str) -> Optional[BaseSession]:
+        with connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT payload_json FROM sessions
+                WHERE date = ?
+                ORDER BY updated_at DESC
+                """,
+                (date_value,),
+            ).fetchall()
+
+        for row in rows:
+            session = BaseSession(**json.loads(row["payload_json"]))
+            if session.status.value not in {"completed", "archived", "skipped"}:
+                return session
+        return None
+
     def delete(self, session_id: str) -> bool:
         with connect() as conn:
             cursor = conn.execute(

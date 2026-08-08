@@ -52,7 +52,7 @@ struct DiscussionRecordFormView: View {
                     Button {
                         Task { await save() }
                     } label: {
-                        Label(isSaving ? "正在保存" : "保存到历史", systemImage: "tray.and.arrow.down")
+                        Label(isSaving ? "正在保存" : "保存到归档", systemImage: "tray.and.arrow.down")
                     }
                     .disabled(isSaving || isLoading || summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
@@ -108,7 +108,7 @@ struct DiscussionRecordFormView: View {
                     userNotes: nil
                 )
             )
-            message = "已保存到历史"
+            message = "已保存到归档"
             dismiss()
         } catch {
             message = error.localizedDescription

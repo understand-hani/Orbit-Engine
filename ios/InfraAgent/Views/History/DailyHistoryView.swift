@@ -12,11 +12,11 @@ struct DailyHistoryView: View {
         List {
             Section("日期总结") {
                 LabeledContent("日期", value: date)
-                LabeledContent("记录数", value: "\(checkins.count)")
+                LabeledContent("归档数", value: "\(checkins.count)")
                 LabeledContent("时长", value: "\(totalDuration) 分钟")
             }
 
-            Section("任务记录") {
+            Section("归档记录") {
                 ForEach(checkins) { checkin in
                     NavigationLink {
                         CheckinDetailView(checkin: checkin)
@@ -30,7 +30,7 @@ struct DailyHistoryView: View {
                                     .foregroundStyle(.secondary)
                                     .lineLimit(2)
                             }
-                            Text("\(checkin.taskType.rawValue) · \(checkin.status) · \(checkin.durationMin) 分钟")
+                            Text("\(checkin.taskType.rawValue) · \(statusLabel(checkin.status)) · \(checkin.durationMin) 分钟")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -46,5 +46,20 @@ struct DailyHistoryView: View {
             return nil
         }
         return trimmed
+    }
+
+    private func statusLabel(_ status: String) -> String {
+        switch status {
+        case "completed":
+            return "已完成"
+        case "skipped":
+            return "已跳过"
+        case "archived":
+            return "已归档"
+        case "partial":
+            return "未完成归档"
+        default:
+            return status
+        }
     }
 }

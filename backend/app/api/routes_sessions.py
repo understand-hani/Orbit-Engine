@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 
 from app.schemas.session import BaseSession
 from app.schemas.jd_analysis import JDInputCreate
+from app.schemas.research_feeder import ConfirmedResearchMaterial
 from app.services.feed_service import FeedService
 
 
@@ -55,6 +56,16 @@ def delete_session_via_post(session_id: str) -> Response:
     if not deleted:
         raise HTTPException(status_code=404, detail="Session not found")
     return Response(status_code=204)
+
+
+@router.post("/sessions/{session_id}/research/selected-materials", response_model=BaseSession)
+def save_selected_research_materials(
+    session_id: str, materials: List[ConfirmedResearchMaterial]
+) -> BaseSession:
+    session = feed_service.save_selected_materials(session_id, materials)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Research session not found")
+    return session
 
 
 @router.get("/sessions/{session_id}", response_model=BaseSession)

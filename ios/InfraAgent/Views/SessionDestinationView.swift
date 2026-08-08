@@ -47,7 +47,7 @@ struct SessionQueueView: View {
                     EmptyStateView(
                         title: "暂无未完成工作区",
                         systemImage: "tray",
-                        message: "已完成的记录会进入历史栏目。"
+                        message: "已完成、已跳过或已归档的记录会进入归档区。"
                     )
                 } else {
                     ForEach(Array(activeSessions.enumerated()), id: \.element.id) { index, session in
@@ -71,7 +71,7 @@ struct SessionQueueView: View {
                             Button(role: .destructive) {
                                 Task { await deleteSession(session) }
                             } label: {
-                                Label("删除", systemImage: "trash")
+                                Label("跳过", systemImage: "archivebox")
                             }
                             .disabled(deletingSessionIDs.contains(session.id))
                         }
@@ -184,6 +184,8 @@ struct SessionDestinationView: View {
                     completionStartMode = mode
                     checkinSourceContext = context
                     isShowingCompletion = true
+                } onSourceContextChanged: { context in
+                    checkinSourceContext = context
                 }
             }
         }
@@ -191,7 +193,7 @@ struct SessionDestinationView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     completionStartMode = .manual
-                    checkinSourceContext = defaultCheckinContext(for: session)
+                    checkinSourceContext = checkinSourceContext ?? defaultCheckinContext(for: session)
                     isShowingCompletion = true
                 } label: {
                     Label("完成/归档", systemImage: "checkmark.circle")
@@ -303,7 +305,7 @@ struct CompletionArchiveView: View {
 
                 Section("去向") {
                     LabeledContent("状态", value: "completed")
-                    Text("保存后会写入 History；返回队列页后，该 session 不再出现在未完成列表中。")
+                    Text("保存后会写入归档区；返回队列页后，该 session 不再出现在未完成列表中。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -441,6 +443,6 @@ private func manualDates(for session: BaseSession) -> [String] {
         if session.date == "2026-08-09" || session.date == "2026-08-16" {
             return ["2026-08-09", "2026-08-16"]
         }
-        return ["2026-08-06", "2026-08-07", "2026-08-13", "2026-08-14"]
+        return ["2026-08-06", "2026-08-07", "2026-08-08", "2026-08-10", "2026-08-13", "2026-08-14", "2026-08-15"]
     }
 }

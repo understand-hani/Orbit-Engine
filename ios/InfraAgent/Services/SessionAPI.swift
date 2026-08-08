@@ -35,6 +35,16 @@ struct SessionAPI {
         try await resolvedClient.postNoContent("/api/sessions/\(id)/delete")
     }
 
+    func saveSelectedResearchMaterials(
+        sessionID: String,
+        materials: [ConfirmedResearchMaterial]
+    ) async throws -> BaseSession {
+        try await resolvedClient.post(
+            "/api/sessions/\(sessionID)/research/selected-materials",
+            body: materials
+        )
+    }
+
     func analyzeJD(sessionID: String, request: JDInputCreate) async throws -> BaseSession {
         try await resolvedClient.post("/api/sessions/\(sessionID)/jd-analysis", body: request)
     }

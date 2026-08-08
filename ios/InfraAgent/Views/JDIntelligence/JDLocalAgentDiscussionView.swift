@@ -19,11 +19,11 @@ struct JDLocalAgentDiscussionView: View {
         VStack(spacing: 0) {
             List {
                 if messages.count > 1 {
-                    Section("历史") {
+                    Section("归档") {
                         Button {
                             Task { await saveDiscussion() }
                         } label: {
-                            Label(isSaving ? "正在保存" : "保存讨论到历史", systemImage: "tray.and.arrow.down")
+                            Label(isSaving ? "正在保存" : "保存讨论到归档", systemImage: "tray.and.arrow.down")
                         }
                         .disabled(isSaving)
 
@@ -119,7 +119,7 @@ struct JDLocalAgentDiscussionView: View {
                     userNotes: nil
                 )
             )
-            saveMessage = "已保存到历史"
+            saveMessage = "已保存到归档"
         } catch {
             saveMessage = error.localizedDescription
         }

@@ -6,6 +6,7 @@ from pathlib import Path
 from app.config import get_settings
 from app.db.migrations import init_db
 from app.schemas.profile import ResearchArchiveCreate, ResumeProfileCreate
+from app.schemas.research_feeder import ConfirmedResearchMaterial
 from app.services.archive_service import ArchiveService
 from app.services.feed_service import FeedService
 from app.services.material_service import MaterialService
@@ -32,6 +33,21 @@ def test_material_resume_archive_services():
         papers = materials.list_papers(research.id)
         assert papers is not None
         assert len(papers) == 2
+        updated_research = feed.save_selected_materials(
+            research.id,
+            [
+                ConfirmedResearchMaterial(
+                    id=papers[0].id,
+                    paper_id=papers[0].id,
+                    title=papers[0].title,
+                    summary=papers[0].summary,
+                    url=papers[0].url,
+                    source_type="public_source",
+                )
+            ],
+        )
+        assert updated_research is not None
+        assert updated_research.payload.selected_materials[0].paper_id == papers[0].id
 
         profile = resume.create(
             ResumeProfileCreate(

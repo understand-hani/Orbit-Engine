@@ -10,7 +10,7 @@ struct RootTabView: View {
 
             HistoryView()
                 .tabItem {
-                    Label("历史", systemImage: "clock")
+                    Label("归档", systemImage: "archivebox")
                 }
 
             PlanView()

@@ -41,7 +41,7 @@ struct PartRecordFormView: View {
             Button {
                 Task { await save() }
             } label: {
-                Label(isSaving ? "正在保存" : "保存到历史", systemImage: "tray.and.arrow.down")
+                Label(isSaving ? "正在保存" : "保存到归档", systemImage: "tray.and.arrow.down")
             }
             .disabled(isSaving || summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
@@ -68,7 +68,7 @@ struct PartRecordFormView: View {
                     userNotes: nil
                 )
             )
-            message = "已保存到历史"
+            message = "已保存到归档"
         } catch {
             message = error.localizedDescription
         }

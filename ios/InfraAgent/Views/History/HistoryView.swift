@@ -22,14 +22,14 @@ struct HistoryView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(date)
                                 .font(.headline)
-                            Text("\(dayCheckins.count) 条记录 · \(dayCheckins.reduce(0) { $0 + $1.durationMin }) 分钟")
+                            Text("\(dayCheckins.count) 条归档 · \(dayCheckins.reduce(0) { $0 + $1.durationMin }) 分钟")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
             }
-            .navigationTitle("历史")
+            .navigationTitle("归档")
             .task {
                 await viewModel.load()
             }

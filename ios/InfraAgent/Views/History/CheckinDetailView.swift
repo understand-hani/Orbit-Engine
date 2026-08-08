@@ -12,7 +12,7 @@ struct CheckinDetailView: View {
         List {
             Section("总结") {
                 Text(checkin.summary)
-                LabeledContent("状态", value: checkin.status)
+                LabeledContent("状态", value: statusLabel(checkin.status))
                 LabeledContent("时长", value: "\(checkin.durationMin) 分钟")
             }
 
@@ -51,7 +51,7 @@ struct CheckinDetailView: View {
                 }
             }
         }
-        .navigationTitle("打卡记录")
+        .navigationTitle("归档记录")
         .task {
             await loadSourceContextIfNeeded()
         }
@@ -96,5 +96,20 @@ struct CheckinDetailView: View {
             return nil
         }
         return trimmed
+    }
+
+    private func statusLabel(_ status: String) -> String {
+        switch status {
+        case "completed":
+            return "已完成"
+        case "skipped":
+            return "已跳过"
+        case "archived":
+            return "已归档"
+        case "partial":
+            return "未完成归档"
+        default:
+            return status
+        }
     }
 }

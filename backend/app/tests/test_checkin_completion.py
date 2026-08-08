@@ -52,7 +52,7 @@ def test_confirm_completion_updates_session_and_creates_checkin():
             os.environ["DATABASE_PATH"] = original_path
         get_settings.cache_clear()
 
-def test_delete_session_removes_saved_session():
+def test_delete_session_marks_session_skipped_and_creates_checkin():
     original_path = os.environ.get("DATABASE_PATH")
     db_path = Path(tempfile.mkdtemp()) / "infra_session_delete_test.db"
     os.environ["DATABASE_PATH"] = str(db_path)
@@ -60,13 +60,18 @@ def test_delete_session_removes_saved_session():
     try:
         init_db()
         feed_service = FeedService()
+        checkin_service = CheckinService()
 
         session = feed_service.generate_and_save_mock_session()
 
         assert feed_service.get_session(session.id) is not None
         assert feed_service.delete_session(session.id) is True
-        assert feed_service.get_session(session.id) is None
-        assert feed_service.delete_session(session.id) is False
+        updated_session = feed_service.get_session(session.id)
+        assert updated_session is not None
+        assert updated_session.status.value == "skipped"
+        checkins = checkin_service.list_checkins(session.date.isoformat())
+        assert len(checkins) == 1
+        assert checkins[0].status.value == "skipped"
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)

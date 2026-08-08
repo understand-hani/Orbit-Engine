@@ -54,7 +54,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] 冻结 Web 扩展，明确 Web 仅保留为 API smoke / 兜底演示。
 - [x] 确认 GOAI/iOS 复用 infra 原生 SwiftUI 结构。
 - [x] 梳理 iOS 页面迁移范围：Today、History、Research、Chat、Settings、Resume/JD 可复用部分。
-- [x] 确认 iOS 底部栏目标：`今日 / 历史 / 计划 / 我的`。
+- [x] 确认 iOS 底部栏目标：`今日 / 归档 / 计划 / 我的`。
 - [x] 列出 Day 2 需要接入的后端 endpoint。
 
 文档 / PPT / PDF 线：
@@ -75,7 +75,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 开发线：
 
 - [x] iOS APIClient 指向 GOAI FastAPI backend。
-- [x] 默认后端 URL 改为 `https://graphical-teeth-athletes-holds.trycloudflare.com`。
+- [x] 默认后端 URL 改为 `https://relationships-meeting-accuracy-bee.trycloudflare.com`。
 - [x] 保留后端 URL 可配置能力，不把 tunnel 完全写死；优先继续使用 `UserDefaults` / 设置页覆盖。
 - [x] iOS 验证 `/api/health`。
 - [x] iOS 验证 `/api/sessions/today`。
@@ -84,7 +84,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] Scheduled 默认展示今天推荐的 session。
 - [x] Manual 展示四个条目入口：Radar、Deep Dive、Weekly Studio、Opportunity Alignment。
 - [x] 四个条目入口点击后能生成 / 切换对应 workspace 入口卡片，先保持轻量。
-- [x] iOS 底部栏改为 `今日 / 历史 / 计划 / 我的`。
+- [x] iOS 底部栏改为 `今日 / 归档 / 计划 / 我的`。
 - [x] 取消底部独立 `JD` 栏；JD 只作为 Opportunity Alignment 的一种旧实现映射。
 - [x] 原 `设置` 并入 `我的`。
 - [x] Today 能显示 Deep Dive session 标题、状态、推荐理由和日期。
@@ -102,7 +102,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] iOS Today 能读后端。
 - [x] iOS 首页具备 Scheduled / Manual 两种入口。
 - [x] iOS Manual 能看到四类 session 入口。
-- [x] iOS 底部栏变为 `今日 / 历史 / 计划 / 我的`。
+- [x] iOS 底部栏变为 `今日 / 归档 / 计划 / 我的`。
 - [x] 后端默认 URL 已更新，同时仍可被用户配置覆盖。
 - [ ] PPT 前 3 页有文字初稿。
 
@@ -114,25 +114,25 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] 队列页显示进行中 / 未完成 Deep Dive。
 - [x] 队列中的同类 session 显示编号和日期，避免多个未完成项无法区分。
 - [x] 队列页显示 `新建 Deep Dive`。
-- [ ] Deep Dive 队列中的进行中 / 未完成卡片支持 iOS 原生左滑删除，而不是右侧常驻删除按钮。
-- [ ] 删除 Deep Dive session 优先改为 `skipped` / `archived` 语义，而不是直接硬删除；当前如果先继续硬删除，需要补后端状态化移除接口。
-- [ ] 如果当天 scheduled Deep Dive 已完成归档，从 Today / Schedule 进入后，进行中 / 未完成列表不应自动回填该 completed session。
-- [ ] 如果当天 scheduled Deep Dive 已完成归档，空列表状态中仍应提供明确的 `新建一个 Deep Dive` 入口，避免用户不知道如何继续。
-- [ ] `新建 Deep Dive` 需要避免因为已完成 session 占用日期或本地去重，导致点击后“看起来没反应”。
+- [x] Deep Dive 队列中的进行中 / 未完成卡片支持 iOS 原生左滑删除，而不是右侧常驻删除按钮。
+- [x] 删除 Deep Dive session 优先改为 `skipped` / `archived` 语义，而不是直接硬删除；当前如果先继续硬删除，需要补后端状态化移除接口。
+- [x] 如果当天 scheduled Deep Dive 已完成归档，从 Today / Schedule 进入后，进行中 / 未完成列表不应自动回填该 completed session。
+- [x] 如果当天 scheduled Deep Dive 已完成归档，空列表状态中仍应提供明确的 `新建一个 Deep Dive` 入口，避免用户不知道如何继续。
+- [x] `新建 Deep Dive` 需要避免因为已完成 session 占用日期或本地去重，导致点击后“看起来没反应”。
 - [x] Deep Dive 工作区新增 `材料生成` 入口。
 - [x] 材料生成入口支持 Agent 检索、URL 登记、个人上传三类来源的前端选择。
 - [x] Agent 检索支持 `Agent 自动生成` 和 `输入检索主题` 两种模式。
 - [x] 材料生成结果可写入现有 `/api/user-context/materials`。
-- [ ] `材料生成` 先返回候选材料卡片，再由用户点选确认后进入研究页；不要一生成就直接落进研究详情。
-- [ ] Agent 检索默认提供 2-3 个候选材料；URL / 特定 PDF 来源默认只生成 1 个候选材料卡片。
-- [ ] 材料确认后，Deep Dive 研究页应只显示“已确认材料”，材料生成入口卡片直接消失，避免入口和结果同时存在。
-- [ ] 已确认材料状态需要持久化到后端 session / selection state，避免退出后重新进入又回到未确认状态。
+- [x] `材料生成` 先返回候选材料卡片，再由用户点选确认后进入研究页；不要一生成就直接落进研究详情。
+- [x] Agent 检索默认提供 2-3 个候选材料；URL / 特定 PDF 来源默认只生成 1 个候选材料卡片。
+- [x] 材料确认后，Deep Dive 研究页应只显示“已确认材料”，材料生成入口卡片直接消失，避免入口和结果同时存在。
+- [x] 已确认材料状态需要持久化到后端 session / selection state，避免退出后重新进入又回到未确认状态。
 - [!] PDF 二进制上传、真实网页抓取和真实公开源检索仍是 roadmap；当前版本先完成入口语义和材料卡片显示状态。
 
 文档 / PPT / PDF 线：
 
 - [ ] 写 `core workflow` 页面草稿。
-- [ ] 明确 workflow：Today -> Deep Dive -> Material -> Agent Guidance -> Check-in -> History。
+- [ ] 明确 workflow：Today -> Deep Dive -> Material -> Agent Guidance -> Check-in -> Archive。
 - [ ] 整理 demo 录屏脚本 v1。
 - [ ] 写清楚“材料源不等于论文源”。
 
@@ -151,14 +151,14 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] 显示阅读目标。
 - [x] 显示选择理由。
 - [x] 显示预计用时。
-- [ ] 删除 `30 / 60 / 90 分钟路径` 区块；当前对收束帮助不大，反而增加噪音。
-- [ ] 完成标准继续保留，但要做成非可点击、低误导的状态展示；不要用看起来像可点选的圆形控件。
+- [x] 删除 `30 / 60 / 90 分钟路径` 区块；当前对收束帮助不大，反而增加噪音。
+- [x] 完成标准继续保留，但要做成非可点击、低误导的状态展示；不要用看起来像可点选的圆形控件。
 - [ ] 完成标准需要逐步和用户动作联动，例如写笔记后满足 insight 类标准，Check-in 后满足 next action 类标准。
-- [ ] 上述信息块不做伪点击入口，避免层级混乱。
-- [ ] `Agent Guidance` 不应再作为和 Check-in 平级的独立入口；应收敛为 Check-in 内部的 `自己编辑 / Agent 生成初稿` 两种模式。
-- [ ] `我的笔记` 不能只是临时本地输入；至少要在归档时并入 History，可回看“标题 / 链接 / 主旨 / 用户笔记 / Check-in 总结”。
-- [ ] History 详情页需要稳定显示原文标题、链接、简介和用户笔记；对旧记录若缺 source metadata，需要通过 session 关联补展示。
-- [ ] 顶部右上角 `完成/归档` 入口也要带上当前材料上下文，不能只在研究页主按钮路径下才写入原文信息。
+- [x] 上述信息块不做伪点击入口，避免层级混乱。
+- [x] `Agent Guidance` 不应再作为和 Check-in 平级的独立入口；应收敛为 Check-in 内部的 `自己编辑 / Agent 生成初稿` 两种模式。
+- [x] `我的笔记` 不能只是临时本地输入；至少要在归档时并入 Archive，可回看“标题 / 链接 / 主旨 / 用户笔记 / Check-in 总结”。
+- [x] Archive 详情页需要稳定显示原文标题、链接、简介和用户笔记；对旧记录若缺 source metadata，需要通过 session 关联补展示。
+- [x] 顶部右上角 `完成/归档` 入口也要带上当前材料上下文，不能只在研究页主按钮路径下才写入原文信息。
 - [ ] Agent 生成的 Check-in 草稿后续应升级为基于材料 + 用户笔记 + Agent 讨论摘要生成，而不是规则模板填充。
 
 文档 / PPT / PDF 线：
@@ -183,18 +183,18 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] 用户可修改 Agent 生成的 Summary。
 - [x] 用户可修改 Agent 生成的 Key insight。
 - [x] 用户可修改 Agent 生成的 Next action。
-- [x] 保存后写入 History。
+- [x] 保存后写入归档。
 
 文档 / PPT / PDF 线：
 
 - [ ] 写 `closed-loop evidence` 页面草稿。
 - [ ] 解释 session status 如何变化。
-- [ ] 解释 History 如何沉淀 check-in。
+- [ ] 解释归档区如何沉淀 check-in。
 - [ ] 解释下一轮 Agent 如何复用历史和计划上下文。
 
 完成标准：
 
-- [x] 主闭环跑通：Deep Dive -> Agent draft -> Check-in -> History。
+- [x] 主闭环跑通：Deep Dive -> Agent draft -> Check-in -> Archive。
 - [ ] closed-loop evidence 页面有初稿。
 
 ### Day 6（2026-08-11）：iOS 计划 / 我的
@@ -351,8 +351,8 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] iOS 原生 Deep Dive 材料生成入口：Agent 检索 / URL / 个人上传。
 - [x] iOS 原生 Deep Dive 详情页：材料生成后显示主文献、候选文献、推荐理由和阅读入口。
 - [x] iOS 原生 Agent Guidance：生成 Check-in 草稿。
-- [x] iOS 原生 Check-in：用户可修改并写入 History。
-- [x] iOS 原生 History 显示完成记录。
+- [x] iOS 原生 Check-in：用户可修改并写入归档。
+- [x] iOS 原生归档区显示完成 / 跳过 / 未完成归档记录。
 - [x] iOS 原生计划/我的展示用户上下文。
 
 轻量做：
@@ -379,7 +379,7 @@ PPT/PDF 建议页：
 2. 问题：不是缺计划，而是每天启动学习/探索的摩擦太高。
 3. 用户：有长期目标、需要周期性行动和反馈的人。
 4. 产品定义：周期性 Agent session，而不是 todo app。
-5. 核心 workflow：Today -> Deep Dive -> Agent Guidance -> Check-in -> History。
+5. 核心 workflow：Today -> Deep Dive -> Agent Guidance -> Check-in -> Archive。
 6. Agent 能力：根据用户上下文组织材料、任务、草稿和下一步。
 7. 四类 session：Radar / Deep Dive / Weekly Studio / Opportunity Alignment。
 8. 领域复用映射表：独立页。
@@ -409,7 +409,7 @@ PPT/PDF 建议页：
 -> 展示主材料和推荐理由
 -> 打开 Agent Guidance，生成 Check-in 草稿
 -> 用户确认/微调 Check-in
--> 写入 History
+-> 写入 Archive
 -> 简短切到计划/我的，说明 Agent 推荐来自用户上下文
 ```
 
@@ -439,11 +439,11 @@ PPT/PDF 建议页：
 - [x] 冻结 Web 端扩展，明确 Web 仅作为 API smoke / 兜底演示。
 - [x] 确认 8/16 主展示面改为 iOS 原生 SwiftUI App + FastAPI。
 - [x] 创建 iOS 迁移清单：`docs/ios_native_migration_checklist.md`。
-- [x] 明确目标底部栏：`今日 / 历史 / 计划 / 我的`。
+- [x] 明确目标底部栏：`今日 / 归档 / 计划 / 我的`。
 - [x] 明确 Day 2 优先验证 endpoint：`/api/health`、`/api/sessions/today`、`/api/user-context`。
 - [x] 根据用户评审要求扩展 Day 2 开发项：Scheduled / Manual、四类 session 入口、底部四栏、移除独立 JD 栏、后端默认 URL 更新但保留覆盖能力。
-- [x] 完成 Day2 iOS 代码线：默认后端 URL 更新为 `https://graphical-teeth-athletes-holds.trycloudflare.com`，仍保留 `UserDefaults` / 设置页覆盖。
-- [x] iOS 底部栏改为 `今日 / 历史 / 计划 / 我的`；`JD` 不再作为底部栏，`设置` 并入 `我的`。
+- [x] 完成 Day2 iOS 代码线：默认后端 URL 更新为 `https://relationships-meeting-accuracy-bee.trycloudflare.com`，仍保留 `UserDefaults` / 设置页覆盖。
+- [x] iOS 底部栏改为 `今日 / 归档 / 计划 / 我的`；`JD` 不再作为底部栏，`设置` 并入 `我的`。
 - [x] iOS Today 增加 Scheduled / Manual segmented control。
 - [x] Manual 增加四个入口：Radar、Deep Dive、Weekly Studio、Opportunity Alignment。
 - [x] Manual 入口暂时复用现有后端日期映射：Radar=`2026-08-04`、Opportunity Alignment=`2026-08-05`、Deep Dive=`2026-08-06`、Weekly Studio=`2026-08-09`。
@@ -451,7 +451,7 @@ PPT/PDF 建议页：
 - [x] 后端 smoke 通过：`/api/health`、`/api/user-context`、`/api/sessions/today`、四个 manual mock date 均返回 200。
 - [!] 本机无 `xcodebuild`，iOS 编译和 Appetize/真机视觉验证待 Codemagic 完成。
 - [x] iOS Today session 卡片不再直接进入 workspace，改为先进入 session type 队列 / 管理页。
-- [x] 新增 `SessionQueueView`：展示进行中 / 未完成 session，已完成记录仍交给 History。
+- [x] 新增 `SessionQueueView`：展示进行中 / 未完成 session，已完成 / 跳过 / 未完成归档记录进入归档区。
 - [x] `SessionQueueView` 增加新建同类 session 按钮，当前版本通过 `POST /api/sessions/mock?date=...` 生成并保存示例 session。
 - [x] 队列层覆盖 Radar、Deep Dive、Weekly Studio、Opportunity Alignment；其中 Deep Dive 对应 Day3 队列页的前半部分。
 - [x] Deep Dive 工作区新增 `材料生成` 入口：Agent 检索、URL、个人上传统一进入同一材料生成 sheet。
@@ -460,7 +460,7 @@ PPT/PDF 建议页：
 - [x] 未完成队列中的 session 行增加 `第 N 个 · 日期` 标识，解决多个同类型未完成项难以区分的问题。
 - [x] 具体 workspace 增加右上角 `完成/归档` 入口。
 - [x] `完成/归档` 表单支持填写用时、简单总结、关键收获和下一步。
-- [x] 保存归档调用 `POST /api/sessions/{session_id}/completion/confirm`，写入 History，并让 completed session 从未完成队列中过滤掉。
+- [x] 保存归档调用 `POST /api/sessions/{session_id}/completion/confirm`，写入归档区，并让 completed session 从未完成队列中过滤掉。
 - [x] 后端 completion smoke 通过：生成 Deep Dive session 后归档，session/check-in 均返回 `completed`。
 - [!] Agent 对话当前仍是 mock：后端 `ChatService` 直接使用 `MockLLMService()`，尚未按 `llm_provider` 切换真实 LLM。
 
@@ -473,7 +473,7 @@ PPT/PDF 建议页：
 - [x] 论文详情页调整阅读流程：先进入 PDF 阅读器 / Agent 讨论，再点击 `Agent 自动读取并提取关键段落`，点击后才显示阅读章节、精选段落和关键图。
 - [x] `我的笔记` 从内联输入改成入口卡片 `写入笔记`，弹出 sheet 后支持 `自己编辑` 和 `Agent 生成初稿` 两种方式。
 - [x] 修复 Codemagic / Xcode build 中两类 SwiftUI `Section + footer` initializer 编译错误。
-- [x] 后端默认 tunnel 多次随测试更新，当前默认 URL 为 `https://psychological-merger-cedar-qualifying.trycloudflare.com`，仍保留 `UserDefaults` 覆盖和旧默认 URL 迁移。
+- [x] 后端默认 tunnel 多次随测试更新，当前默认 URL 为 `https://relationships-meeting-accuracy-bee.trycloudflare.com`，仍保留 `UserDefaults` 覆盖和旧默认 URL 迁移。
 - [!] 本机仍无 `xcodebuild`，iOS 编译验证依赖 Web/Codemagic build log。
 - [x] Deep Dive 材料生成后新增 `完成标准` 区块，优先读取 session completion criteria；为空时使用 Deep Dive 默认完成标准。
 - [x] Deep Dive 材料生成后新增 `30 / 60 / 90 分钟路径`，用于展示不同时间预算下的阅读收束方式。

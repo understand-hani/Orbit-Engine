@@ -166,6 +166,15 @@ class ArchivePlan(BaseModel):
     summary_md: str = ""
 
 
+class ConfirmedResearchMaterial(BaseModel):
+    id: str
+    paper_id: Optional[str] = None
+    title: str
+    summary: str = ""
+    url: Optional[HttpUrl] = None
+    source_type: str = ""
+
+
 class ResearchFeederPayload(BaseModel):
     research_day_role: ResearchDayRole
     research_context: ResearchContext
@@ -175,3 +184,4 @@ class ResearchFeederPayload(BaseModel):
     paper_readers: List[PaperReader] = []
     notes: PaperNotes = PaperNotes()
     archive_plan: Optional[ArchivePlan] = None
+    selected_materials: List[ConfirmedResearchMaterial] = []

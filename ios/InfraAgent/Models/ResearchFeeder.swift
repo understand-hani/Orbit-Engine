@@ -9,6 +9,7 @@ struct ResearchFeederPayload: Codable {
     let paperReaders: [PaperReader]?
     let notes: PaperNotes
     let archivePlan: ArchivePlan?
+    let selectedMaterials: [ConfirmedResearchMaterial]?
 
     enum CodingKeys: String, CodingKey {
         case researchDayRole = "research_day_role"
@@ -19,6 +20,7 @@ struct ResearchFeederPayload: Codable {
         case paperReaders = "paper_readers"
         case notes
         case archivePlan = "archive_plan"
+        case selectedMaterials = "selected_materials"
     }
 }
 
