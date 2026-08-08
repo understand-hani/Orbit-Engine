@@ -41,7 +41,8 @@ class FeedService:
             payload = self.research_agent.generate(session.payload)
             action = SuggestedAction.open_paper_reader
 
-        return session.model_copy(update={"payload": payload, "suggested_action": action})
+        session = session.model_copy(update={"payload": payload, "suggested_action": action})
+        return self._apply_default_title(session, exclude_self=False)
 
     def generate_and_save_mock_session(self, target_date: Optional[date] = None) -> BaseSession:
         session = self.generate_mock_session(target_date)
@@ -170,10 +171,10 @@ class FeedService:
 
         session = self.generate_mock_session(target_date)
         session = session.model_copy(update={"id": session_id})
-        session = self._apply_default_title(session)
+        session = self._apply_default_title(session, exclude_self=False)
         return self.sessions.save(session)
 
-    def _apply_default_title(self, session: BaseSession) -> BaseSession:
+    def _apply_default_title(self, session: BaseSession, exclude_self: bool = True) -> BaseSession:
         if session.task_type != TaskType.research_feeder:
             return session
 
@@ -181,8 +182,12 @@ class FeedService:
             session.date.isoformat(),
             session.task_type.value,
         )
-        used_titles = {item.title for item in existing if item.id != session.id}
-        sequence = len(existing) + 1
+        used_titles = {
+            item.title
+            for item in existing
+            if not exclude_self or item.id != session.id
+        }
+        sequence = 1
         title = f"{self._title_prefix(session)}{sequence}"
         while title in used_titles:
             sequence += 1
@@ -221,7 +226,10 @@ class FeedService:
         day = target_date or date.today()
         existing = self.sessions.get_latest_active_by_date(day.isoformat())
         if existing is not None:
-            return existing
+            titled_existing = self._apply_default_title(existing)
+            if titled_existing.title != existing.title:
+                return self.sessions.save(titled_existing)
+            return titled_existing
         latest = self.sessions.get_latest_by_date(day.isoformat())
         if latest is not None:
             return latest

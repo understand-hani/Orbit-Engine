@@ -52,7 +52,7 @@ struct SessionQueueView: View {
                     EmptyStateView(
                         title: "暂无未完成工作区",
                         systemImage: "tray",
-                        message: "已完成、已丢弃或已暂存的记录会进入归档区。"
+                        message: "已完成和已暂存的记录会进入归档区；已丢弃的任务不会再显示。"
                     )
                 } else {
                     ForEach(Array(activeSessions.enumerated()), id: \.element.id) { index, session in
@@ -136,7 +136,7 @@ struct SessionQueueView: View {
             }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("丢弃后会从未完成队列移除，并在归档中标记为已丢弃。")
+            Text("丢弃后会从未完成队列移除，不会进入归档。")
         }
         .sheet(isPresented: Binding(
             get: { renamingSession != nil },

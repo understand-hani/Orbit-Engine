@@ -113,9 +113,11 @@ def test_research_session_default_title_and_rename_rejects_duplicate():
 
         first = feed_service.generate_and_save_mock_session()
         second = feed_service.generate_and_save_mock_session(first.date)
+        preview = feed_service.generate_mock_session(first.date)
 
         assert first.title == f"Deep Dive-{first.date.isoformat()}-1"
         assert second.title == f"Deep Dive-{first.date.isoformat()}-2"
+        assert preview.title == f"Deep Dive-{first.date.isoformat()}-3"
 
         renamed = feed_service.rename_session(second.id, "3")
         assert renamed is not None

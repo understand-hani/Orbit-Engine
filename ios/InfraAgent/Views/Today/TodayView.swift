@@ -110,7 +110,7 @@ struct TodayView: View {
                         }
                     }
                 case .loaded:
-                    if let session = viewModel.session {
+                    if let session = viewModel.session, isActive(session) {
                         Section("今日工作区") {
                             NavigationLink {
                                 SessionQueueView(seedSession: session)
@@ -126,6 +126,14 @@ struct TodayView: View {
                                 }
                                 .padding(.vertical, 4)
                             }
+                        }
+                    } else {
+                        Section("今日工作区") {
+                            EmptyStateView(
+                                title: "暂无今日工作区",
+                                systemImage: "tray",
+                                message: "已丢弃、已暂存或已完成的任务不会在 Today 中重复出现。"
+                            )
                         }
                     }
                 }
@@ -172,6 +180,12 @@ struct TodayView: View {
         case .jdAnalysis:
             return "opportunity_alignment"
         }
+    }
+
+    private func isActive(_ session: BaseSession) -> Bool {
+        session.status != .completed &&
+            session.status != .archived &&
+            session.status != .skipped
     }
 }
 
