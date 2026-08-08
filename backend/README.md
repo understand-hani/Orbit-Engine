@@ -34,7 +34,7 @@ LLM_PROVIDER=openrouter
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 OPENROUTER_MODEL=openai/gpt-4o-mini
 OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-OPENROUTER_TIMEOUT_SEC=45
+OPENROUTER_TIMEOUT_SEC=20
 OPENROUTER_SITE_URL=
 ```
 

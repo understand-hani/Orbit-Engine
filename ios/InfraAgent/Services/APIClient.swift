@@ -111,7 +111,7 @@ final class APIClient {
         guard let url = components.url else {
             throw APIClientError.invalidURL
         }
-        return URLRequest(url: url)
+        return URLRequest(url: url, timeoutInterval: AppConfig.apiTimeoutInterval)
     }
 
     private func send<T: Decodable>(_ request: URLRequest) async throws -> T {

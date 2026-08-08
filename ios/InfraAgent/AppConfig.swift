@@ -3,6 +3,7 @@ import Foundation
 struct AppConfig {
     static let appName = "圆周引擎"
     static let backendBaseURLKey = "backend_base_url"
+    static let apiTimeoutInterval: TimeInterval = 30
     static let defaultBackendBaseURL = URL(string: "https://telephony-locator-billing-empirical.trycloudflare.com")!
     private static let legacyDefaultBackendBaseURLs = [
         "https://fairfield-rpm-leo-sacred.trycloudflare.com",
