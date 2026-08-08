@@ -161,6 +161,11 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] Archive 详情页需要稳定显示原文标题、链接、简介和用户笔记；对旧记录若缺 source metadata，需要通过 session 关联补展示。
 - [x] 顶部右上角 `完成/归档` 入口也要带上当前材料上下文，不能只在研究页主按钮路径下才写入原文信息。
 - [ ] Agent 生成的 Check-in 草稿后续应升级为基于材料 + 用户笔记 + Agent 讨论摘要生成，而不是规则模板填充。
+- [x] Deep Dive LLM 下一阶段优先跑通“真材料闭环”：材料确认后，Agent prompt 必须拿到真实材料标题、摘要、URL、PDF metadata、推荐理由，而不是只拿 `mock_paper_primary` / `paper_id` 占位。
+- [ ] `论文 -> Agent 讨论` 需要绑定当前论文内容：自动注入 paper title、summary、why_selected、selected_passages、sections 和当前阅读问题，让用户无需手动复制材料上下文。
+- [ ] `Check-in / 归档 -> Agent 生成初稿` 需要基于当前论文、用户笔记、Agent 讨论记录、完成标准生成可归档摘要，而不是泛泛模板。
+- [ ] Deep Dive 暂存标题一致性 bug 在真实材料上下文之后立即修复：session 从进行中 / 未完成移动到暂存 / 完成归档时，标题和序号必须保持不变。
+- [ ] Deep Dive UI polish 放在数据闭环之后：先确保真实材料、讨论、初稿、归档数据一致，再优化视觉层和交互动效。
 
 文档 / PPT / PDF 线：
 
@@ -484,3 +489,5 @@ PPT/PDF 建议页：
 ### 2026-08-08
 
 - [!] Deep Dive 暂存标题一致性仍未验收通过：用户反馈进行中 / 未完成卡片暂存后，在归档页 `暂存` 区仍显示为 `Deep Dive-日期-1`，与原卡片序号不一致。下一轮需先重走真实 iOS 流程或加端到端可观测日志，确认后端 session title、checkin summary、iOS HistoryView 展示源三者完全一致。
+- [x] LLM 接入成功后确认 Deep Dive 下一阶段优先级：先做真实材料上下文注入，再做论文 Agent 讨论绑定当前论文内容，再做基于材料 / 笔记 / 讨论 / 完成标准的 Check-in 初稿，随后修复暂存标题一致性，最后做 UI polish。
+- [x] Deep Dive Agent 讨论已注入真实材料上下文：后端会根据 session payload 和 context_refs 解析 confirmed materials、paper、reader sections、selected passages、key figures、notes，再发给 LLM。

@@ -3,6 +3,7 @@ from typing import List, Optional
 from uuid import uuid4
 
 from app.db.repositories import ChatRepository, SessionRepository
+from app.schemas.common import TaskType
 from app.schemas.chat import (
     AIChatMessage,
     AIChatSendResponse,
@@ -11,6 +12,7 @@ from app.schemas.chat import (
     AIChatThreadCreate,
     ChatRole,
 )
+from app.schemas.research_feeder import PaperReader, ResearchFeederPayload
 from app.services.llm_service import (
     DEEP_DIVE_DISCUSSION_SYSTEM_PROMPT,
     JD_DISCUSSION_SYSTEM_PROMPT,
@@ -169,7 +171,15 @@ class ChatService:
             for message in thread.messages[-8:]
             if message.role in {ChatRole.user, ChatRole.assistant}
         ]
-        if thread.context_refs:
+        context_message = self._context_message_for(thread)
+        if context_message:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": context_message,
+                }
+            )
+        elif thread.context_refs:
             messages.append(
                 {
                     "role": "user",
@@ -178,6 +188,161 @@ class ChatService:
             )
         messages.append({"role": "user", "content": content})
         return messages
+
+    def _context_message_for(self, thread: AIChatThread) -> str:
+        session = self.sessions.get_by_id(thread.session_id)
+        if session is None or session.task_type != TaskType.research_feeder:
+            return ""
+        payload = session.payload
+        if not isinstance(payload, ResearchFeederPayload):
+            return ""
+
+        lines = [
+            "Deep Dive 当前材料上下文如下。回答用户时必须优先基于这些内容，不要把 paper_id 当成唯一信息。",
+            f"Session: {session.title}",
+            f"当前方向: {payload.research_context.current_direction}",
+            f"当前任务: {payload.research_context.current_task}",
+            f"本周目标: {payload.research_context.week_goal}",
+            f"相关项目: {payload.research_context.related_project}",
+            f"选材理由: {payload.reading_pack.selection_reason}",
+            f"阅读目标: {payload.reading_pack.reading_goal}",
+        ]
+
+        if payload.selected_materials:
+            lines.append("已确认材料:")
+            for material in payload.selected_materials[:5]:
+                material_url = str(material.url) if material.url else ""
+                lines.append(
+                    "- "
+                    f"title={material.title}; "
+                    f"summary={material.summary}; "
+                    f"url={material_url}; "
+                    f"source_type={material.source_type}"
+                )
+
+        paper_ref = self._first_matching_paper_ref(thread.context_refs, payload)
+        paper = next((item for item in payload.papers if item.id == paper_ref), None)
+        if paper is not None:
+            lines.extend(
+                [
+                    "当前论文:",
+                    f"- id: {paper.id}",
+                    f"- title: {paper.title}",
+                    f"- authors: {', '.join(paper.authors)}",
+                    f"- venue/year: {paper.venue} {paper.year or ''}".strip(),
+                    f"- url: {str(paper.url) if paper.url else ''}",
+                    f"- pdf_url: {str(paper.pdf_url) if paper.pdf_url else ''}",
+                    f"- repo_url: {str(paper.repo_url) if paper.repo_url else ''}",
+                    f"- summary: {paper.summary}",
+                    f"- why_selected: {paper.why_selected}",
+                    f"- tags: {', '.join(paper.tags)}",
+                ]
+            )
+
+            reader = self._reader_for(payload, paper.id)
+            if reader is not None:
+                self._append_reader_context(lines, reader, thread.context_refs)
+
+        if payload.notes:
+            lines.extend(
+                [
+                    "当前笔记:",
+                    f"- input_output: {payload.notes.input_output}",
+                    f"- core_idea: {payload.notes.core_idea}",
+                    f"- evidence: {payload.notes.evidence}",
+                    f"- relation_to_my_plan: {payload.notes.relation_to_my_plan}",
+                    f"- next_action: {payload.notes.next_action}",
+                ]
+            )
+
+        return "\n".join(line for line in lines if line.strip())
+
+    def _first_matching_paper_ref(
+        self,
+        context_refs: List[str],
+        payload: ResearchFeederPayload,
+    ) -> Optional[str]:
+        paper_ids = {paper.id for paper in payload.papers}
+        for ref in context_refs:
+            if ref in paper_ids:
+                return ref
+        for material in payload.selected_materials:
+            if material.paper_id and material.paper_id in paper_ids:
+                return material.paper_id
+            if material.id in paper_ids:
+                return material.id
+        return payload.reading_pack.primary_paper_id if payload.reading_pack.primary_paper_id in paper_ids else None
+
+    def _reader_for(self, payload: ResearchFeederPayload, paper_id: str) -> Optional[PaperReader]:
+        for reader in payload.paper_readers:
+            if reader.paper_id == paper_id:
+                return reader
+        if payload.paper_reader and payload.paper_reader.paper_id == paper_id:
+            return payload.paper_reader
+        return None
+
+    def _append_reader_context(
+        self,
+        lines: List[str],
+        reader: PaperReader,
+        context_refs: List[str],
+    ) -> None:
+        lines.append("阅读器上下文:")
+        if reader.pdf_url:
+            lines.append(f"- pdf_url: {str(reader.pdf_url)}")
+
+        matching_sections = [section for section in reader.sections if section.id in context_refs]
+        matching_passages = [passage for passage in reader.selected_passages if passage.id in context_refs]
+        matching_figures = [figure for figure in reader.key_figures if figure.id in context_refs]
+
+        sections = matching_sections or reader.sections[:3]
+        if sections:
+            lines.append("阅读章节:")
+            for section in sections:
+                page = self._page_range(section.page_start, section.page_end)
+                lines.append(
+                    "- "
+                    f"{section.section_name}; "
+                    f"page={page}; "
+                    f"mode={section.read_mode.value}; "
+                    f"why_read={section.why_read}; "
+                    f"agent_instruction={section.agent_instruction}; "
+                    f"knowledge_points={', '.join(section.knowledge_points)}; "
+                    f"extracted_text={section.extracted_text}"
+                )
+
+        passages = matching_passages or reader.selected_passages[:3]
+        if passages:
+            lines.append("精选段落:")
+            for passage in passages:
+                lines.append(
+                    "- "
+                    f"section={passage.section_name}; "
+                    f"page={passage.page or ''}; "
+                    f"text={passage.text_excerpt}; "
+                    f"why_selected={passage.why_selected}; "
+                    f"reading_question={passage.reading_question}"
+                )
+
+        figures = matching_figures or reader.key_figures[:2]
+        if figures:
+            lines.append("关键图:")
+            for figure in figures:
+                lines.append(
+                    "- "
+                    f"{figure.figure_label}; "
+                    f"page={figure.page or ''}; "
+                    f"caption={figure.visual.caption}; "
+                    f"why_important={figure.why_important}; "
+                    f"reading_question={figure.reading_question}"
+                )
+
+    def _page_range(self, page_start: Optional[int], page_end: Optional[int]) -> str:
+        if page_start is None:
+            return ""
+        if page_end is None or page_end == page_start:
+            return str(page_start)
+        return f"{page_start}-{page_end}"
 
     def _format_openrouter_error(self, exc: Exception) -> str:
         text = str(exc)
