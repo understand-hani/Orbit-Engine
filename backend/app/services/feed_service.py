@@ -98,6 +98,7 @@ class FeedService:
             return True
 
         archived_at = datetime.now(timezone.utc)
+        session = self._apply_default_title(session)
         updated_session = session.model_copy(
             update={
                 "status": SessionStatus.archived,
@@ -113,6 +114,21 @@ class FeedService:
             created_at=archived_at,
         )
         return True
+
+    def restore_session(self, session_id: str) -> Optional[BaseSession]:
+        session = self.sessions.get_by_id(session_id)
+        if session is None:
+            return None
+
+        restored_session = self._apply_default_title(
+            session.model_copy(
+                update={
+                    "status": SessionStatus.active,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            )
+        )
+        return self.sessions.save(restored_session)
 
     def save_selected_materials(
         self, session_id: str, materials: list[ConfirmedResearchMaterial]

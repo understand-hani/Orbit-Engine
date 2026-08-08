@@ -160,6 +160,14 @@ class CheckinRepository:
             return None
         return Checkin(**json.loads(row["payload_json"]))
 
+    def delete(self, checkin_id: str) -> bool:
+        with connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM checkins WHERE id = ?",
+                (checkin_id,),
+            )
+        return cursor.rowcount > 0
+
     def list_by_date(self, date_value: Optional[str] = None) -> List[Checkin]:
         if date_value is None:
             with connect() as conn:

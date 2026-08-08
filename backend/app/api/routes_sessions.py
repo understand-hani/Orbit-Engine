@@ -66,6 +66,14 @@ def archive_session(session_id: str) -> Response:
     return Response(status_code=204)
 
 
+@router.post("/sessions/{session_id}/restore", response_model=BaseSession)
+def restore_session(session_id: str) -> BaseSession:
+    session = feed_service.restore_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
+
+
 @router.post("/sessions/{session_id}/rename", response_model=BaseSession)
 def rename_session(session_id: str, request: SessionRenameRequest) -> BaseSession:
     try:

@@ -39,6 +39,10 @@ struct SessionAPI {
         try await resolvedClient.postNoContent("/api/sessions/\(id)/archive")
     }
 
+    func restore(id: String) async throws -> BaseSession {
+        try await resolvedClient.post("/api/sessions/\(id)/restore")
+    }
+
     func rename(id: String, suffix: String) async throws -> BaseSession {
         try await resolvedClient.post("/api/sessions/\(id)/rename", body: SessionRenameRequest(suffix: suffix))
     }

@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from app.schemas.checkin import Checkin, CheckinCreate
 from app.schemas.completion import CompletionConfirmRequest
@@ -28,6 +28,14 @@ def get_checkin(checkin_id: str) -> Checkin:
     if checkin is None:
         raise HTTPException(status_code=404, detail="Checkin not found")
     return checkin
+
+
+@router.delete("/checkins/{checkin_id}", status_code=204)
+def delete_checkin(checkin_id: str) -> Response:
+    deleted = checkin_service.delete_checkin(checkin_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Checkin not found")
+    return Response(status_code=204)
 
 
 @router.post("/sessions/{session_id}/completion/confirm")

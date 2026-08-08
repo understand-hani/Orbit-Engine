@@ -27,12 +27,26 @@ struct HistoryView: View {
                                 CheckinDetailView(checkin: checkin)
                             } label: {
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text(checkin.summary)
+                                    Text(archivedTitle(for: checkin))
                                         .font(.headline)
                                     Text("\(checkin.date) · \(checkin.taskType.rawValue)")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    Task { await viewModel.deleteArchivedCheckin(checkin) }
+                                } label: {
+                                    Label("删除", systemImage: "trash")
+                                }
+
+                                Button {
+                                    Task { await viewModel.restoreArchivedCheckin(checkin) }
+                                } label: {
+                                    Label("恢复", systemImage: "arrow.uturn.backward")
+                                }
+                                .tint(.blue)
                             }
                         }
                     }
@@ -60,6 +74,15 @@ struct HistoryView: View {
                 await viewModel.load()
             }
         }
+    }
+
+    private func archivedTitle(for checkin: Checkin) -> String {
+        let prefix = "Deep Dive-\(checkin.date)-"
+        if checkin.summary.contains(prefix),
+           let range = checkin.summary.range(of: prefix) {
+            return String(checkin.summary[range.lowerBound...])
+        }
+        return "\(prefix)1"
     }
 }
 

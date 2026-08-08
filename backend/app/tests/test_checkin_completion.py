@@ -156,6 +156,12 @@ def test_archive_session_marks_session_archived_and_creates_checkin():
         checkins = checkin_service.list_checkins(session.date.isoformat())
         assert len(checkins) == 1
         assert checkins[0].status.value == "archived"
+        assert checkins[0].summary == f"已暂存：Deep Dive-{session.date.isoformat()}-1"
+
+        restored_session = feed_service.restore_session(session.id)
+        assert restored_session is not None
+        assert restored_session.status.value == "active"
+        assert restored_session.title == f"Deep Dive-{session.date.isoformat()}-1"
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)

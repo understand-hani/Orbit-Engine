@@ -23,6 +23,10 @@ struct CheckinAPI {
         try await resolvedClient.get("/api/checkins/\(id)")
     }
 
+    func delete(id: String) async throws {
+        try await resolvedClient.delete("/api/checkins/\(id)")
+    }
+
     func confirmCompletion(sessionID: String, request: CompletionConfirmRequest) async throws -> CompletionConfirmResponse {
         try await resolvedClient.post("/api/sessions/\(sessionID)/completion/confirm", body: request)
     }

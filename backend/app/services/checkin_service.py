@@ -28,6 +28,9 @@ class CheckinService:
     def list_checkins(self, target_date: Optional[str] = None) -> List[Checkin]:
         return self.checkins.list_by_date(target_date)
 
+    def delete_checkin(self, checkin_id: str) -> bool:
+        return self.checkins.delete(checkin_id)
+
     def confirm_completion(
         self, session_id: str, request: CompletionConfirmRequest
     ) -> Optional[Dict[str, object]]:
