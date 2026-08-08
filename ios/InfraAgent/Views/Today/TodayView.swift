@@ -161,7 +161,7 @@ struct TodayView: View {
                session.date == "2026-08-09" {
                 return "Weekly Studio"
             }
-            return session.title
+            return deepDiveDisplayTitle(for: session)
         case .jdAnalysis:
             return "Opportunity Alignment"
         }
@@ -186,6 +186,14 @@ struct TodayView: View {
         session.status != .completed &&
             session.status != .archived &&
             session.status != .skipped
+    }
+
+    private func deepDiveDisplayTitle(for session: BaseSession) -> String {
+        let prefix = "Deep Dive-\(session.date)-"
+        if session.title.hasPrefix(prefix) {
+            return session.title
+        }
+        return "\(prefix)1"
     }
 }
 

@@ -255,9 +255,17 @@ struct SessionQueueView: View {
 
     private func displayName(for session: BaseSession, index: Int) -> String {
         if session.taskType == .researchFeeder {
-            return session.title
+            return deepDiveDisplayName(for: session, index: index)
         }
         return "\(sessionDisplayTitle(session)) · \(instanceLabel(for: session, index: index))"
+    }
+
+    private func deepDiveDisplayName(for session: BaseSession, index: Int) -> String {
+        let prefix = renamePrefix(for: session)
+        if session.title.hasPrefix(prefix) {
+            return session.title
+        }
+        return "\(prefix)\(index + 1)"
     }
 
     private func renamePrefix(for session: BaseSession) -> String {
