@@ -136,6 +136,11 @@ struct TodayView: View {
                     await viewModel.loadToday()
                 }
             }
+            .onAppear {
+                if viewModel.mode == .scheduled {
+                    Task { await viewModel.loadToday() }
+                }
+            }
         }
     }
 
@@ -148,7 +153,7 @@ struct TodayView: View {
                session.date == "2026-08-09" {
                 return "Weekly Studio"
             }
-            return "Deep Dive"
+            return session.title
         case .jdAnalysis:
             return "Opportunity Alignment"
         }

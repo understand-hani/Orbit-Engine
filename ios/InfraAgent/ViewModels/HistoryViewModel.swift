@@ -43,6 +43,6 @@ final class HistoryViewModel: ObservableObject {
     }
 
     private var timelineCheckins: [Checkin] {
-        checkins.filter { $0.status != "archived" }
+        checkins.filter { $0.status == "completed" }
     }
 }

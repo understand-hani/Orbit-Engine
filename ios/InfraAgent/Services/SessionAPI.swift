@@ -39,6 +39,10 @@ struct SessionAPI {
         try await resolvedClient.postNoContent("/api/sessions/\(id)/archive")
     }
 
+    func rename(id: String, suffix: String) async throws -> BaseSession {
+        try await resolvedClient.post("/api/sessions/\(id)/rename", body: SessionRenameRequest(suffix: suffix))
+    }
+
     func saveSelectedResearchMaterials(
         sessionID: String,
         materials: [ConfirmedResearchMaterial]
@@ -57,4 +61,8 @@ struct SessionAPI {
         guard let date else { return [] }
         return [URLQueryItem(name: "date", value: date)]
     }
+}
+
+private struct SessionRenameRequest: Encodable {
+    let suffix: String
 }

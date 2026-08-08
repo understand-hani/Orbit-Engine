@@ -30,3 +30,6 @@ class BaseSession(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
+class SessionRenameRequest(BaseModel):
+    suffix: str

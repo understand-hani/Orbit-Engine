@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Response
 
-from app.schemas.session import BaseSession
+from app.schemas.session import BaseSession, SessionRenameRequest
 from app.schemas.jd_analysis import JDInputCreate
 from app.schemas.research_feeder import ConfirmedResearchMaterial
 from app.services.feed_service import FeedService
@@ -64,6 +64,17 @@ def archive_session(session_id: str) -> Response:
     if not archived:
         raise HTTPException(status_code=404, detail="Session not found")
     return Response(status_code=204)
+
+
+@router.post("/sessions/{session_id}/rename", response_model=BaseSession)
+def rename_session(session_id: str, request: SessionRenameRequest) -> BaseSession:
+    try:
+        session = feed_service.rename_session(session_id, request.suffix)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
 
 @router.post("/sessions/{session_id}/research/selected-materials", response_model=BaseSession)

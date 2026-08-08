@@ -55,6 +55,7 @@ class FeedService:
                     "updated_at": datetime.now(timezone.utc),
                 }
             )
+        session = self._apply_default_title(session)
         return self.sessions.save(session)
 
     def get_session(self, session_id: str) -> Optional[BaseSession]:
@@ -74,22 +75,14 @@ class FeedService:
         }:
             return True
 
-        archived_at = datetime.now(timezone.utc)
+        discarded_at = datetime.now(timezone.utc)
         updated_session = session.model_copy(
             update={
                 "status": SessionStatus.skipped,
-                "updated_at": archived_at,
+                "updated_at": discarded_at,
             }
         )
         self.sessions.save(updated_session)
-
-        self._save_session_marker(
-            session=session,
-            status=CheckinStatus.skipped,
-            summary=f"已丢弃：{session.title}",
-            next_action="该工作区已从当前队列移除。",
-            created_at=archived_at,
-        )
         return True
 
     def archive_session(self, session_id: str) -> bool:
@@ -136,6 +129,33 @@ class FeedService:
         )
         return self.sessions.save(updated_session)
 
+    def rename_session(self, session_id: str, suffix: str) -> Optional[BaseSession]:
+        session = self.sessions.get_by_id(session_id)
+        if session is None:
+            return None
+
+        cleaned_suffix = suffix.strip()
+        if not cleaned_suffix:
+            raise ValueError("名称后缀不能为空")
+        if cleaned_suffix.startswith(self._title_prefix(session)):
+            raise ValueError("只能填写日期后面的序号部分")
+
+        new_title = f"{self._title_prefix(session)}{cleaned_suffix}"
+        same_day_sessions = self.sessions.get_by_date_and_task(
+            session.date.isoformat(),
+            session.task_type.value,
+        )
+        if any(item.id != session.id and item.title == new_title for item in same_day_sessions):
+            raise ValueError("名称已存在")
+
+        updated_session = session.model_copy(
+            update={
+                "title": new_title,
+                "updated_at": datetime.now(timezone.utc),
+            }
+        )
+        return self.sessions.save(updated_session)
+
     def _recover_missing_research_session(self, session_id: str) -> Optional[BaseSession]:
         prefix = "session_"
         suffix = "_research_feeder"
@@ -150,7 +170,29 @@ class FeedService:
 
         session = self.generate_mock_session(target_date)
         session = session.model_copy(update={"id": session_id})
+        session = self._apply_default_title(session)
         return self.sessions.save(session)
+
+    def _apply_default_title(self, session: BaseSession) -> BaseSession:
+        if session.task_type != TaskType.research_feeder:
+            return session
+
+        existing = self.sessions.get_by_date_and_task(
+            session.date.isoformat(),
+            session.task_type.value,
+        )
+        used_titles = {item.title for item in existing if item.id != session.id}
+        sequence = len(existing) + 1
+        title = f"{self._title_prefix(session)}{sequence}"
+        while title in used_titles:
+            sequence += 1
+            title = f"{self._title_prefix(session)}{sequence}"
+        return session.model_copy(update={"title": title})
+
+    def _title_prefix(self, session: BaseSession) -> str:
+        if session.task_type == TaskType.research_feeder:
+            return f"Deep Dive-{session.date.isoformat()}-"
+        return f"{session.title}-{session.date.isoformat()}-"
 
     def _save_session_marker(
         self,
@@ -180,6 +222,9 @@ class FeedService:
         existing = self.sessions.get_latest_active_by_date(day.isoformat())
         if existing is not None:
             return existing
+        latest = self.sessions.get_latest_by_date(day.isoformat())
+        if latest is not None:
+            return latest
         return self.generate_and_save_mock_session(day)
 
     def analyze_jd(self, session_id: str, jd_input: JDInputCreate) -> Optional[BaseSession]:

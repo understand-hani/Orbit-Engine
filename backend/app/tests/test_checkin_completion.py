@@ -52,7 +52,7 @@ def test_confirm_completion_updates_session_and_creates_checkin():
             os.environ["DATABASE_PATH"] = original_path
         get_settings.cache_clear()
 
-def test_delete_session_marks_session_skipped_and_creates_checkin():
+def test_delete_session_marks_session_skipped_without_checkin():
     original_path = os.environ.get("DATABASE_PATH")
     db_path = Path(tempfile.mkdtemp()) / "infra_session_delete_test.db"
     os.environ["DATABASE_PATH"] = str(db_path)
@@ -70,8 +70,63 @@ def test_delete_session_marks_session_skipped_and_creates_checkin():
         assert updated_session is not None
         assert updated_session.status.value == "skipped"
         checkins = checkin_service.list_checkins(session.date.isoformat())
-        assert len(checkins) == 1
-        assert checkins[0].status.value == "skipped"
+        assert checkins == []
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
+def test_today_does_not_recreate_discarded_session():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_session_today_discard_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        feed_service = FeedService()
+
+        session = feed_service.generate_and_save_mock_session()
+        assert feed_service.delete_session(session.id) is True
+
+        today_session = feed_service.get_or_create_mock_session(session.date)
+        assert today_session.id == session.id
+        assert today_session.status.value == "skipped"
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
+def test_research_session_default_title_and_rename_rejects_duplicate():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_session_rename_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        feed_service = FeedService()
+
+        first = feed_service.generate_and_save_mock_session()
+        second = feed_service.generate_and_save_mock_session(first.date)
+
+        assert first.title == f"Deep Dive-{first.date.isoformat()}-1"
+        assert second.title == f"Deep Dive-{first.date.isoformat()}-2"
+
+        renamed = feed_service.rename_session(second.id, "3")
+        assert renamed is not None
+        assert renamed.title == f"Deep Dive-{first.date.isoformat()}-3"
+
+        try:
+            feed_service.rename_session(renamed.id, "1")
+        except ValueError as exc:
+            assert "名称已存在" in str(exc)
+        else:
+            raise AssertionError("duplicate rename should be rejected")
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)

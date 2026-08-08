@@ -77,6 +77,18 @@ class SessionRepository:
             ).fetchall()
         return [BaseSession(**json.loads(row["payload_json"])) for row in rows]
 
+    def get_by_date_and_task(self, date_value: str, task_type: str) -> List[BaseSession]:
+        with connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT payload_json FROM sessions
+                WHERE date = ? AND task_type = ?
+                ORDER BY created_at ASC
+                """,
+                (date_value, task_type),
+            ).fetchall()
+        return [BaseSession(**json.loads(row["payload_json"])) for row in rows]
+
     def get_latest_by_date(self, date_value: str) -> Optional[BaseSession]:
         sessions = self.get_by_date(date_value)
         return sessions[0] if sessions else None

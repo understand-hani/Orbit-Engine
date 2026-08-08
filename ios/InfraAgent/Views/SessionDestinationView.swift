@@ -20,6 +20,9 @@ struct SessionQueueView: View {
     @State private var processingSessionIDs: Set<String> = []
     @State private var pendingDiscardSession: BaseSession?
     @State private var isShowingDiscardConfirmation = false
+    @State private var renamingSession: BaseSession?
+    @State private var renameSuffix = ""
+    @State private var renameErrorMessage: String?
     @State private var errorMessage: String?
 
     private let sessionAPI = SessionAPI()
@@ -59,7 +62,7 @@ struct SessionQueueView: View {
                             }
                         } label: {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("\(sessionDisplayTitle(session)) · \(instanceLabel(for: session, index: index))")
+                                Text(displayName(for: session, index: index))
                                     .font(.headline)
                                 Text(session.subtitle)
                                     .font(.subheadline)
@@ -84,6 +87,14 @@ struct SessionQueueView: View {
                                 Label("暂存", systemImage: "archivebox")
                             }
                             .tint(.orange)
+                            .disabled(processingSessionIDs.contains(session.id))
+
+                            Button {
+                                startRenaming(session)
+                            } label: {
+                                Label("重命名", systemImage: "pencil")
+                            }
+                            .tint(.blue)
                             .disabled(processingSessionIDs.contains(session.id))
                         }
                     }
@@ -126,6 +137,30 @@ struct SessionQueueView: View {
             Button("取消", role: .cancel) {}
         } message: {
             Text("丢弃后会从未完成队列移除，并在归档中标记为已丢弃。")
+        }
+        .sheet(isPresented: Binding(
+            get: { renamingSession != nil },
+            set: { isPresented in
+                if !isPresented {
+                    renamingSession = nil
+                    renameErrorMessage = nil
+                }
+            }
+        )) {
+            RenameSessionView(
+                prefix: renamingSession.map { renamePrefix(for: $0) } ?? "",
+                suffix: $renameSuffix,
+                errorMessage: renameErrorMessage,
+                onCancel: {
+                    renamingSession = nil
+                    renameErrorMessage = nil
+                },
+                onSave: {
+                    if let renamingSession {
+                        Task { await renameSession(renamingSession) }
+                    }
+                }
+            )
         }
     }
 
@@ -181,6 +216,29 @@ struct SessionQueueView: View {
         }
     }
 
+    private func startRenaming(_ session: BaseSession) {
+        renamingSession = session
+        renameSuffix = suffixForRename(session)
+        renameErrorMessage = nil
+    }
+
+    private func renameSession(_ session: BaseSession) async {
+        let trimmedSuffix = renameSuffix.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedSuffix.isEmpty else {
+            renameErrorMessage = "序号不能为空。"
+            return
+        }
+
+        do {
+            let updatedSession = try await sessionAPI.rename(id: session.id, suffix: trimmedSuffix)
+            updateSession(updatedSession)
+            renamingSession = nil
+            renameErrorMessage = nil
+        } catch {
+            renameErrorMessage = error.localizedDescription
+        }
+    }
+
     private func nextManualDate() -> String {
         let dates = manualDates(for: seedSession)
         let existingDates = Set(sessions.map(\.date))
@@ -193,6 +251,28 @@ struct SessionQueueView: View {
 
     private func instanceLabel(for session: BaseSession, index: Int) -> String {
         "第 \(index + 1) 个 · \(session.date)"
+    }
+
+    private func displayName(for session: BaseSession, index: Int) -> String {
+        if session.taskType == .researchFeeder {
+            return session.title
+        }
+        return "\(sessionDisplayTitle(session)) · \(instanceLabel(for: session, index: index))"
+    }
+
+    private func renamePrefix(for session: BaseSession) -> String {
+        if session.taskType == .researchFeeder {
+            return "Deep Dive-\(session.date)-"
+        }
+        return "\(sessionDisplayTitle(session))-\(session.date)-"
+    }
+
+    private func suffixForRename(_ session: BaseSession) -> String {
+        let prefix = renamePrefix(for: session)
+        if session.title.hasPrefix(prefix) {
+            return String(session.title.dropFirst(prefix.count))
+        }
+        return "1"
     }
 
     private func isActive(_ session: BaseSession) -> Bool {
@@ -242,6 +322,52 @@ struct SessionDestinationView: View {
             CompletionArchiveView(session: session, initialMode: completionStartMode, sourceContext: checkinSourceContext) { completedSession in
                 onCompleted?(completedSession)
                 isShowingCompletion = false
+            }
+        }
+    }
+}
+
+private struct RenameSessionView: View {
+    let prefix: String
+    @Binding var suffix: String
+    let errorMessage: String?
+    let onCancel: () -> Void
+    let onSave: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("名称") {
+                    LabeledContent("固定部分", value: prefix)
+                    TextField("序号", text: $suffix)
+                        .keyboardType(.numbersAndPunctuation)
+                        .textInputAutocapitalization(.never)
+                    Text("只能修改日期后面的序号部分。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .font(.subheadline)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle("重命名")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
+                        onCancel()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") {
+                        onSave()
+                    }
+                }
             }
         }
     }
