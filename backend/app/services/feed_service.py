@@ -69,6 +69,7 @@ class FeedService:
                     "updated_at": datetime.now(timezone.utc),
                 }
             )
+        self._normalize_existing_research_titles(session)
         session = self._apply_default_title(session)
         return self.sessions.save(session)
 
@@ -111,7 +112,8 @@ class FeedService:
             return True
 
         archived_at = datetime.now(timezone.utc)
-        session = self._apply_default_title(session)
+        self._normalize_existing_research_titles(session)
+        session = self._ensure_default_title(session)
         updated_session = session.model_copy(
             update={
                 "status": SessionStatus.archived,
@@ -120,9 +122,9 @@ class FeedService:
         )
         self.sessions.save(updated_session)
         self._save_session_marker(
-            session=session,
+            session=updated_session,
             status=CheckinStatus.archived,
-            summary=f"已暂存：{session.title}",
+            summary=f"已暂存：{updated_session.title}",
             next_action="以后可以从归档区找回并继续。",
             created_at=archived_at,
         )
@@ -133,13 +135,12 @@ class FeedService:
         if session is None:
             return None
 
-        restored_session = self._apply_default_title(
-            session.model_copy(
-                update={
-                    "status": SessionStatus.active,
-                    "updated_at": datetime.now(timezone.utc),
-                }
-            )
+        session = self._ensure_default_title(session)
+        restored_session = session.model_copy(
+            update={
+                "status": SessionStatus.active,
+                "updated_at": datetime.now(timezone.utc),
+            }
         )
         return self.sessions.save(restored_session)
 
@@ -216,6 +217,9 @@ class FeedService:
             for item in existing
             if item.status != SessionStatus.skipped and (not exclude_self or item.id != session.id)
         }
+        if self._title_sequence(session) is not None and session.title not in used_titles:
+            return session
+
         sequence = self._next_title_sequence(session, existing, exclude_self)
         title = f"{self._title_prefix(session)}{sequence}"
         while title in used_titles:
@@ -223,10 +227,58 @@ class FeedService:
             title = f"{self._title_prefix(session)}{sequence}"
         return session.model_copy(update={"title": title})
 
+    def _ensure_default_title(self, session: BaseSession) -> BaseSession:
+        if session.task_type != TaskType.research_feeder:
+            return session
+        if self._title_sequence(session) is not None:
+            return session
+        return self._apply_default_title(session)
+
+    def _normalize_existing_research_titles(self, session: BaseSession) -> None:
+        if session.task_type != TaskType.research_feeder:
+            return
+
+        existing = self.sessions.get_by_date_and_task(
+            session.date.isoformat(),
+            session.task_type.value,
+        )
+        used_sequences = {
+            sequence
+            for item in existing
+            if item.status != SessionStatus.skipped
+            if (sequence := self._title_sequence(item)) is not None
+        }
+        next_sequence = (max(used_sequences) + 1) if used_sequences else 1
+
+        for item in existing:
+            if item.status == SessionStatus.skipped or self._title_sequence(item) is not None:
+                continue
+            while next_sequence in used_sequences:
+                next_sequence += 1
+            normalized = item.model_copy(
+                update={
+                    "title": f"{self._title_prefix(session)}{next_sequence}",
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            )
+            self.sessions.save(normalized)
+            used_sequences.add(next_sequence)
+            next_sequence += 1
+
     def _title_prefix(self, session: BaseSession) -> str:
         if session.task_type == TaskType.research_feeder:
             return f"Deep Dive-{session.date.strftime('%Y/%m/%d')}-"
         return f"{session.title}-{session.date.isoformat()}-"
+
+    def _title_sequence(self, session: BaseSession) -> Optional[int]:
+        if session.task_type != TaskType.research_feeder:
+            return None
+
+        date_slash = session.date.strftime("%Y/%m/%d")
+        date_dash = session.date.isoformat()
+        pattern = re.compile(rf"^Deep Dive-(?:{re.escape(date_slash)}|{re.escape(date_dash)})-(\d+)$")
+        match = pattern.match(session.title)
+        return int(match.group(1)) if match else None
 
     def _next_title_sequence(
         self,
@@ -237,18 +289,15 @@ class FeedService:
         if session.task_type != TaskType.research_feeder:
             return 1
 
-        date_slash = session.date.strftime("%Y/%m/%d")
-        date_dash = session.date.isoformat()
-        pattern = re.compile(rf"^Deep Dive-(?:{re.escape(date_slash)}|{re.escape(date_dash)})-(\d+)$")
         used_sequences = set()
         for item in existing:
             if item.status == SessionStatus.skipped:
                 continue
             if exclude_self and item.id == session.id:
                 continue
-            match = pattern.match(item.title)
-            if match:
-                used_sequences.add(int(match.group(1)))
+            sequence = self._title_sequence(item)
+            if sequence is not None:
+                used_sequences.add(sequence)
 
         return (max(used_sequences) + 1) if used_sequences else 1
 

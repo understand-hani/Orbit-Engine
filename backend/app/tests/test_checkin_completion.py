@@ -211,6 +211,110 @@ def test_archive_session_marks_session_archived_and_creates_checkin():
         get_settings.cache_clear()
 
 
+def test_archive_and_restore_preserve_deep_dive_title():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_session_archive_title_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        feed_service = FeedService()
+        checkin_service = CheckinService()
+
+        first = feed_service.generate_and_save_mock_session()
+        second = feed_service.generate_and_save_mock_session(first.date)
+        title_date = first.date.strftime("%Y/%m/%d")
+
+        assert first.title == f"Deep Dive-{title_date}-1"
+        assert second.title == f"Deep Dive-{title_date}-2"
+        assert feed_service.archive_session(second.id) is True
+
+        archived_second = feed_service.get_session(second.id)
+        assert archived_second is not None
+        assert archived_second.title == f"Deep Dive-{title_date}-2"
+        checkins = checkin_service.list_checkins(second.date.isoformat())
+        assert checkins[0].summary == f"已暂存：Deep Dive-{title_date}-2"
+
+        third = feed_service.generate_and_save_mock_session(first.date, task_type=TaskType.research_feeder)
+        assert third.title == f"Deep Dive-{title_date}-3"
+
+        restored_second = feed_service.restore_session(second.id)
+        assert restored_second is not None
+        assert restored_second.title == f"Deep Dive-{title_date}-2"
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
+def test_archiving_legacy_deep_dive_title_normalizes_once_and_counts_sequence():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_session_legacy_archive_title_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        feed_service = FeedService()
+        legacy = feed_service.generate_and_save_mock_session(task_type=TaskType.research_feeder)
+        legacy = legacy.model_copy(update={"title": "研究阅读启动"})
+        feed_service.sessions.save(legacy)
+        title_date = legacy.date.strftime("%Y/%m/%d")
+
+        assert feed_service.archive_session(legacy.id) is True
+        archived_legacy = feed_service.get_session(legacy.id)
+        assert archived_legacy is not None
+        assert archived_legacy.title == f"Deep Dive-{title_date}-1"
+
+        next_session = feed_service.generate_and_save_mock_session(
+            legacy.date,
+            task_type=TaskType.research_feeder,
+        )
+        assert next_session.title == f"Deep Dive-{title_date}-2"
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
+def test_new_deep_dive_counts_legacy_active_sessions_after_normalization():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_session_legacy_active_sequence_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        feed_service = FeedService()
+        legacy_one = feed_service.generate_and_save_mock_session(task_type=TaskType.research_feeder)
+        legacy_two = feed_service.generate_and_save_mock_session(
+            legacy_one.date,
+            task_type=TaskType.research_feeder,
+        )
+        legacy_one = legacy_one.model_copy(update={"title": "研究阅读启动"})
+        legacy_two = legacy_two.model_copy(update={"title": "研究阅读补做"})
+        feed_service.sessions.save(legacy_one)
+        feed_service.sessions.save(legacy_two)
+        title_date = legacy_one.date.strftime("%Y/%m/%d")
+
+        next_session = feed_service.generate_and_save_mock_session(
+            legacy_one.date,
+            task_type=TaskType.research_feeder,
+        )
+
+        assert feed_service.get_session(legacy_one.id).title == f"Deep Dive-{title_date}-1"
+        assert feed_service.get_session(legacy_two.id).title == f"Deep Dive-{title_date}-2"
+        assert next_session.title == f"Deep Dive-{title_date}-3"
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
 def test_today_generates_next_title_after_terminal_archive_or_completion():
     original_path = os.environ.get("DATABASE_PATH")
     db_path = Path(tempfile.mkdtemp()) / "infra_session_today_sequence_test.db"
