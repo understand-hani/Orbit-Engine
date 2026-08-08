@@ -5,6 +5,7 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.db.migrations import init_db
+from app.schemas.common import TaskType
 from app.schemas.profile import ResearchArchiveCreate, ResumeProfileCreate
 from app.schemas.research_feeder import ConfirmedResearchMaterial
 from app.services.archive_service import ArchiveService
@@ -62,6 +63,20 @@ def test_material_resume_archive_services():
         assert recovered_research is not None
         assert recovered_research.id == "session_2026-08-08_research_feeder"
         assert recovered_research.payload.selected_materials[0].id == "manual_material"
+        recovered_monday_research = feed.save_selected_materials(
+            "session_2026-08-10_research_feeder",
+            [
+                ConfirmedResearchMaterial(
+                    id="monday_manual_material",
+                    title="周一 Deep Dive 材料",
+                    summary="即使当天计划是 Radar，也应该恢复成 Deep Dive。",
+                    source_type="url",
+                )
+            ],
+        )
+        assert recovered_monday_research is not None
+        assert recovered_monday_research.task_type == TaskType.research_feeder
+        assert recovered_monday_research.title == "Deep Dive-2026/08/10-1"
 
         profile = resume.create(
             ResumeProfileCreate(

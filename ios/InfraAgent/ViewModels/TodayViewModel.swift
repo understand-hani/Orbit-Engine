@@ -53,7 +53,7 @@ final class TodayViewModel: ObservableObject {
         state = .loading
         await refreshContext()
         do {
-            session = try await sessionAPI.mock(date: entry.date)
+            session = try await sessionAPI.mock(date: entry.date, taskType: entry.taskTypeOverride)
             state = .loaded
         } catch {
             state = .failed(error.localizedDescription)
@@ -99,37 +99,52 @@ struct ManualSessionEntry: Identifiable {
     let subtitle: String
     let systemImage: String
     let date: String
+    let taskTypeOverride: TaskType?
 
-    static let all: [ManualSessionEntry] = [
+    static var all: [ManualSessionEntry] {
+        [
         ManualSessionEntry(
             id: "radar",
             title: "Radar",
             subtitle: "发现趋势、信号、机会和外部变化。",
             systemImage: "dot.radiowaves.left.and.right",
-            date: "2026-08-04"
+            date: "2026-08-04",
+            taskTypeOverride: nil
         ),
         ManualSessionEntry(
             id: "deep_dive",
             title: "Deep Dive",
             subtitle: "围绕一个材料完成深入阅读和小产出。",
             systemImage: "doc.text.magnifyingglass",
-            date: "2026-08-06"
+            date: todayString(),
+            taskTypeOverride: .researchFeeder
         ),
         ManualSessionEntry(
             id: "weekly_studio",
             title: "Weekly Studio",
             subtitle: "复盘、归档、更新计划并准备下一轮。",
             systemImage: "calendar.badge.clock",
-            date: "2026-08-09"
+            date: "2026-08-09",
+            taskTypeOverride: nil
         ),
         ManualSessionEntry(
             id: "opportunity_alignment",
             title: "Opportunity Alignment",
             subtitle: "把学习行动和真实机会、要求、反馈对齐。",
             systemImage: "scope",
-            date: "2026-08-05"
+            date: "2026-08-05",
+            taskTypeOverride: nil
         ),
-    ]
+        ]
+    }
+
+    private static func todayString() -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
+    }
 }
 
 struct HealthAPI {

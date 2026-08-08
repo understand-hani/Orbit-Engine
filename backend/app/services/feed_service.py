@@ -24,11 +24,19 @@ class FeedService:
         self.sessions = SessionRepository()
         self.checkins = CheckinRepository()
 
-    def preview_session(self, target_date: Optional[date] = None) -> BaseSession:
-        return self.coordinator.create_session(target_date)
+    def preview_session(
+        self,
+        target_date: Optional[date] = None,
+        task_type: Optional[TaskType] = None,
+    ) -> BaseSession:
+        return self.coordinator.create_session(target_date, task_type_override=task_type)
 
-    def generate_mock_session(self, target_date: Optional[date] = None) -> BaseSession:
-        session = self.coordinator.create_session(target_date)
+    def generate_mock_session(
+        self,
+        target_date: Optional[date] = None,
+        task_type: Optional[TaskType] = None,
+    ) -> BaseSession:
+        session = self.coordinator.create_session(target_date, task_type_override=task_type)
         payload = session.payload
         action = session.suggested_action
 
@@ -45,8 +53,12 @@ class FeedService:
         session = session.model_copy(update={"payload": payload, "suggested_action": action})
         return self._apply_default_title(session, exclude_self=False)
 
-    def generate_and_save_mock_session(self, target_date: Optional[date] = None) -> BaseSession:
-        session = self.generate_mock_session(target_date)
+    def generate_and_save_mock_session(
+        self,
+        target_date: Optional[date] = None,
+        task_type: Optional[TaskType] = None,
+    ) -> BaseSession:
+        session = self.generate_mock_session(target_date, task_type=task_type)
         if self.sessions.get_by_id(session.id) is not None:
             suffix = uuid4().hex[:8]
             session = session.model_copy(
@@ -186,7 +198,7 @@ class FeedService:
         except ValueError:
             return None
 
-        session = self.generate_mock_session(target_date)
+        session = self.generate_mock_session(target_date, task_type=TaskType.research_feeder)
         session = session.model_copy(update={"id": session_id})
         session = self._apply_default_title(session, exclude_self=False)
         return self.sessions.save(session)
@@ -238,10 +250,7 @@ class FeedService:
             if match:
                 used_sequences.add(int(match.group(1)))
 
-        sequence = 1
-        while sequence in used_sequences:
-            sequence += 1
-        return sequence
+        return (max(used_sequences) + 1) if used_sequences else 1
 
     def _save_session_marker(
         self,

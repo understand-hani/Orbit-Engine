@@ -39,9 +39,13 @@ from app.schemas.tech_radar import RadarDigest, RadarScope, RadarType, TechRadar
 
 
 class WeeklyCoordinator:
-    def create_session(self, target_date: Optional[date] = None) -> BaseSession:
+    def create_session(
+        self,
+        target_date: Optional[date] = None,
+        task_type_override: Optional[TaskType] = None,
+    ) -> BaseSession:
         day = target_date or date.today()
-        config = self._resolve_config(day)
+        config = self._resolve_config(day, task_type_override)
         payload = self._build_payload(day, config)
         now = datetime.now(timezone.utc)
 
@@ -63,7 +67,21 @@ class WeeklyCoordinator:
             updated_at=now,
         )
 
-    def _resolve_config(self, target_date: date) -> Dict:
+    def _resolve_config(
+        self,
+        target_date: date,
+        task_type_override: Optional[TaskType] = None,
+    ) -> Dict:
+        if task_type_override == TaskType.research_feeder:
+            return {
+                "task_type": TaskType.research_feeder,
+                "session_mode": SessionMode.manual,
+                "title": "Deep Dive",
+                "subtitle": "围绕一个材料完成深入阅读和小产出",
+                "suggested_action": SuggestedAction.generate_reading_pack,
+                "research_day_role": ResearchDayRole.select_and_start,
+            }
+
         weekday = target_date.weekday()
         if weekday in SCHEDULED_TASK_CONFIG:
             config = dict(SCHEDULED_TASK_CONFIG[weekday])
@@ -217,4 +235,3 @@ class WeeklyCoordinator:
 
     def _chat_thread_id(self, target_date: date, task_type: TaskType) -> str:
         return f"chat_{target_date.isoformat()}_{task_type.value}"
-

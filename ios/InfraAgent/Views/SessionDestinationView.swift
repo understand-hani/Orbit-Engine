@@ -206,7 +206,7 @@ struct SessionQueueView: View {
 
         do {
             let date = nextManualDate()
-            let session = try await sessionAPI.generateAndSaveMock(date: date)
+            let session = try await sessionAPI.generateAndSaveMock(date: date, taskType: taskTypeOverrideForNewSession())
             guard belongsToCurrentQueue(session) else {
                 errorMessage = "后端返回了 \(sessionDisplayTitle(session))，不是当前 \(sessionDisplayTitle(seedSession)) 队列的工作区。"
                 return
@@ -271,6 +271,9 @@ struct SessionQueueView: View {
     }
 
     private func nextManualDate() -> String {
+        if seedSession.taskType == .researchFeeder && !isWeeklyStudio(seedSession) {
+            return seedSession.date
+        }
         let dates = manualDates(for: seedSession)
         let existingDates = Set(sessions.filter(belongsToCurrentQueue).map(\.date))
         return dates.first { !existingDates.contains($0) } ?? dates.last ?? seedSession.date
@@ -332,6 +335,13 @@ struct SessionQueueView: View {
             return true
         }
         return isWeeklyStudio(session) == isWeeklyStudio(seedSession)
+    }
+
+    private func taskTypeOverrideForNewSession() -> TaskType? {
+        if seedSession.taskType == .researchFeeder && !isWeeklyStudio(seedSession) {
+            return .researchFeeder
+        }
+        return nil
     }
 }
 

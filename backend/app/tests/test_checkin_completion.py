@@ -1,10 +1,11 @@
 import os
 import tempfile
+from datetime import date
 from pathlib import Path
 
 from app.config import get_settings
 from app.db.migrations import init_db
-from app.schemas.common import SessionStatus
+from app.schemas.common import SessionStatus, TaskType
 from app.schemas.completion import CompletionConfirmRequest, CompletionSuggestion
 from app.services.checkin_service import CheckinService
 from app.services.feed_service import FeedService
@@ -122,14 +123,14 @@ def test_research_session_default_title_and_rename_rejects_duplicate():
         assert first.title == f"Deep Dive-{title_date}-1"
         assert second.title == f"Deep Dive-{title_date}-2"
         assert preview.title == f"Deep Dive-{title_date}-3"
-        assert replacement.title == f"Deep Dive-{title_date}-1"
+        assert replacement.title == f"Deep Dive-{title_date}-3"
 
-        renamed = feed_service.rename_session(second.id, "3")
+        renamed = feed_service.rename_session(second.id, "4")
         assert renamed is not None
-        assert renamed.title == f"Deep Dive-{title_date}-3"
+        assert renamed.title == f"Deep Dive-{title_date}-4"
 
         try:
-            feed_service.rename_session(renamed.id, "1")
+            feed_service.rename_session(renamed.id, "3")
         except ValueError as exc:
             assert "名称已存在" in str(exc)
         else:
@@ -247,6 +248,31 @@ def test_today_generates_next_title_after_terminal_archive_or_completion():
         after_delete = feed_service.get_or_create_mock_session(archived.date)
         assert after_delete.id == after_completion.id
         assert after_delete.status == SessionStatus.skipped
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
+def test_can_force_deep_dive_for_current_date_independent_of_weekday_schedule():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_session_forced_deep_dive_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        feed_service = FeedService()
+        monday = date.fromisoformat("2026-08-10")
+
+        scheduled = feed_service.generate_mock_session(monday)
+        forced = feed_service.generate_and_save_mock_session(monday, task_type=TaskType.research_feeder)
+
+        title_date = monday.strftime("%Y/%m/%d")
+        assert scheduled.task_type == TaskType.tech_radar
+        assert forced.task_type == TaskType.research_feeder
+        assert forced.title == f"Deep Dive-{title_date}-1"
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)

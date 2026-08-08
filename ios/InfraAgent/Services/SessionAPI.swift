@@ -11,16 +11,16 @@ struct SessionAPI {
         try await resolvedClient.get("/api/sessions/today", queryItems: dateQuery(date))
     }
 
-    func preview(date: String? = nil) async throws -> BaseSession {
-        try await resolvedClient.get("/api/sessions/preview", queryItems: dateQuery(date))
+    func preview(date: String? = nil, taskType: TaskType? = nil) async throws -> BaseSession {
+        try await resolvedClient.get("/api/sessions/preview", queryItems: sessionQuery(date: date, taskType: taskType))
     }
 
-    func mock(date: String? = nil) async throws -> BaseSession {
-        try await resolvedClient.get("/api/sessions/mock", queryItems: dateQuery(date))
+    func mock(date: String? = nil, taskType: TaskType? = nil) async throws -> BaseSession {
+        try await resolvedClient.get("/api/sessions/mock", queryItems: sessionQuery(date: date, taskType: taskType))
     }
 
-    func generateAndSaveMock(date: String? = nil) async throws -> BaseSession {
-        try await resolvedClient.post("/api/sessions/mock", queryItems: dateQuery(date))
+    func generateAndSaveMock(date: String? = nil, taskType: TaskType? = nil) async throws -> BaseSession {
+        try await resolvedClient.post("/api/sessions/mock", queryItems: sessionQuery(date: date, taskType: taskType))
     }
 
     func sessionsByDate(_ date: String) async throws -> [BaseSession] {
@@ -64,6 +64,14 @@ struct SessionAPI {
     private func dateQuery(_ date: String?) -> [URLQueryItem] {
         guard let date else { return [] }
         return [URLQueryItem(name: "date", value: date)]
+    }
+
+    private func sessionQuery(date: String?, taskType: TaskType?) -> [URLQueryItem] {
+        var items = dateQuery(date)
+        if let taskType {
+            items.append(URLQueryItem(name: "task_type", value: taskType.rawValue))
+        }
+        return items
     }
 }
 

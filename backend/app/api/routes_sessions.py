@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Response
 
+from app.schemas.common import TaskType
 from app.schemas.session import BaseSession, SessionRenameRequest
 from app.schemas.jd_analysis import JDInputCreate
 from app.schemas.research_feeder import ConfirmedResearchMaterial
@@ -14,20 +15,27 @@ feed_service = FeedService()
 
 
 @router.get("/sessions/preview", response_model=BaseSession)
-def preview_session(target_date: Optional[date] = Query(default=None, alias="date")) -> BaseSession:
-    return feed_service.preview_session(target_date)
+def preview_session(
+    target_date: Optional[date] = Query(default=None, alias="date"),
+    task_type: Optional[TaskType] = Query(default=None),
+) -> BaseSession:
+    return feed_service.preview_session(target_date, task_type)
 
 
 @router.get("/sessions/mock", response_model=BaseSession)
-def mock_session(target_date: Optional[date] = Query(default=None, alias="date")) -> BaseSession:
-    return feed_service.generate_mock_session(target_date)
+def mock_session(
+    target_date: Optional[date] = Query(default=None, alias="date"),
+    task_type: Optional[TaskType] = Query(default=None),
+) -> BaseSession:
+    return feed_service.generate_mock_session(target_date, task_type)
 
 
 @router.post("/sessions/mock", response_model=BaseSession)
 def generate_and_save_mock_session(
-    target_date: Optional[date] = Query(default=None, alias="date")
+    target_date: Optional[date] = Query(default=None, alias="date"),
+    task_type: Optional[TaskType] = Query(default=None),
 ) -> BaseSession:
-    return feed_service.generate_and_save_mock_session(target_date)
+    return feed_service.generate_and_save_mock_session(target_date, task_type)
 
 
 @router.get("/sessions/today", response_model=BaseSession)
