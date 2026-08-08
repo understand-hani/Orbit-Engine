@@ -294,9 +294,13 @@ struct SessionQueueView: View {
 
     private func renamePrefix(for session: BaseSession) -> String {
         if session.taskType == .researchFeeder {
-            return "Deep Dive-\(session.date)-"
+            return "Deep Dive-\(displayDateForTitle(session.date))-"
         }
         return "\(sessionDisplayTitle(session))-\(session.date)-"
+    }
+
+    private func displayDateForTitle(_ date: String) -> String {
+        date.replacingOccurrences(of: "-", with: "/")
     }
 
     private func suffixForRename(_ session: BaseSession) -> String {

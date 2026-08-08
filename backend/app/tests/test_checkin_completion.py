@@ -114,14 +114,18 @@ def test_research_session_default_title_and_rename_rejects_duplicate():
         first = feed_service.generate_and_save_mock_session()
         second = feed_service.generate_and_save_mock_session(first.date)
         preview = feed_service.generate_mock_session(first.date)
+        assert feed_service.delete_session(first.id) is True
+        replacement = feed_service.generate_and_save_mock_session(first.date)
 
-        assert first.title == f"Deep Dive-{first.date.isoformat()}-1"
-        assert second.title == f"Deep Dive-{first.date.isoformat()}-2"
-        assert preview.title == f"Deep Dive-{first.date.isoformat()}-3"
+        title_date = first.date.strftime("%Y/%m/%d")
+        assert first.title == f"Deep Dive-{title_date}-1"
+        assert second.title == f"Deep Dive-{title_date}-2"
+        assert preview.title == f"Deep Dive-{title_date}-3"
+        assert replacement.title == f"Deep Dive-{title_date}-1"
 
         renamed = feed_service.rename_session(second.id, "3")
         assert renamed is not None
-        assert renamed.title == f"Deep Dive-{first.date.isoformat()}-3"
+        assert renamed.title == f"Deep Dive-{title_date}-3"
 
         try:
             feed_service.rename_session(renamed.id, "1")
@@ -156,12 +160,13 @@ def test_archive_session_marks_session_archived_and_creates_checkin():
         checkins = checkin_service.list_checkins(session.date.isoformat())
         assert len(checkins) == 1
         assert checkins[0].status.value == "archived"
-        assert checkins[0].summary == f"已暂存：Deep Dive-{session.date.isoformat()}-1"
+        title_date = session.date.strftime("%Y/%m/%d")
+        assert checkins[0].summary == f"已暂存：Deep Dive-{title_date}-1"
 
         restored_session = feed_service.restore_session(session.id)
         assert restored_session is not None
         assert restored_session.status.value == "active"
-        assert restored_session.title == f"Deep Dive-{session.date.isoformat()}-1"
+        assert restored_session.title == f"Deep Dive-{title_date}-1"
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)

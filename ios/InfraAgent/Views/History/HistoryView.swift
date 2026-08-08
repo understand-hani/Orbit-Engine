@@ -14,6 +14,23 @@ struct HistoryView: View {
                     ErrorBanner(message: error)
                 }
 
+                Section("归档记录") {
+                    ForEach(viewModel.groupedDates, id: \.self) { date in
+                        let dayCheckins = viewModel.checkins(on: date)
+                        NavigationLink {
+                            DailyHistoryView(date: date, checkins: dayCheckins)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(date)
+                                    .font(.headline)
+                                Text("\(dayCheckins.count) 条归档 · \(dayCheckins.reduce(0) { $0 + $1.durationMin }) 分钟")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
                 Section("暂存") {
                     if viewModel.archivedCheckins.isEmpty {
                         EmptyStateView(
@@ -51,23 +68,6 @@ struct HistoryView: View {
                         }
                     }
                 }
-
-                Section("归档记录") {
-                    ForEach(viewModel.groupedDates, id: \.self) { date in
-                        let dayCheckins = viewModel.checkins(on: date)
-                        NavigationLink {
-                            DailyHistoryView(date: date, checkins: dayCheckins)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(date)
-                                    .font(.headline)
-                                Text("\(dayCheckins.count) 条归档 · \(dayCheckins.reduce(0) { $0 + $1.durationMin }) 分钟")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
             }
             .navigationTitle("归档")
             .task {
@@ -77,10 +77,17 @@ struct HistoryView: View {
     }
 
     private func archivedTitle(for checkin: Checkin) -> String {
-        let prefix = "Deep Dive-\(checkin.date)-"
+        let displayDate = checkin.date.replacingOccurrences(of: "-", with: "/")
+        let prefix = "Deep Dive-\(displayDate)-"
         if checkin.summary.contains(prefix),
            let range = checkin.summary.range(of: prefix) {
             return String(checkin.summary[range.lowerBound...])
+        }
+        let legacyPrefix = "Deep Dive-\(checkin.date)-"
+        if checkin.summary.contains(legacyPrefix),
+           let range = checkin.summary.range(of: legacyPrefix) {
+            return String(checkin.summary[range.lowerBound...])
+                .replacingOccurrences(of: legacyPrefix, with: prefix)
         }
         return "\(prefix)1"
     }

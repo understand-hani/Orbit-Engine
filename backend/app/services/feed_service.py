@@ -201,7 +201,7 @@ class FeedService:
         used_titles = {
             item.title
             for item in existing
-            if not exclude_self or item.id != session.id
+            if item.status != SessionStatus.skipped and (not exclude_self or item.id != session.id)
         }
         sequence = 1
         title = f"{self._title_prefix(session)}{sequence}"
@@ -212,7 +212,7 @@ class FeedService:
 
     def _title_prefix(self, session: BaseSession) -> str:
         if session.task_type == TaskType.research_feeder:
-            return f"Deep Dive-{session.date.isoformat()}-"
+            return f"Deep Dive-{session.date.strftime('%Y/%m/%d')}-"
         return f"{session.title}-{session.date.isoformat()}-"
 
     def _save_session_marker(

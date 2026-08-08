@@ -189,7 +189,7 @@ struct TodayView: View {
     }
 
     private func deepDiveDisplayTitle(for session: BaseSession) -> String {
-        let prefix = "Deep Dive-\(session.date)-"
+        let prefix = "Deep Dive-\(session.date.replacingOccurrences(of: "-", with: "/"))-"
         if session.title.hasPrefix(prefix) {
             return session.title
         }
