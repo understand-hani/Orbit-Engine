@@ -164,6 +164,9 @@ struct SessionQueueView: View {
     }
 
     private func updateSession(_ session: BaseSession) {
+        guard belongsToCurrentQueue(session) else {
+            return
+        }
         if !isActive(session) {
             sessions.removeAll { $0.id == session.id }
             return
@@ -176,7 +179,7 @@ struct SessionQueueView: View {
     }
 
     private func reconcileSeedSession() {
-        sessions.removeAll { !isActive($0) }
+        sessions.removeAll { !isActive($0) || !belongsToCurrentQueue($0) }
         if sessions.isEmpty && isActive(seedSession) {
             sessions = [seedSession]
         }
@@ -204,6 +207,10 @@ struct SessionQueueView: View {
         do {
             let date = nextManualDate()
             let session = try await sessionAPI.generateAndSaveMock(date: date)
+            guard belongsToCurrentQueue(session) else {
+                errorMessage = "后端返回了 \(sessionDisplayTitle(session))，不是当前 \(sessionDisplayTitle(seedSession)) 队列的工作区。"
+                return
+            }
             if !sessions.contains(where: { $0.id == session.id }) {
                 sessions.insert(session, at: 0)
             } else if let index = sessions.firstIndex(where: { $0.id == session.id }) {
@@ -265,12 +272,12 @@ struct SessionQueueView: View {
 
     private func nextManualDate() -> String {
         let dates = manualDates(for: seedSession)
-        let existingDates = Set(sessions.map(\.date))
+        let existingDates = Set(sessions.filter(belongsToCurrentQueue).map(\.date))
         return dates.first { !existingDates.contains($0) } ?? dates.last ?? seedSession.date
     }
 
     private var activeSessions: [BaseSession] {
-        sessions.filter(isActive)
+        sessions.filter { isActive($0) && belongsToCurrentQueue($0) }
     }
 
     private func instanceLabel(for session: BaseSession, index: Int) -> String {
@@ -315,6 +322,16 @@ struct SessionQueueView: View {
         session.status != .completed &&
             session.status != .archived &&
             session.status != .skipped
+    }
+
+    private func belongsToCurrentQueue(_ session: BaseSession) -> Bool {
+        guard session.taskType == seedSession.taskType else {
+            return false
+        }
+        guard session.taskType == .researchFeeder else {
+            return true
+        }
+        return isWeeklyStudio(session) == isWeeklyStudio(seedSession)
     }
 }
 
@@ -610,7 +627,7 @@ private func sessionDisplayTitle(_ session: BaseSession) -> String {
     case .techRadar:
         return "Radar"
     case .researchFeeder:
-        if session.date == "2026-08-09" || session.date == "2026-08-16" {
+        if isWeeklyStudio(session) {
             return "Weekly Studio"
         }
         return "Deep Dive"
@@ -624,7 +641,7 @@ private func sessionDisplayType(_ session: BaseSession) -> String {
     case .techRadar:
         return "radar"
     case .researchFeeder:
-        if session.date == "2026-08-09" || session.date == "2026-08-16" {
+        if isWeeklyStudio(session) {
             return "weekly_studio"
         }
         return "deep_dive"
@@ -640,9 +657,13 @@ private func manualDates(for session: BaseSession) -> [String] {
     case .jdAnalysis:
         return ["2026-08-05", "2026-08-12"]
     case .researchFeeder:
-        if session.date == "2026-08-09" || session.date == "2026-08-16" {
+        if isWeeklyStudio(session) {
             return ["2026-08-09", "2026-08-16"]
         }
-        return ["2026-08-06", "2026-08-07", "2026-08-08", "2026-08-10", "2026-08-13", "2026-08-14", "2026-08-15"]
+        return ["2026-08-06", "2026-08-07", "2026-08-08", "2026-08-13", "2026-08-14", "2026-08-15"]
     }
+}
+
+private func isWeeklyStudio(_ session: BaseSession) -> Bool {
+    session.date == "2026-08-09" || session.date == "2026-08-16"
 }
