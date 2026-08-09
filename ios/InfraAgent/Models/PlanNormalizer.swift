@@ -5,7 +5,8 @@ struct PlanNormalizer {
         var updated = context
         let normalizedPlan = normalizedFullCyclePlan(
             context.plan.fullCyclePlan,
-            direction: context.profile.goal.isEmpty ? context.plan.longTermGoal : context.profile.goal
+            direction: context.profile.goal.isEmpty ? context.plan.longTermGoal : context.profile.goal,
+            targetCycle: context.plan.targetCycle
         )
         let changed = normalizedPlan != context.plan.fullCyclePlan
         if changed {
@@ -15,7 +16,14 @@ struct PlanNormalizer {
         return (updated, changed)
     }
 
-    static func normalizedFullCyclePlan(_ items: [String], direction: String) -> [String] {
+    static func normalizedFullCyclePlan(_ items: [String], direction: String, targetCycle: String = "") -> [String] {
+        let formatted = items
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        if formatted.count >= 3, formatted.count <= 4, formatted.allSatisfy(isFormattedPhase) {
+            return formatted
+        }
+
         let cleaned = items
             .map(stripPhasePrefix)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -24,9 +32,15 @@ struct PlanNormalizer {
         guard !cleaned.isEmpty else { return [] }
 
         let groups = grouped(cleaned, maxGroups: 4)
+        let timeRanges = phaseTimeRanges(targetCycle: targetCycle, count: groups.count)
         return groups.enumerated().map { offset, group in
             let merged = merge(group, direction: direction, phaseIndex: offset + 1)
-            return "第 \(offset + 1) 阶段：\(merged)"
+            return formatPhase(
+                index: offset + 1,
+                timeRange: timeRanges[offset],
+                body: merged,
+                direction: direction
+            )
         }
     }
 
@@ -81,6 +95,16 @@ struct PlanNormalizer {
         return "围绕「\(direction)」完成这一阶段的连续子任务：\(details)。这一阶段结束时形成一份可回看的阶段笔记或对比结论。"
     }
 
+    private static func formatPhase(index: Int, timeRange: String, body: String, direction: String) -> String {
+        let objective = body.trimmingCharacters(in: CharacterSet(charactersIn: "。 "))
+        return [
+            "第 \(index) 阶段（\(timeRange)）",
+            "目标：\(objective)。",
+            "动作：拆出本阶段最关键的 2-3 个问题，围绕这些问题选择材料、完成 Deep Dive，并记录证据。",
+            "产出：形成一份能说明「\(direction)」阶段进展的笔记、对比清单或小型实践结果。"
+        ].joined(separator: "\n")
+    }
+
     private static func expandVaguePlanItem(_ item: String, direction: String, phaseIndex: Int) -> String {
         let topic = normalizedVagueTopic(item)
         switch phaseIndex {
@@ -126,5 +150,75 @@ struct PlanNormalizer {
             }
         }
         return text
+    }
+
+    private static func isFormattedPhase(_ item: String) -> Bool {
+        item.contains("目标：") &&
+            item.contains("动作：") &&
+            item.contains("产出：") &&
+            item.contains("（") &&
+            item.contains("）")
+    }
+
+    private static func phaseTimeRanges(targetCycle: String, count: Int) -> [String] {
+        if let totalMonths = parseTotalMonths(targetCycle) {
+            return numberRanges(total: totalMonths, count: count, unit: "个月")
+        }
+        if let totalWeeks = parseTotalWeeks(targetCycle) {
+            return numberRanges(total: totalWeeks, count: count, unit: "周")
+        }
+        return (1...count).map { "阶段 \($0)/\(count)" }
+    }
+
+    private static func parseTotalMonths(_ targetCycle: String) -> Int? {
+        let text = targetCycle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty {
+            return nil
+        }
+        if text.contains("半年") {
+            return 6
+        }
+        if text.contains("一年") || text.contains("1年") {
+            return 12
+        }
+        let digits = text.filter(\.isNumber)
+        guard let value = Int(digits), value > 0 else {
+            return nil
+        }
+        if text.contains("年") {
+            return value * 12
+        }
+        if text.contains("月") || text.contains("个月") {
+            return value
+        }
+        return nil
+    }
+
+    private static func parseTotalWeeks(_ targetCycle: String) -> Int? {
+        let text = targetCycle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let digits = text.filter(\.isNumber)
+        guard text.contains("周"), let value = Int(digits), value > 0 else {
+            return nil
+        }
+        return value
+    }
+
+    private static func numberRanges(total: Int, count: Int, unit: String) -> [String] {
+        var ranges: [String] = []
+        var cursor = 1
+
+        for index in 0..<count {
+            let remainingGroups = count - index
+            let remainingUnits = total - cursor + 1
+            let span = max(remainingUnits / remainingGroups, 1)
+            let end = min(cursor + span - 1, total)
+            if cursor == end {
+                ranges.append("第 \(cursor) \(unit)")
+            } else {
+                ranges.append("第 \(cursor)-\(end) \(unit)")
+            }
+            cursor = end + 1
+        }
+        return ranges
     }
 }

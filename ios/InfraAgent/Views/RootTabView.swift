@@ -70,13 +70,7 @@ struct PlanView: View {
                                 .foregroundStyle(.secondary)
                         } else {
                             ForEach(Array(context.plan.fullCyclePlan.enumerated()), id: \.offset) { index, item in
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("阶段 \(index + 1)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Text(item)
-                                }
-                                .padding(.vertical, 4)
+                                PlanPhaseBlockView(index: index + 1, text: item)
                             }
                         }
                     }
@@ -212,7 +206,7 @@ private struct PlanQuickEditView: View {
         let normalized = PlanNormalizer.normalizedContext(initialContext).context
         _longTermGoal = State(initialValue: initialContext.plan.longTermGoal)
         _targetCycle = State(initialValue: initialContext.plan.targetCycle)
-        _fullCyclePlanText = State(initialValue: normalized.plan.fullCyclePlan.joined(separator: "\n"))
+        _fullCyclePlanText = State(initialValue: normalized.plan.fullCyclePlan.joined(separator: "\n\n"))
         _weeklyFocus = State(initialValue: initialContext.plan.weeklyFocus)
         _nextAction = State(initialValue: initialContext.plan.nextAction)
         _activeTasksText = State(initialValue: initialContext.plan.activeTasks.joined(separator: "\n"))
@@ -228,10 +222,10 @@ private struct PlanQuickEditView: View {
             }
 
             Section("全周期计划") {
-                Text("建议保留 3-4 个阶段。每个阶段直接写清楚目标、动作或产出，不要只写一个名词。")
+                Text("建议保留 3-4 个阶段。每个阶段可用多行写目标、动作和产出；阶段之间用空行分隔。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextField("每行一个阶段", text: $fullCyclePlanText, axis: .vertical)
+                TextField("阶段之间用空行分隔", text: $fullCyclePlanText, axis: .vertical)
                     .lineLimit(4...10)
             }
 
@@ -282,8 +276,9 @@ private struct PlanQuickEditView: View {
         updated.plan.longTermGoal = nonEmpty(longTermGoal, fallback: initialContext.plan.longTermGoal)
         updated.plan.targetCycle = nonEmpty(targetCycle, fallback: initialContext.plan.targetCycle)
         updated.plan.fullCyclePlan = PlanNormalizer.normalizedFullCyclePlan(
-            nonEmptyList(splitLines(fullCyclePlanText), fallback: initialContext.plan.fullCyclePlan),
-            direction: updated.profile.goal.isEmpty ? updated.plan.longTermGoal : updated.profile.goal
+            nonEmptyList(splitPlanBlocks(fullCyclePlanText), fallback: initialContext.plan.fullCyclePlan),
+            direction: updated.profile.goal.isEmpty ? updated.plan.longTermGoal : updated.profile.goal,
+            targetCycle: updated.plan.targetCycle
         )
         updated.plan.weeklyFocus = nonEmpty(weeklyFocus, fallback: initialContext.plan.weeklyFocus)
         updated.plan.nextAction = nonEmpty(nextAction, fallback: initialContext.plan.nextAction)
@@ -300,6 +295,13 @@ private struct PlanQuickEditView: View {
             .filter { !$0.isEmpty }
     }
 
+    private func splitPlanBlocks(_ text: String) -> [String] {
+        text
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
     private func nonEmpty(_ value: String, fallback: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? fallback : trimmed
@@ -310,7 +312,41 @@ private struct PlanQuickEditView: View {
     }
 
     private var fullCyclePlanValidationMessage: String? {
-        PlanNormalizer.validationMessage(for: splitLines(fullCyclePlanText))
+        PlanNormalizer.validationMessage(for: splitPlanBlocks(fullCyclePlanText))
+    }
+}
+
+private struct PlanPhaseBlockView: View {
+    let index: Int
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+            ForEach(bodyLines, id: \.self) { line in
+                Text(line)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 6)
+    }
+
+    private var lines: [String] {
+        text
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private var title: String {
+        lines.first ?? "阶段 \(index)"
+    }
+
+    private var bodyLines: [String] {
+        Array(lines.dropFirst())
     }
 }
 

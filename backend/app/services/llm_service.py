@@ -285,6 +285,11 @@ Rules:
 - Do not output vague labels like just a tool, framework, or topic name.
 - Each milestone should describe a concrete phase objective plus the specific
   work to do or output to produce in that phase.
+- Format each full_cycle_plan item as a readable block:
+  第 N 阶段（时间范围）
+  目标：...
+  动作：...
+  产出：...
 - active_tasks should be small, observable actions.
 - active_tasks must be specific enough that a user can immediately act on them.
 - tracking_keywords should be useful search keywords, not generic motivation.

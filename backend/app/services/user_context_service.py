@@ -88,9 +88,9 @@ class UserContextService:
         full_cycle_plan = [item.strip() for item in request.full_cycle_plan if item.strip()]
         if not full_cycle_plan:
             full_cycle_plan = [
-                f"第 1 阶段：围绕「{direction}」建立基础地图，整理 10-15 个核心概念、代表材料和可直接检索的关键词。",
-                f"第 2 阶段：围绕「{direction}」完成 2-4 次 Deep Dive，把关键路线、方法差异和适用边界写成可复用笔记。",
-                f"第 3 阶段：围绕「{direction}」做一个小型输出，如对比清单、案例拆解或实践草稿，用来验证前两阶段结论。",
+                f"围绕「{direction}」建立基础地图，整理 10-15 个核心概念、代表材料和可直接检索的关键词。",
+                f"围绕「{direction}」完成 2-4 次 Deep Dive，把关键路线、方法差异和适用边界写成可复用笔记。",
+                f"围绕「{direction}」做一个小型输出，如对比清单、案例拆解或实践草稿，用来验证前两阶段结论。",
             ]
 
         current_milestone = full_cycle_plan[0]
@@ -143,7 +143,11 @@ class UserContextService:
 
     def _normalize_work_learning_plan(self, context: UserContext) -> WorkLearningPlan:
         direction = context.profile.goal or context.plan.long_term_goal or "当前方向"
-        normalized_full_cycle_plan = self._normalize_plan_items(context.plan.full_cycle_plan, direction)
+        normalized_full_cycle_plan = self._normalize_plan_items(
+            context.plan.full_cycle_plan,
+            direction,
+            context.plan.target_cycle,
+        )
         return context.plan.model_copy(
             update={
                 "full_cycle_plan": normalized_full_cycle_plan,
@@ -156,19 +160,24 @@ class UserContextService:
         suggestion: DirectionProfileSuggestion,
     ) -> DirectionProfileSuggestion:
         direction = request.current_direction.strip() or request.long_term_goal.strip() or "当前方向"
-        normalized_plan = self._normalize_plan_items(suggestion.full_cycle_plan, direction)
+        normalized_plan = self._normalize_plan_items(suggestion.full_cycle_plan, direction, request.target_cycle)
         return suggestion.model_copy(update={"full_cycle_plan": normalized_plan})
 
-    def _normalize_plan_items(self, items: list[str], direction: str) -> list[str]:
+    def _normalize_plan_items(self, items: list[str], direction: str, target_cycle: str = "") -> list[str]:
+        formatted = [item.strip() for item in items if item.strip()]
+        if 3 <= len(formatted) <= 4 and all(self._is_formatted_phase(item) for item in formatted):
+            return formatted
+
         cleaned = [self._strip_phase_prefix(item) for item in items if item.strip()]
         if not cleaned:
             return []
 
         grouped = self._group_plan_items(cleaned, max_groups=4)
+        ranges = self._phase_time_ranges(target_cycle, len(grouped))
         normalized: list[str] = []
         for index, group in enumerate(grouped, start=1):
             merged = self._merge_group(group, direction, index)
-            normalized.append(f"第 {index} 阶段：{merged}")
+            normalized.append(self._format_phase(index, ranges[index - 1], merged, direction))
         return normalized
 
     def _group_plan_items(self, items: list[str], max_groups: int) -> list[list[str]]:
@@ -202,6 +211,68 @@ class UserContextService:
             f"围绕「{direction}」完成这一阶段的连续子任务：{details}。"
             "这一阶段结束时要形成一份可回看的阶段笔记或对比结论。"
         )
+
+    def _format_phase(self, index: int, time_range: str, body: str, direction: str) -> str:
+        objective = body.rstrip("。")
+        return "\n".join(
+            [
+                f"第 {index} 阶段（{time_range}）",
+                f"目标：{objective}。",
+                "动作：拆出本阶段最关键的 2-3 个问题，围绕这些问题选择材料、完成 Deep Dive，并记录证据。",
+                f"产出：形成一份能说明「{direction}」阶段进展的笔记、对比清单或小型实践结果。",
+            ]
+        )
+
+    def _phase_time_ranges(self, target_cycle: str, count: int) -> list[str]:
+        total_months = self._parse_total_months(target_cycle)
+        if total_months is not None:
+            return self._number_ranges(total_months, count, "个月")
+
+        total_weeks = self._parse_total_weeks(target_cycle)
+        if total_weeks is not None:
+            return self._number_ranges(total_weeks, count, "周")
+
+        return [f"阶段 {index}/{count}" for index in range(1, count + 1)]
+
+    def _parse_total_months(self, target_cycle: str) -> int | None:
+        text = target_cycle.strip()
+        if not text:
+            return None
+        if "半年" in text:
+            return 6
+        if "一年" in text or "1年" in text:
+            return 12
+        digits = "".join(ch for ch in text if ch.isdigit())
+        if not digits:
+            return None
+        value = int(digits)
+        if "年" in text:
+            return max(value * 12, 1)
+        if "月" in text or "个月" in text:
+            return max(value, 1)
+        return None
+
+    def _parse_total_weeks(self, target_cycle: str) -> int | None:
+        text = target_cycle.strip()
+        digits = "".join(ch for ch in text if ch.isdigit())
+        if digits and "周" in text:
+            return max(int(digits), 1)
+        return None
+
+    def _number_ranges(self, total: int, count: int, unit: str) -> list[str]:
+        ranges: list[str] = []
+        cursor = 1
+        for index in range(count):
+            remaining_groups = count - index
+            remaining_units = total - cursor + 1
+            span = max(remaining_units // remaining_groups, 1)
+            end = min(cursor + span - 1, total)
+            if cursor == end:
+                ranges.append(f"第 {cursor} {unit}")
+            else:
+                ranges.append(f"第 {cursor}-{end} {unit}")
+            cursor = end + 1
+        return ranges
 
     def _strip_phase_prefix(self, item: str) -> str:
         text = item.strip()
@@ -244,6 +315,9 @@ class UserContextService:
         if topic.endswith("等"):
             topic = topic[:-1].strip()
         return topic
+
+    def _is_formatted_phase(self, item: str) -> bool:
+        return "目标：" in item and "动作：" in item and "产出：" in item and "（" in item and "）" in item
 
     def _default_context(self) -> UserContext:
         now = datetime.now(timezone.utc)

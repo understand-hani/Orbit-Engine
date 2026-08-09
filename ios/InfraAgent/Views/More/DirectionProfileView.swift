@@ -154,10 +154,10 @@ struct DirectionProfileView: View {
                 switch planStep {
                 case .fullCycle:
                     Section("全周期计划") {
-                        Text("先确认整个目标周期的阶段安排。建议控制在 3-4 个阶段，每行一个阶段，并把该阶段要做什么、产出什么写清楚。")
+                        Text("建议控制在 3-4 个阶段。每个阶段可用多行写目标、动作和产出；阶段之间用空行分隔。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        TextField("全周期计划，每行一个阶段", text: $fullCyclePlanText, axis: .vertical)
+                        TextField("阶段之间用空行分隔", text: $fullCyclePlanText, axis: .vertical)
                             .lineLimit(4...10)
                     }
                     if let issue = fullCyclePlanValidationMessage {
@@ -169,7 +169,7 @@ struct DirectionProfileView: View {
                     }
                 case .week:
                     Section("已确认的全周期计划") {
-                        planPreviewSectionItems(splitLines(fullCyclePlanText), emptyText: "还没有全周期计划。")
+                        planPreviewSectionItems(splitPlanBlocks(fullCyclePlanText), emptyText: "还没有全周期计划。")
                     }
 
                     Section("第一周计划") {
@@ -185,7 +185,7 @@ struct DirectionProfileView: View {
                     }
                 case .strategy:
                     Section("全周期计划") {
-                        planPreviewSectionItems(splitLines(fullCyclePlanText), emptyText: "还没有全周期计划。")
+                        planPreviewSectionItems(splitPlanBlocks(fullCyclePlanText), emptyText: "还没有全周期计划。")
                     }
 
                     Section("第一周计划") {
@@ -325,8 +325,9 @@ struct DirectionProfileView: View {
         context.plan.longTermGoal = nonEmpty(longTermGoal, fallback: context.plan.longTermGoal)
         context.plan.targetCycle = nonEmpty(targetCycle, fallback: context.plan.targetCycle)
         context.plan.fullCyclePlan = PlanNormalizer.normalizedFullCyclePlan(
-            nonEmptyList(splitLines(fullCyclePlanText), fallback: context.plan.fullCyclePlan),
-            direction: context.profile.goal.isEmpty ? context.plan.longTermGoal : context.profile.goal
+            nonEmptyList(splitPlanBlocks(fullCyclePlanText), fallback: context.plan.fullCyclePlan),
+            direction: context.profile.goal.isEmpty ? context.plan.longTermGoal : context.profile.goal,
+            targetCycle: context.plan.targetCycle
         )
         context.plan.weeklyFocus = nonEmpty(weeklyFocus, fallback: context.plan.weeklyFocus)
         context.plan.nextAction = nonEmpty(nextAction, fallback: context.plan.nextAction)
@@ -358,7 +359,7 @@ struct DirectionProfileView: View {
         currentStage = context.profile.currentStage
         targetCycle = context.plan.targetCycle
         longTermGoal = context.plan.longTermGoal
-        fullCyclePlanText = context.plan.fullCyclePlan.joined(separator: "\n")
+        fullCyclePlanText = context.plan.fullCyclePlan.joined(separator: "\n\n")
         weeklyFocus = context.plan.weeklyFocus
         nextAction = context.plan.nextAction
         fieldsText = context.preferences.fields.joined(separator: "\n")
@@ -372,8 +373,9 @@ struct DirectionProfileView: View {
     private func apply(_ suggestion: DirectionProfileSuggestion) {
         fullCyclePlanText = PlanNormalizer.normalizedFullCyclePlan(
             suggestion.fullCyclePlan,
-            direction: goal.isEmpty ? longTermGoal : goal
-        ).joined(separator: "\n")
+            direction: goal.isEmpty ? longTermGoal : goal,
+            targetCycle: targetCycle
+        ).joined(separator: "\n\n")
         weeklyFocus = suggestion.weeklyFocus
         nextAction = suggestion.nextAction
         activeTasksText = suggestion.activeTasks.joined(separator: "\n")
@@ -390,7 +392,7 @@ struct DirectionProfileView: View {
         do {
             let suggestion = try await api.suggestDirection(
                 buildSuggestionRequest(
-                    fullCyclePlan: splitLines(fullCyclePlanText),
+                    fullCyclePlan: splitPlanBlocks(fullCyclePlanText),
                     weeklyFocus: "",
                     activeTasks: [],
                     nextAction: ""
@@ -416,7 +418,7 @@ struct DirectionProfileView: View {
         do {
             let suggestion = try await api.suggestDirection(
                 buildSuggestionRequest(
-                    fullCyclePlan: splitLines(fullCyclePlanText),
+                    fullCyclePlan: splitPlanBlocks(fullCyclePlanText),
                     weeklyFocus: weeklyFocus,
                     activeTasks: splitLines(activeTasksText),
                     nextAction: nextAction
@@ -467,6 +469,13 @@ struct DirectionProfileView: View {
             .filter { !$0.isEmpty }
     }
 
+    private func splitPlanBlocks(_ text: String) -> [String] {
+        text
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
     private func nonEmpty(_ value: String, fallback: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? fallback : trimmed
@@ -486,7 +495,7 @@ struct DirectionProfileView: View {
     }
 
     private var fullCyclePlanValidationMessage: String? {
-        PlanNormalizer.validationMessage(for: splitLines(fullCyclePlanText))
+        PlanNormalizer.validationMessage(for: splitPlanBlocks(fullCyclePlanText))
     }
 
     @ViewBuilder
@@ -497,11 +506,24 @@ struct DirectionProfileView: View {
         } else {
             ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(index + 1). \(item)")
+                    Text("阶段 \(index + 1)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    ForEach(planBlockLines(item), id: \.self) { line in
+                        Text(line)
+                            .font(.subheadline)
+                    }
                 }
                 .padding(.vertical, 2)
             }
         }
+    }
+
+    private func planBlockLines(_ item: String) -> [String] {
+        item
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 }
 

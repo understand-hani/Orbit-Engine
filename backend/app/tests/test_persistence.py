@@ -78,7 +78,7 @@ def test_save_and_read_user_context_direction_profile(tmp_path):
         assert loaded.profile.current_stage == "先配置方向，再做自动选材。"
         assert loaded.plan.target_cycle == "3 个月"
         assert len(loaded.plan.full_cycle_plan) == 3
-        assert loaded.plan.full_cycle_plan[0].startswith("第 1 阶段：")
+        assert loaded.plan.full_cycle_plan[0].startswith("第 1 阶段（")
         assert "整理核心问题" in loaded.plan.full_cycle_plan[0]
         assert loaded.plan.weekly_focus == "验证方向配置能驱动 Deep Dive Agent 选材。"
         assert loaded.plan.tracking_keywords == ["deep dive", "agent material recommendation"]
@@ -116,6 +116,10 @@ def test_direction_profile_suggestion_falls_back_without_llm(tmp_path):
 
         assert suggestion.full_cycle_plan
         assert 3 <= len(suggestion.full_cycle_plan) <= 4
+        assert "（" in suggestion.full_cycle_plan[0]
+        assert "目标：" in suggestion.full_cycle_plan[0]
+        assert "动作：" in suggestion.full_cycle_plan[0]
+        assert "产出：" in suggestion.full_cycle_plan[0]
         assert "新能源行业研究" in suggestion.weekly_focus
         assert suggestion.next_action
         assert suggestion.active_tasks
@@ -161,13 +165,15 @@ def test_direction_profile_suggestion_uses_edited_full_cycle_plan(tmp_path):
                 full_cycle_plan=[
                     "第 1 阶段：先搭建储能产业链地图并划分关键公司",
                     "第 2 阶段：跟踪政策、价格和龙头公司季度变化",
+                    "第 3 阶段：形成一份储能公司对比和后续跟踪模板",
                 ],
             )
         )
 
         assert suggestion.full_cycle_plan == [
-            "第 1 阶段：先搭建储能产业链地图并划分关键公司",
-            "第 2 阶段：跟踪政策、价格和龙头公司季度变化",
+            "第 1 阶段（第 1 个月）\n目标：先搭建储能产业链地图并划分关键公司。\n动作：拆出本阶段最关键的 2-3 个问题，围绕这些问题选择材料、完成 Deep Dive，并记录证据。\n产出：形成一份能说明「储能产业链研究」阶段进展的笔记、对比清单或小型实践结果。",
+            "第 2 阶段（第 2 个月）\n目标：跟踪政策、价格和龙头公司季度变化。\n动作：拆出本阶段最关键的 2-3 个问题，围绕这些问题选择材料、完成 Deep Dive，并记录证据。\n产出：形成一份能说明「储能产业链研究」阶段进展的笔记、对比清单或小型实践结果。",
+            "第 3 阶段（第 3 个月）\n目标：形成一份储能公司对比和后续跟踪模板。\n动作：拆出本阶段最关键的 2-3 个问题，围绕这些问题选择材料、完成 Deep Dive，并记录证据。\n产出：形成一份能说明「储能产业链研究」阶段进展的笔记、对比清单或小型实践结果。",
         ]
         assert "储能产业链地图" in suggestion.weekly_focus
         assert any("阶段" in task or "本周" in task for task in suggestion.active_tasks)
@@ -218,6 +224,7 @@ def test_existing_context_plan_is_normalized_on_read(tmp_path):
 
         assert len(loaded.plan.full_cycle_plan) == 4
         assert all(item.startswith("第 ") for item in loaded.plan.full_cycle_plan)
+        assert all("目标：" in item and "动作：" in item and "产出：" in item for item in loaded.plan.full_cycle_plan)
         assert all("Dreamer；vista等" not in item for item in loaded.plan.full_cycle_plan)
         assert all("vista等" not in item for item in loaded.plan.full_cycle_plan)
     finally:
