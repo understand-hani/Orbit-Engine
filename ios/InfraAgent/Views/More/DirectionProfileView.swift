@@ -86,10 +86,8 @@ struct DirectionProfileView: View {
                 } label: {
                     HStack {
                         Spacer()
-                        Label(
-                            isGenerating ? "Agent 正在生成" : "提交方向，让 Agent 生成计划",
-                            systemImage: "sparkles"
-                        )
+                        Text(isGenerating ? "Agent 正在生成" : "提交方向，让 Agent 生成计划")
+                            .fontWeight(.semibold)
                         Spacer()
                     }
                 }
@@ -174,7 +172,6 @@ struct DirectionProfileView: View {
         do {
             let loaded = try await api.get()
             context = loaded
-            apply(loaded)
             message = "这些配置会用于下一步 Agent 自动检索今天 Deep Dive 材料。"
         } catch {
             message = "加载失败：\(error.localizedDescription)"
@@ -211,26 +208,28 @@ struct DirectionProfileView: View {
         defer { isSaving = false }
 
         let now = Date()
-        context.profile.goal = goal
-        context.profile.backgroundSummary = backgroundSummary
-        context.profile.currentStage = currentStage
-        context.profile.constraints = splitLines(constraintsText)
+        context.profile.goal = nonEmpty(goal, fallback: context.profile.goal)
+        context.profile.backgroundSummary = nonEmpty(backgroundSummary, fallback: context.profile.backgroundSummary)
+        context.profile.currentStage = nonEmpty(currentStage, fallback: context.profile.currentStage)
+        context.profile.constraints = nonEmptyList(splitLines(constraintsText), fallback: context.profile.constraints)
         context.profile.updatedAt = now
-        context.plan.longTermGoal = longTermGoal
-        context.plan.weeklyFocus = weeklyFocus
-        context.plan.nextAction = nextAction
-        context.plan.activeTasks = splitLines(activeTasksText)
-        context.plan.trackingKeywords = splitLines(keywordsText)
+        context.plan.longTermGoal = nonEmpty(longTermGoal, fallback: context.plan.longTermGoal)
+        context.plan.weeklyFocus = nonEmpty(weeklyFocus, fallback: context.plan.weeklyFocus)
+        context.plan.nextAction = nonEmpty(nextAction, fallback: context.plan.nextAction)
+        context.plan.activeTasks = nonEmptyList(splitLines(activeTasksText), fallback: context.plan.activeTasks)
+        context.plan.trackingKeywords = nonEmptyList(splitLines(keywordsText), fallback: context.plan.trackingKeywords)
         context.plan.updatedAt = now
-        context.preferences.fields = splitLines(fieldsText)
-        context.preferences.sourcePreferences = Array(sourcePreferences).sorted()
+        context.preferences.fields = nonEmptyList(splitLines(fieldsText), fallback: context.preferences.fields)
+        context.preferences.sourcePreferences = nonEmptyList(
+            Array(sourcePreferences).sorted(),
+            fallback: context.preferences.sourcePreferences
+        )
         context.preferences.sessionTimeBudgetMin = timeBudget
         context.preferences.updatedAt = now
 
         do {
             let saved = try await api.save(context)
             self.context = saved
-            apply(saved)
             message = "已保存。Agent 自动选材会优先使用这些方向和偏好。"
         } catch {
             message = "保存失败：\(error.localizedDescription)"
@@ -275,6 +274,15 @@ struct DirectionProfileView: View {
             .components(separatedBy: CharacterSet(charactersIn: ",，\n"))
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+
+    private func nonEmpty(_ value: String, fallback: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? fallback : trimmed
+    }
+
+    private func nonEmptyList(_ value: [String], fallback: [String]) -> [String] {
+        value.isEmpty ? fallback : value
     }
 }
 
