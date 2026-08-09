@@ -213,9 +213,12 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [ ] iOS `计划` 页面显示 tracking keywords。
 - [ ] iOS `我的` 页面显示个人情况 / 简历摘要。
 - [x] iOS `我的` 页面新增 `方向配置` 入口，用于替代完整登录前的轻量 Onboarding Profile。
-- [x] iOS `方向配置` 支持编辑长期目标、当前方向、当前阶段、背景 / 已有基础、本周 focus、下一步动作。
-- [x] iOS `方向配置` 支持编辑领域关键词、关注领域、材料源偏好、时间预算和约束。
+- [x] iOS `方向配置` 改成两阶段：先由用户填写方向类信息，再由 Agent 生成本周计划、检索策略和约束。
+- [x] iOS `方向配置` 的提示文案使用 secondary 灰色样式，避免和用户可编辑内容混淆。
+- [x] iOS `方向配置` 支持编辑长期目标、当前方向、当前阶段、背景 / 已有基础。
+- [x] iOS `方向配置` 支持在 Agent 生成后编辑本周 focus、下一步动作、领域关键词、关注领域、材料源偏好、时间预算和约束。
 - [x] 后端新增 `PUT /api/user-context`，用于保存单用户本地 UserContext；暂不做登录、多用户和云同步。
+- [x] 后端新增 `POST /api/user-context/direction/suggest`，用于根据用户方向生成可编辑的后续配置；OpenRouter 不可用时提供规则 fallback。
 - [ ] iOS `我的` 页面显示领域偏好。
 - [ ] iOS `我的` 页面显示材料源偏好。
 - [ ] iOS `我的` 页面显示本地数据说明。
@@ -501,3 +504,4 @@ PPT/PDF 建议页：
 - [x] 默认后端 URL 更新为 `https://ssl-mirror-unsigned-championships.trycloudflare.com`，并通过 `/api/health` 验证 OpenRouter 配置正常。
 - [x] `Check-in / 归档 -> Agent 生成初稿` 已升级为 LLM 上下文草稿：后端 draft payload 注入 selected materials、primary paper、paper reader、用户笔记、完成标准和最近 Agent 讨论记录。
 - [x] 确认 Day 6 `计划 / 我的` 应先做轻量方向配置，而不是完整登录；`我的 -> 方向配置` 将作为 Deep Dive Agent 自动选材的用户方向输入。
+- [x] `我的 -> 方向配置` 调整为用户先填“方向”，提交后由 Agent 生成“本周计划 / Agent 检索策略 / 约束”，并支持用户继续修改保存。

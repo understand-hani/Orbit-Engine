@@ -94,3 +94,39 @@ struct UserMaterialContext: Codable, Identifiable {
         case fetchedAt = "fetched_at"
     }
 }
+
+struct DirectionProfileSuggestionRequest: Codable {
+    let longTermGoal: String
+    let currentDirection: String
+    let currentStage: String
+    let backgroundSummary: String
+    let timeBudgetMin: Int
+
+    enum CodingKeys: String, CodingKey {
+        case longTermGoal = "long_term_goal"
+        case currentDirection = "current_direction"
+        case currentStage = "current_stage"
+        case backgroundSummary = "background_summary"
+        case timeBudgetMin = "time_budget_min"
+    }
+}
+
+struct DirectionProfileSuggestion: Codable {
+    let weeklyFocus: String
+    let nextAction: String
+    let activeTasks: [String]
+    let trackingKeywords: [String]
+    let fields: [String]
+    let sourcePreferences: [String]
+    let constraints: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case weeklyFocus = "weekly_focus"
+        case nextAction = "next_action"
+        case activeTasks = "active_tasks"
+        case trackingKeywords = "tracking_keywords"
+        case fields
+        case sourcePreferences = "source_preferences"
+        case constraints
+    }
+}

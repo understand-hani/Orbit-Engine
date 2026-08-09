@@ -3,6 +3,8 @@ from uuid import uuid4
 
 from app.db.repositories import UserContextRepository
 from app.schemas.user_context import (
+    DirectionProfileSuggestion,
+    DirectionProfileSuggestionRequest,
     MaterialSourceType,
     PersonalProfile,
     UserContext,
@@ -11,11 +13,18 @@ from app.schemas.user_context import (
     UserPreference,
     WorkLearningPlan,
 )
+from app.config import get_settings
+from app.services.llm_service import (
+    DIRECTION_PROFILE_SUGGESTION_SYSTEM_PROMPT,
+    OpenRouterChatService,
+)
 
 
 class UserContextService:
     def __init__(self) -> None:
         self.repository = UserContextRepository()
+        self.settings = get_settings()
+        self.llm = OpenRouterChatService()
 
     def get_or_create(self) -> UserContext:
         existing = self.repository.get()
@@ -25,6 +34,23 @@ class UserContextService:
 
     def save(self, context: UserContext) -> UserContext:
         return self.repository.save(context)
+
+    def suggest_direction_profile(
+        self,
+        request: DirectionProfileSuggestionRequest,
+    ) -> DirectionProfileSuggestion:
+        if self.settings.llm_provider == "openrouter":
+            try:
+                output = self.llm.generate_json(
+                    system_prompt=DIRECTION_PROFILE_SUGGESTION_SYSTEM_PROMPT,
+                    user_payload=request.model_dump(mode="json"),
+                    output_model=DirectionProfileSuggestion,
+                    schema_name="direction_profile_suggestion",
+                )
+                return output
+            except Exception:
+                pass
+        return self._fallback_direction_profile(request)
 
     def add_material(self, request: UserMaterialCreate) -> UserMaterial:
         context = self.get_or_create()
@@ -49,6 +75,43 @@ class UserContextService:
         updated = context.model_copy(update={"materials": [material, *context.materials]})
         self.repository.save(updated)
         return material
+
+    def _fallback_direction_profile(
+        self,
+        request: DirectionProfileSuggestionRequest,
+    ) -> DirectionProfileSuggestion:
+        direction = request.current_direction.strip() or "当前方向"
+        stage = request.current_stage.strip() or "当前阶段"
+        return DirectionProfileSuggestion(
+            weekly_focus=f"围绕「{direction}」选择一份能服务 {stage} 的材料，完成一次可归档 Deep Dive。",
+            next_action="让 Agent 自动检索候选材料，先确认一份今天最值得读的主材料。",
+            active_tasks=[
+                "生成 3-5 个候选材料",
+                "选择 1 个主材料和 1 个备选材料",
+                "完成一次 Deep Dive 并记录关键判断",
+            ],
+            tracking_keywords=[
+                item
+                for item in [
+                    direction,
+                    request.long_term_goal.strip(),
+                    stage,
+                ]
+                if item
+            ],
+            fields=[direction],
+            source_preferences=[
+                MaterialSourceType.arxiv,
+                MaterialSourceType.github,
+                MaterialSourceType.official_doc,
+                MaterialSourceType.url,
+            ],
+            constraints=[
+                f"每次 Deep Dive 控制在 {request.time_budget_min} 分钟左右",
+                "优先选择能产生明确判断或下一步动作的材料",
+                "避免只收藏材料但不完成阅读输出",
+            ],
+        )
 
     def _default_context(self) -> UserContext:
         now = datetime.now(timezone.utc)

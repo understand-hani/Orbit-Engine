@@ -87,6 +87,24 @@ class UserContext(BaseModel):
     materials: List[UserMaterial] = []
 
 
+class DirectionProfileSuggestionRequest(BaseModel):
+    long_term_goal: str = ""
+    current_direction: str
+    current_stage: str = ""
+    background_summary: str = ""
+    time_budget_min: int = 30
+
+
+class DirectionProfileSuggestion(BaseModel):
+    weekly_focus: str
+    next_action: str
+    active_tasks: List[str] = []
+    tracking_keywords: List[str] = []
+    fields: List[str] = []
+    source_preferences: List[MaterialSourceType] = []
+    constraints: List[str] = []
+
+
 class RecommendationContext(BaseModel):
     derived_from: List[str] = []
     tracking_keywords: List[str] = []

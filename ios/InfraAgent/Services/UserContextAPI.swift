@@ -14,4 +14,8 @@ struct UserContextAPI {
     func save(_ context: UserContext) async throws -> UserContext {
         try await resolvedClient.put("/api/user-context", body: context)
     }
+
+    func suggestDirection(_ request: DirectionProfileSuggestionRequest) async throws -> DirectionProfileSuggestion {
+        try await resolvedClient.post("/api/user-context/direction/suggest", body: request)
+    }
 }

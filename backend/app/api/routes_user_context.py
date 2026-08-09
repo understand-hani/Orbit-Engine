@@ -1,6 +1,12 @@
 from fastapi import APIRouter
 
-from app.schemas.user_context import UserContext, UserMaterial, UserMaterialCreate
+from app.schemas.user_context import (
+    DirectionProfileSuggestion,
+    DirectionProfileSuggestionRequest,
+    UserContext,
+    UserMaterial,
+    UserMaterialCreate,
+)
 from app.services.user_context_service import UserContextService
 
 
@@ -16,6 +22,13 @@ def get_user_context() -> UserContext:
 @router.put("/user-context", response_model=UserContext)
 def save_user_context(context: UserContext) -> UserContext:
     return service.save(context)
+
+
+@router.post("/user-context/direction/suggest", response_model=DirectionProfileSuggestion)
+def suggest_direction_profile(
+    request: DirectionProfileSuggestionRequest,
+) -> DirectionProfileSuggestion:
+    return service.suggest_direction_profile(request)
 
 
 @router.post("/user-context/materials", response_model=UserMaterial)

@@ -17,6 +17,8 @@ struct DirectionProfileView: View {
     @State private var message: String?
     @State private var isLoading = false
     @State private var isSaving = false
+    @State private var isGenerating = false
+    @State private var showGeneratedSections = false
 
     private let api = UserContextAPI()
     private let sourceOptions = [
@@ -39,6 +41,10 @@ struct DirectionProfileView: View {
             }
 
             Section("方向") {
+                Text("先告诉 Agent 你接下来想推进什么。下面的提示文字只是示例，不需要按固定领域填写。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 TextField("长期目标", text: $longTermGoal, axis: .vertical)
                     .lineLimit(2...4)
                 TextField("当前方向", text: $goal, axis: .vertical)
@@ -47,43 +53,68 @@ struct DirectionProfileView: View {
                     .lineLimit(2...4)
                 TextField("背景 / 已有基础", text: $backgroundSummary, axis: .vertical)
                     .lineLimit(3...6)
-            }
 
-            Section("本周计划") {
-                TextField("本周 focus", text: $weeklyFocus, axis: .vertical)
-                    .lineLimit(2...5)
-                TextField("下一步动作", text: $nextAction, axis: .vertical)
-                    .lineLimit(2...4)
-                TextField("当前任务，每行一个", text: $activeTasksText, axis: .vertical)
-                    .lineLimit(3...8)
-            }
-
-            Section("Agent 检索策略") {
-                TextField("领域关键词，用逗号或换行分隔", text: $keywordsText, axis: .vertical)
-                    .lineLimit(2...6)
-                TextField("关注领域，用逗号或换行分隔", text: $fieldsText, axis: .vertical)
-                    .lineLimit(2...5)
                 Stepper("时间预算 \(timeBudget) 分钟", value: $timeBudget, in: 15...120, step: 15)
 
-                ForEach(sourceOptions, id: \.0) { option in
-                    Button {
-                        toggleSource(option.0)
-                    } label: {
-                        HStack {
-                            Text(option.1)
-                            Spacer()
-                            if sourcePreferences.contains(option.0) {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
+                Button {
+                    Task { await generateSuggestion() }
+                } label: {
+                    Label(
+                        isGenerating ? "Agent 正在生成" : "提交方向，让 Agent 生成后续配置",
+                        systemImage: "sparkles"
+                    )
                 }
+                .disabled(isGenerating || context == nil || goal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
 
-            Section("约束") {
-                TextField("约束，每行一个", text: $constraintsText, axis: .vertical)
-                    .lineLimit(2...6)
+            if showGeneratedSections {
+                Section("本周计划") {
+                    Text("Agent 会根据你的方向先生成一版计划；你可以直接修改。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    TextField("本周 focus", text: $weeklyFocus, axis: .vertical)
+                        .lineLimit(2...5)
+                    TextField("下一步动作", text: $nextAction, axis: .vertical)
+                        .lineLimit(2...4)
+                    TextField("当前任务，每行一个", text: $activeTasksText, axis: .vertical)
+                        .lineLimit(3...8)
+                }
+
+                Section("Agent 检索策略") {
+                    Text("这些字段会用于下一步自动生成搜索 query 和筛选今天的 Deep Dive 材料。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    TextField("领域关键词，用逗号或换行分隔", text: $keywordsText, axis: .vertical)
+                        .lineLimit(2...6)
+                    TextField("关注领域，用逗号或换行分隔", text: $fieldsText, axis: .vertical)
+                        .lineLimit(2...5)
+
+                    ForEach(sourceOptions, id: \.0) { option in
+                        Button {
+                            toggleSource(option.0)
+                        } label: {
+                            HStack {
+                                Text(option.1)
+                                Spacer()
+                                if sourcePreferences.contains(option.0) {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Section("约束") {
+                    Text("约束会帮助 Agent 避免推荐太泛、太难或不适合当前时间窗口的材料。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    TextField("约束，每行一个", text: $constraintsText, axis: .vertical)
+                        .lineLimit(2...6)
+                }
             }
         }
         .navigationTitle("方向配置")
@@ -117,6 +148,30 @@ struct DirectionProfileView: View {
             message = "这些配置会用于下一步 Agent 自动检索今天 Deep Dive 材料。"
         } catch {
             message = "加载失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func generateSuggestion() async {
+        isGenerating = true
+        message = nil
+        defer { isGenerating = false }
+
+        do {
+            let suggestion = try await api.suggestDirection(
+                DirectionProfileSuggestionRequest(
+                    longTermGoal: longTermGoal,
+                    currentDirection: goal,
+                    currentStage: currentStage,
+                    backgroundSummary: backgroundSummary,
+                    timeBudgetMin: timeBudget
+                )
+            )
+            apply(suggestion)
+            showGeneratedSections = true
+            message = "Agent 已生成后续配置，请检查并按你的真实情况修改后保存。"
+        } catch {
+            showGeneratedSections = true
+            message = "Agent 生成失败，你仍可以手动编辑后续配置：\(error.localizedDescription)"
         }
     }
 
@@ -165,6 +220,16 @@ struct DirectionProfileView: View {
         constraintsText = context.profile.constraints.joined(separator: "\n")
         sourcePreferences = Set(context.preferences.sourcePreferences)
         timeBudget = context.preferences.sessionTimeBudgetMin
+    }
+
+    private func apply(_ suggestion: DirectionProfileSuggestion) {
+        weeklyFocus = suggestion.weeklyFocus
+        nextAction = suggestion.nextAction
+        activeTasksText = suggestion.activeTasks.joined(separator: "\n")
+        keywordsText = suggestion.trackingKeywords.joined(separator: "\n")
+        fieldsText = suggestion.fields.joined(separator: "\n")
+        constraintsText = suggestion.constraints.joined(separator: "\n")
+        sourcePreferences = Set(suggestion.sourcePreferences)
     }
 
     private func toggleSource(_ source: String) {
