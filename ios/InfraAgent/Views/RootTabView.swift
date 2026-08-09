@@ -226,6 +226,14 @@ private struct PlanQuickEditView: View {
                     .lineLimit(4...10)
             }
 
+            if let issue = fullCyclePlanValidationMessage {
+                Section {
+                    Text(issue)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+
             Section("本周计划") {
                 TextField("本周重点", text: $weeklyFocus, axis: .vertical)
                     .lineLimit(2...5)
@@ -254,7 +262,7 @@ private struct PlanQuickEditView: View {
                         await onSave(buildUpdatedContext())
                     }
                 }
-                .disabled(isSaving)
+                .disabled(isSaving || fullCyclePlanValidationMessage != nil)
             }
         }
     }
@@ -287,6 +295,29 @@ private struct PlanQuickEditView: View {
 
     private func nonEmptyList(_ value: [String], fallback: [String]) -> [String] {
         value.isEmpty ? fallback : value
+    }
+
+    private var fullCyclePlanValidationMessage: String? {
+        let planItems = splitLines(fullCyclePlanText)
+        if planItems.count < 3 || planItems.count > 4 {
+            return "全周期计划需要控制在 3-4 个阶段。当前阶段数：\(planItems.count)。"
+        }
+        if let vagueItem = planItems.first(where: isVaguePlanItem) {
+            return "有阶段写得太空泛：\(vagueItem)。请把该阶段要做什么、产出什么写清楚。"
+        }
+        return nil
+    }
+
+    private func isVaguePlanItem(_ item: String) -> Bool {
+        let trimmed = item.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.count <= 12 {
+            return true
+        }
+        let lowered = trimmed.lowercased()
+        let vagueTokens = ["等", "等等", "相关", "基础", "入门", "掌握", "了解", "学习", "vista", "dreamer", "world models"]
+        let hasVagueToken = vagueTokens.contains { lowered.contains($0) }
+        let hasDetailMarker = ["，", "。", "：", "、", "并", "完成", "整理", "形成", "输出", "复现", "对比"].contains { trimmed.contains($0) }
+        return hasVagueToken && !hasDetailMarker
     }
 }
 

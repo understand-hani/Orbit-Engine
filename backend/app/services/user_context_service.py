@@ -29,11 +29,14 @@ class UserContextService:
     def get_or_create(self) -> UserContext:
         existing = self.repository.get()
         if existing is not None:
-            return existing
+            normalized = self._normalize_context(existing)
+            if normalized != existing:
+                return self.repository.save(normalized)
+            return normalized
         return self.repository.save(self._default_context())
 
     def save(self, context: UserContext) -> UserContext:
-        return self.repository.save(context)
+        return self.repository.save(self._normalize_context(context))
 
     def suggest_direction_profile(
         self,
@@ -47,10 +50,10 @@ class UserContextService:
                     output_model=DirectionProfileSuggestion,
                     schema_name="direction_profile_suggestion",
                 )
-                return output
+                return self._normalize_direction_profile_suggestion(request, output)
             except Exception:
                 pass
-        return self._fallback_direction_profile(request)
+        return self._normalize_direction_profile_suggestion(request, self._fallback_direction_profile(request))
 
     def add_material(self, request: UserMaterialCreate) -> UserMaterial:
         context = self.get_or_create()
@@ -131,6 +134,116 @@ class UserContextService:
                 "避免只收藏材料但不完成阅读输出",
             ],
         )
+
+    def _normalize_context(self, context: UserContext) -> UserContext:
+        normalized_plan = self._normalize_work_learning_plan(context)
+        if normalized_plan == context.plan:
+            return context
+        return context.model_copy(update={"plan": normalized_plan})
+
+    def _normalize_work_learning_plan(self, context: UserContext) -> WorkLearningPlan:
+        direction = context.profile.goal or context.plan.long_term_goal or "当前方向"
+        normalized_full_cycle_plan = self._normalize_plan_items(context.plan.full_cycle_plan, direction)
+        return context.plan.model_copy(
+            update={
+                "full_cycle_plan": normalized_full_cycle_plan,
+            }
+        )
+
+    def _normalize_direction_profile_suggestion(
+        self,
+        request: DirectionProfileSuggestionRequest,
+        suggestion: DirectionProfileSuggestion,
+    ) -> DirectionProfileSuggestion:
+        direction = request.current_direction.strip() or request.long_term_goal.strip() or "当前方向"
+        normalized_plan = self._normalize_plan_items(suggestion.full_cycle_plan, direction)
+        return suggestion.model_copy(update={"full_cycle_plan": normalized_plan})
+
+    def _normalize_plan_items(self, items: list[str], direction: str) -> list[str]:
+        cleaned = [self._strip_phase_prefix(item) for item in items if item.strip()]
+        if not cleaned:
+            return []
+
+        grouped = self._group_plan_items(cleaned, max_groups=4)
+        normalized: list[str] = []
+        for index, group in enumerate(grouped, start=1):
+            merged = self._merge_group(group, direction, index)
+            normalized.append(f"第 {index} 阶段：{merged}")
+        return normalized
+
+    def _group_plan_items(self, items: list[str], max_groups: int) -> list[list[str]]:
+        if len(items) <= max_groups:
+            return [[item] for item in items]
+
+        group_count = max_groups
+        size = len(items) // group_count
+        remainder = len(items) % group_count
+        groups: list[list[str]] = []
+        cursor = 0
+        for index in range(group_count):
+            group_size = size + (1 if index < remainder else 0)
+            groups.append(items[cursor : cursor + group_size])
+            cursor += group_size
+        return groups
+
+    def _merge_group(self, group: list[str], direction: str, index: int) -> str:
+        if len(group) == 1:
+            item = group[0]
+            if self._is_vague_plan_item(item):
+                return self._expand_vague_plan_item(item, direction, index)
+            return item
+
+        normalized_group = [
+            self._expand_vague_plan_item(item, direction, index) if self._is_vague_plan_item(item) else item
+            for item in group
+        ]
+        details = "；".join(normalized_group)
+        return (
+            f"围绕「{direction}」完成这一阶段的连续子任务：{details}。"
+            "这一阶段结束时要形成一份可回看的阶段笔记或对比结论。"
+        )
+
+    def _strip_phase_prefix(self, item: str) -> str:
+        text = item.strip()
+        for prefix in ["第 1 阶段：", "第 2 阶段：", "第 3 阶段：", "第 4 阶段：", "第 5 阶段：", "第 6 阶段：", "第 7 阶段：", "第 8 阶段：", "第 9 阶段：", "第 10 阶段：", "第1阶段：", "第2阶段：", "第3阶段：", "第4阶段：", "第5阶段：", "第6阶段：", "第7阶段：", "第8阶段：", "第9阶段：", "第10阶段："]:
+            if text.startswith(prefix):
+                return text[len(prefix) :].strip()
+        return text
+
+    def _is_vague_plan_item(self, item: str) -> bool:
+        text = item.strip()
+        if len(text) <= 12:
+            return True
+        vague_tokens = ["等", "等等", "相关", "基础", "入门", "掌握", "了解", "学习", "vista", "dreamer", "world models"]
+        lowered = text.lower()
+        if any(token in lowered for token in vague_tokens):
+            lacks_detail_markers = all(marker not in text for marker in ["，", "。", "：", "、", "并", "完成", "整理", "形成", "输出", "复现", "对比"])
+            if lacks_detail_markers:
+                return True
+        return False
+
+    def _expand_vague_plan_item(self, item: str, direction: str, index: int) -> str:
+        topic = self._normalize_vague_topic(item)
+        if index == 1:
+            return f"围绕「{topic}」补齐 {direction} 所需的基础概念、代表材料和检索关键词，并整理一份阶段地图。"
+        if index == 2:
+            return f"围绕「{topic}」完成关键方法或路线对比，记录它和 {direction} 的关系、适用边界以及值得继续追的点。"
+        if index == 3:
+            return f"围绕「{topic}」完成一次复现、案例拆解或实验草稿，把结果写成可展示的阶段输出。"
+        return f"围绕「{topic}」把前面阶段的判断落到一个明确产出上，并说明它如何服务 {direction}。"
+
+    def _normalize_vague_topic(self, item: str) -> str:
+        topic = item.strip("。；， ")
+        lowered = topic.lower()
+        if "vista" in lowered:
+            return "一条候选世界模型路线"
+        if "dreamer" in lowered:
+            return "Dreamer 这类世界模型方法"
+        if "world models" in lowered:
+            return "World Models 方向的核心方法"
+        if topic.endswith("等"):
+            topic = topic[:-1].strip()
+        return topic
 
     def _default_context(self) -> UserContext:
         now = datetime.now(timezone.utc)

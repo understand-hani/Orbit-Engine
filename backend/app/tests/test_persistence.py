@@ -53,7 +53,11 @@ def test_save_and_read_user_context_direction_profile(tmp_path):
                 "plan": context.plan.model_copy(
                     update={
                         "target_cycle": "3 个月",
-                        "full_cycle_plan": ["第 1 阶段：定方向", "第 2 阶段：做输出"],
+                        "full_cycle_plan": [
+                            "第 1 阶段：明确目标领域，整理核心问题、关键词和材料范围。",
+                            "第 2 阶段：完成 2 次 Deep Dive，并写出方法差异和阶段判断。",
+                            "第 3 阶段：做一份小输出，验证前两阶段形成的判断。",
+                        ],
                         "weekly_focus": "验证方向配置能驱动 Deep Dive Agent 选材。",
                         "tracking_keywords": ["deep dive", "agent material recommendation"],
                     }
@@ -73,7 +77,9 @@ def test_save_and_read_user_context_direction_profile(tmp_path):
         assert loaded.profile.goal == "学习自定义领域并让 Agent 自动推荐 Deep Dive 材料。"
         assert loaded.profile.current_stage == "先配置方向，再做自动选材。"
         assert loaded.plan.target_cycle == "3 个月"
-        assert loaded.plan.full_cycle_plan == ["第 1 阶段：定方向", "第 2 阶段：做输出"]
+        assert len(loaded.plan.full_cycle_plan) == 3
+        assert loaded.plan.full_cycle_plan[0].startswith("第 1 阶段：")
+        assert "整理核心问题" in loaded.plan.full_cycle_plan[0]
         assert loaded.plan.weekly_focus == "验证方向配置能驱动 Deep Dive Agent 选材。"
         assert loaded.plan.tracking_keywords == ["deep dive", "agent material recommendation"]
         assert loaded.preferences.fields == ["custom domain"]
@@ -178,4 +184,45 @@ def test_direction_profile_suggestion_uses_edited_full_cycle_plan(tmp_path):
             os.environ.pop("OPENROUTER_API_KEY", None)
         else:
             os.environ["OPENROUTER_API_KEY"] = original_key
+        get_settings.cache_clear()
+
+
+def test_existing_context_plan_is_normalized_on_read(tmp_path):
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = tmp_path / "infra_plan_normalize_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        service = UserContextService()
+        context = service.get_or_create()
+        noisy = context.model_copy(
+            update={
+                "plan": context.plan.model_copy(
+                    update={
+                        "full_cycle_plan": [
+                            "第1阶段：学习世界模型基础",
+                            "掌握World Models",
+                            "Dreamer",
+                            "vista等",
+                            "深入自动驾驶世界模型方向",
+                            "复现一个基础世界模型代码",
+                        ]
+                    }
+                )
+            }
+        )
+        service.repository.save(noisy)
+
+        loaded = service.get_or_create()
+
+        assert len(loaded.plan.full_cycle_plan) == 4
+        assert all(item.startswith("第 ") for item in loaded.plan.full_cycle_plan)
+        assert all("Dreamer；vista等" not in item for item in loaded.plan.full_cycle_plan)
+        assert all("vista等" not in item for item in loaded.plan.full_cycle_plan)
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
         get_settings.cache_clear()
