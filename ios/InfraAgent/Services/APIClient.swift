@@ -74,6 +74,18 @@ final class APIClient {
         return try await send(request)
     }
 
+    func put<T: Decodable, Body: Encodable>(
+        _ path: String,
+        queryItems: [URLQueryItem] = [],
+        body: Body
+    ) async throws -> T {
+        var request = try makeRequest(path: path, queryItems: queryItems)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try encoder.encode(body)
+        return try await send(request)
+    }
+
     func postNoContent(_ path: String, queryItems: [URLQueryItem] = []) async throws {
         var request = try makeRequest(path: path, queryItems: queryItems)
         request.httpMethod = "POST"

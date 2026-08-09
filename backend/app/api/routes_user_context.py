@@ -13,6 +13,11 @@ def get_user_context() -> UserContext:
     return service.get_or_create()
 
 
+@router.put("/user-context", response_model=UserContext)
+def save_user_context(context: UserContext) -> UserContext:
+    return service.save(context)
+
+
 @router.post("/user-context/materials", response_model=UserMaterial)
 def add_user_material(request: UserMaterialCreate) -> UserMaterial:
     return service.add_material(request)

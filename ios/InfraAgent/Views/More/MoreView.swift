@@ -18,6 +18,12 @@ struct MoreView: View {
 
                 Section("个人信息") {
                     NavigationLink {
+                        DirectionProfileView()
+                    } label: {
+                        Label("方向配置", systemImage: "scope")
+                    }
+
+                    NavigationLink {
                         ResumeView()
                     } label: {
                         Label("个人情况 / 简历摘要", systemImage: "person.text.rectangle")
