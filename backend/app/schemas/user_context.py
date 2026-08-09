@@ -28,6 +28,8 @@ class PersonalProfile(BaseModel):
 class WorkLearningPlan(BaseModel):
     id: str = "active_plan"
     long_term_goal: str = "围绕目标领域建立可持续的能力建设节奏。"
+    target_cycle: str = ""
+    full_cycle_plan: List[str] = []
     weekly_focus: str = "本周先跑通 Deep Dive：从材料选择到阅读、打卡、历史记录。"
     active_tasks: List[str] = [
         "选择一份和当前目标相关的材料",
@@ -92,10 +94,12 @@ class DirectionProfileSuggestionRequest(BaseModel):
     current_direction: str
     current_stage: str = ""
     background_summary: str = ""
+    target_cycle: str = ""
     time_budget_min: int = 30
 
 
 class DirectionProfileSuggestion(BaseModel):
+    full_cycle_plan: List[str] = []
     weekly_focus: str
     next_action: str
     active_tasks: List[str] = []

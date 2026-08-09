@@ -75,7 +75,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 开发线：
 
 - [x] iOS APIClient 指向 GOAI FastAPI backend。
-- [x] 默认后端 URL 改为 `https://ssl-mirror-unsigned-championships.trycloudflare.com`。
+- [x] 默认后端 URL 改为 `https://comparable-electron-filename-period.trycloudflare.com`。
 - [x] 保留后端 URL 可配置能力，不把 tunnel 完全写死；优先继续使用 `UserDefaults` / 设置页覆盖。
 - [x] iOS 验证 `/api/health`。
 - [x] iOS 验证 `/api/sessions/today`。
@@ -223,7 +223,10 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] iOS `方向配置` 主按钮文案改为 `提交方向，让 Agent 生成计划`。
 - [x] 默认方向配置内容改为贴合当前用户背景：SLAM 几何直觉、4DGS 动态重建、自动驾驶工程经验、World Model / Driving Video Generation 方向判断。
 - [x] iOS `方向配置` 支持编辑长期目标、当前方向、当前阶段、背景 / 已有基础。
+- [x] iOS `方向配置` 增加目标周期输入，例如 2 周、3 个月、半年、一年。
+- [x] Agent 根据目标周期生成 `全周期计划`，并和本周计划一样支持用户编辑。
 - [x] iOS `方向配置` 支持在 Agent 生成后编辑本周 focus、下一步动作、领域关键词、关注领域、材料源偏好、时间预算和约束。
+- [x] 方向配置保存位置明确：方向 / 背景写入 `UserContext.profile`；周期 / 全周期计划 / 本周计划 / 关键词写入 `UserContext.plan`；材料源偏好 / 时间预算写入 `UserContext.preferences`。
 - [x] 后端新增 `PUT /api/user-context`，用于保存单用户本地 UserContext；暂不做登录、多用户和云同步。
 - [x] 后端新增 `POST /api/user-context/direction/suggest`，用于根据用户方向生成可编辑的后续配置；OpenRouter 不可用时提供规则 fallback。
 - [ ] iOS `我的` 页面显示领域偏好。
@@ -462,7 +465,7 @@ PPT/PDF 建议页：
 - [x] 明确目标底部栏：`今日 / 归档 / 计划 / 我的`。
 - [x] 明确 Day 2 优先验证 endpoint：`/api/health`、`/api/sessions/today`、`/api/user-context`。
 - [x] 根据用户评审要求扩展 Day 2 开发项：Scheduled / Manual、四类 session 入口、底部四栏、移除独立 JD 栏、后端默认 URL 更新但保留覆盖能力。
-- [x] 完成 Day2 iOS 代码线：默认后端 URL 更新为 `https://ssl-mirror-unsigned-championships.trycloudflare.com`，仍保留 `UserDefaults` / 设置页覆盖。
+- [x] 完成 Day2 iOS 代码线：默认后端 URL 更新为 `https://comparable-electron-filename-period.trycloudflare.com`，仍保留 `UserDefaults` / 设置页覆盖。
 - [x] iOS 底部栏改为 `今日 / 归档 / 计划 / 我的`；`JD` 不再作为底部栏，`设置` 并入 `我的`。
 - [x] iOS Today 增加 Scheduled / Manual segmented control。
 - [x] Manual 增加四个入口：Radar、Deep Dive、Weekly Studio、Opportunity Alignment。
@@ -493,7 +496,7 @@ PPT/PDF 建议页：
 - [x] 论文详情页调整阅读流程：先进入 PDF 阅读器 / Agent 讨论，再点击 `Agent 自动读取并提取关键段落`，点击后才显示阅读章节、精选段落和关键图。
 - [x] `我的笔记` 从内联输入改成入口卡片 `写入笔记`，弹出 sheet 后支持 `自己编辑` 和 `Agent 生成初稿` 两种方式。
 - [x] 修复 Codemagic / Xcode build 中两类 SwiftUI `Section + footer` initializer 编译错误。
-- [x] 后端默认 tunnel 多次随测试更新，当前默认 URL 为 `https://ssl-mirror-unsigned-championships.trycloudflare.com`，仍保留 `UserDefaults` 覆盖和旧默认 URL 迁移。
+- [x] 后端默认 tunnel 多次随测试更新，当前默认 URL 为 `https://comparable-electron-filename-period.trycloudflare.com`，仍保留 `UserDefaults` 覆盖和旧默认 URL 迁移。
 - [!] 本机仍无 `xcodebuild`，iOS 编译验证依赖 Web/Codemagic build log。
 - [x] Deep Dive 材料生成后新增 `完成标准` 区块，优先读取 session completion criteria；为空时使用 Deep Dive 默认完成标准。
 - [x] Deep Dive 材料生成后新增 `30 / 60 / 90 分钟路径`，用于展示不同时间预算下的阅读收束方式。
@@ -508,10 +511,11 @@ PPT/PDF 建议页：
 
 ### 2026-08-09
 
-- [x] 默认后端 URL 更新为 `https://ssl-mirror-unsigned-championships.trycloudflare.com`，并通过 `/api/health` 验证 OpenRouter 配置正常。
+- [x] 默认后端 URL 更新为 `https://comparable-electron-filename-period.trycloudflare.com`，并通过 `/api/health` 验证 OpenRouter 配置正常。
 - [x] `Check-in / 归档 -> Agent 生成初稿` 已升级为 LLM 上下文草稿：后端 draft payload 注入 selected materials、primary paper、paper reader、用户笔记、完成标准和最近 Agent 讨论记录。
 - [x] 确认 Day 6 `计划 / 我的` 应先做轻量方向配置，而不是完整登录；`我的 -> 方向配置` 将作为 Deep Dive Agent 自动选材的用户方向输入。
 - [x] `我的 -> 方向配置` 调整为用户先填“方向”，提交后由 Agent 生成“本周计划 / Agent 检索策略 / 约束”，并支持用户继续修改保存。
 - [x] `我的 -> 方向配置` 方向区 UI 调整为四个清晰问题 + 独立提交按钮；灰色说明与用户输入区分展示。
 - [x] `我的 -> 方向配置` 输入框 placeholder 清空，默认四题内容改为当前用户 4DGS / WM 背景，按钮文案调整为对称表达。
 - [x] `我的 -> 方向配置` 方向输入框保持空白，按钮改为纯文本居中，修复图标导致的视觉不对齐。
+- [x] `我的 -> 方向配置` 增加目标周期和全周期计划；Agent 生成内容均保持可编辑，保存后进入个人上下文 UserContext。

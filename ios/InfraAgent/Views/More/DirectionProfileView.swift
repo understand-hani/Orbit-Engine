@@ -5,7 +5,9 @@ struct DirectionProfileView: View {
     @State private var goal = ""
     @State private var backgroundSummary = ""
     @State private var currentStage = ""
+    @State private var targetCycle = ""
     @State private var longTermGoal = ""
+    @State private var fullCyclePlanText = ""
     @State private var weeklyFocus = ""
     @State private var nextAction = ""
     @State private var fieldsText = ""
@@ -77,6 +79,14 @@ struct DirectionProfileView: View {
                     lineLimit: 3...6
                 )
 
+                DirectionQuestionField(
+                    title: "5. 你希望用多长周期完成这个目标？",
+                    help: "例如：2 周、3 个月、半年、一年。Agent 会据此生成全周期计划和本周计划。",
+                    placeholder: "",
+                    text: $targetCycle,
+                    lineLimit: 1...2
+                )
+
                 Stepper("时间预算 \(timeBudget) 分钟", value: $timeBudget, in: 15...120, step: 15)
             }
 
@@ -96,6 +106,15 @@ struct DirectionProfileView: View {
             }
 
             if showGeneratedSections {
+                Section("全周期计划") {
+                    Text("这是 Agent 根据你的目标周期生成的阶段计划；每行一个阶段，保存后会进入个人上下文。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    TextField("全周期计划，每行一个阶段", text: $fullCyclePlanText, axis: .vertical)
+                        .lineLimit(4...10)
+                }
+
                 Section("本周计划") {
                     Text("Agent 会根据你的方向先生成一版计划；你可以直接修改。")
                         .font(.caption)
@@ -190,6 +209,7 @@ struct DirectionProfileView: View {
                     currentDirection: goal,
                     currentStage: currentStage,
                     backgroundSummary: backgroundSummary,
+                    targetCycle: targetCycle,
                     timeBudgetMin: timeBudget
                 )
             )
@@ -214,6 +234,8 @@ struct DirectionProfileView: View {
         context.profile.constraints = nonEmptyList(splitLines(constraintsText), fallback: context.profile.constraints)
         context.profile.updatedAt = now
         context.plan.longTermGoal = nonEmpty(longTermGoal, fallback: context.plan.longTermGoal)
+        context.plan.targetCycle = nonEmpty(targetCycle, fallback: context.plan.targetCycle)
+        context.plan.fullCyclePlan = nonEmptyList(splitLines(fullCyclePlanText), fallback: context.plan.fullCyclePlan)
         context.plan.weeklyFocus = nonEmpty(weeklyFocus, fallback: context.plan.weeklyFocus)
         context.plan.nextAction = nonEmpty(nextAction, fallback: context.plan.nextAction)
         context.plan.activeTasks = nonEmptyList(splitLines(activeTasksText), fallback: context.plan.activeTasks)
@@ -240,7 +262,9 @@ struct DirectionProfileView: View {
         goal = context.profile.goal
         backgroundSummary = context.profile.backgroundSummary
         currentStage = context.profile.currentStage
+        targetCycle = context.plan.targetCycle
         longTermGoal = context.plan.longTermGoal
+        fullCyclePlanText = context.plan.fullCyclePlan.joined(separator: "\n")
         weeklyFocus = context.plan.weeklyFocus
         nextAction = context.plan.nextAction
         fieldsText = context.preferences.fields.joined(separator: "\n")
@@ -252,6 +276,7 @@ struct DirectionProfileView: View {
     }
 
     private func apply(_ suggestion: DirectionProfileSuggestion) {
+        fullCyclePlanText = suggestion.fullCyclePlan.joined(separator: "\n")
         weeklyFocus = suggestion.weeklyFocus
         nextAction = suggestion.nextAction
         activeTasksText = suggestion.activeTasks.joined(separator: "\n")

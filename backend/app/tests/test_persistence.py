@@ -52,6 +52,8 @@ def test_save_and_read_user_context_direction_profile(tmp_path):
                 ),
                 "plan": context.plan.model_copy(
                     update={
+                        "target_cycle": "3 个月",
+                        "full_cycle_plan": ["第 1 阶段：定方向", "第 2 阶段：做输出"],
                         "weekly_focus": "验证方向配置能驱动 Deep Dive Agent 选材。",
                         "tracking_keywords": ["deep dive", "agent material recommendation"],
                     }
@@ -70,6 +72,8 @@ def test_save_and_read_user_context_direction_profile(tmp_path):
 
         assert loaded.profile.goal == "学习自定义领域并让 Agent 自动推荐 Deep Dive 材料。"
         assert loaded.profile.current_stage == "先配置方向，再做自动选材。"
+        assert loaded.plan.target_cycle == "3 个月"
+        assert loaded.plan.full_cycle_plan == ["第 1 阶段：定方向", "第 2 阶段：做输出"]
         assert loaded.plan.weekly_focus == "验证方向配置能驱动 Deep Dive Agent 选材。"
         assert loaded.plan.tracking_keywords == ["deep dive", "agent material recommendation"]
         assert loaded.preferences.fields == ["custom domain"]
@@ -99,10 +103,12 @@ def test_direction_profile_suggestion_falls_back_without_llm(tmp_path):
                 current_direction="新能源行业研究",
                 current_stage="入门到形成第一篇笔记",
                 background_summary="用户有基础财务知识，但行业研究经验少。",
+                target_cycle="半年",
                 time_budget_min=45,
             )
         )
 
+        assert suggestion.full_cycle_plan
         assert "新能源行业研究" in suggestion.weekly_focus
         assert suggestion.next_action
         assert suggestion.active_tasks

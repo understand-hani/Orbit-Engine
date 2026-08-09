@@ -277,6 +277,7 @@ Rules:
 - Do not assume the user is in 4DGS, world models, AI, software, or research.
 - Adapt to the domain described by the user.
 - Keep weekly_focus concrete enough to generate search queries this week.
+- Use target_cycle to create a full_cycle_plan, with 3-6 editable milestones.
 - active_tasks should be small, observable actions.
 - tracking_keywords should be useful search keywords, not generic motivation.
 - source_preferences must use only: pdf, url, manual, public_source, arxiv,

@@ -30,6 +30,8 @@ struct PersonalProfileContext: Codable {
 struct WorkLearningPlanContext: Codable {
     var id: String
     var longTermGoal: String
+    var targetCycle: String
+    var fullCyclePlan: [String]
     var weeklyFocus: String
     var activeTasks: [String]
     var nextAction: String
@@ -39,6 +41,8 @@ struct WorkLearningPlanContext: Codable {
     enum CodingKeys: String, CodingKey {
         case id
         case longTermGoal = "long_term_goal"
+        case targetCycle = "target_cycle"
+        case fullCyclePlan = "full_cycle_plan"
         case weeklyFocus = "weekly_focus"
         case activeTasks = "active_tasks"
         case nextAction = "next_action"
@@ -100,6 +104,7 @@ struct DirectionProfileSuggestionRequest: Codable {
     let currentDirection: String
     let currentStage: String
     let backgroundSummary: String
+    let targetCycle: String
     let timeBudgetMin: Int
 
     enum CodingKeys: String, CodingKey {
@@ -107,11 +112,13 @@ struct DirectionProfileSuggestionRequest: Codable {
         case currentDirection = "current_direction"
         case currentStage = "current_stage"
         case backgroundSummary = "background_summary"
+        case targetCycle = "target_cycle"
         case timeBudgetMin = "time_budget_min"
     }
 }
 
 struct DirectionProfileSuggestion: Codable {
+    let fullCyclePlan: [String]
     let weeklyFocus: String
     let nextAction: String
     let activeTasks: [String]
@@ -121,6 +128,7 @@ struct DirectionProfileSuggestion: Codable {
     let constraints: [String]
 
     enum CodingKeys: String, CodingKey {
+        case fullCyclePlan = "full_cycle_plan"
         case weeklyFocus = "weekly_focus"
         case nextAction = "next_action"
         case activeTasks = "active_tasks"

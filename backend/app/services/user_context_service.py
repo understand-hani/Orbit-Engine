@@ -83,6 +83,11 @@ class UserContextService:
         direction = request.current_direction.strip() or "当前方向"
         stage = request.current_stage.strip() or "当前阶段"
         return DirectionProfileSuggestion(
+            full_cycle_plan=[
+                f"第 1 阶段：围绕「{direction}」建立材料地图和关键词体系",
+                "第 2 阶段：完成 2-4 次 Deep Dive，形成可复用笔记和判断",
+                "第 3 阶段：选择一个小项目、案例或输出物验证学习结果",
+            ],
             weekly_focus=f"围绕「{direction}」选择一份能服务 {stage} 的材料，完成一次可归档 Deep Dive。",
             next_action="让 Agent 自动检索候选材料，先确认一份今天最值得读的主材料。",
             active_tasks=[
@@ -128,6 +133,12 @@ class UserContextService:
         )
         plan = WorkLearningPlan(
             long_term_goal="建立 SLAM 几何直觉 x 4DGS 动态重建 x 自动驾驶工程经验的差异化能力线，形成可展示的研究/工程证据。",
+            target_cycle="3 个月",
+            full_cycle_plan=[
+                "第 1 阶段：补齐 StreetGaussian / 4DGS 动态重建核心论文和 baseline 认知",
+                "第 2 阶段：完成 SLAM filtering 与 GT-box 动态分离路线对照，形成实验或笔记证据",
+                "第 3 阶段：进入轻量 World Model / driving video generation pipeline，判断 reconstruction 与 generation 路线取舍",
+            ],
             weekly_focus="本周聚焦 4DGS / World Model 方向判断：优先读能帮助比较 reconstruction 与 generation 路线的材料。",
             active_tasks=[
                 "维护一个可追踪的个人目标",
