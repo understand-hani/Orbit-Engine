@@ -130,3 +130,51 @@ def test_direction_profile_suggestion_falls_back_without_llm(tmp_path):
         else:
             os.environ["OPENROUTER_API_KEY"] = original_key
         get_settings.cache_clear()
+
+
+def test_direction_profile_suggestion_uses_edited_full_cycle_plan(tmp_path):
+    original_path = os.environ.get("DATABASE_PATH")
+    original_provider = os.environ.get("LLM_PROVIDER")
+    original_key = os.environ.get("OPENROUTER_API_KEY")
+    db_path = tmp_path / "infra_direction_refine_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    os.environ["LLM_PROVIDER"] = "openrouter"
+    os.environ.pop("OPENROUTER_API_KEY", None)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        suggestion = UserContextService().suggest_direction_profile(
+            DirectionProfileSuggestionRequest(
+                long_term_goal="形成自己的行业研究方法",
+                current_direction="储能产业链研究",
+                current_stage="建立框架",
+                background_summary="有财报基础，但缺行业跟踪框架。",
+                target_cycle="3 个月",
+                time_budget_min=30,
+                full_cycle_plan=[
+                    "第 1 阶段：先搭建储能产业链地图并划分关键公司",
+                    "第 2 阶段：跟踪政策、价格和龙头公司季度变化",
+                ],
+            )
+        )
+
+        assert suggestion.full_cycle_plan == [
+            "第 1 阶段：先搭建储能产业链地图并划分关键公司",
+            "第 2 阶段：跟踪政策、价格和龙头公司季度变化",
+        ]
+        assert "储能产业链地图" in suggestion.weekly_focus
+        assert any("阶段" in task or "本周" in task for task in suggestion.active_tasks)
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        if original_provider is None:
+            os.environ.pop("LLM_PROVIDER", None)
+        else:
+            os.environ["LLM_PROVIDER"] = original_provider
+        if original_key is None:
+            os.environ.pop("OPENROUTER_API_KEY", None)
+        else:
+            os.environ["OPENROUTER_API_KEY"] = original_key
+        get_settings.cache_clear()

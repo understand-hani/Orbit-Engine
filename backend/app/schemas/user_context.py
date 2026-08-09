@@ -96,6 +96,10 @@ class DirectionProfileSuggestionRequest(BaseModel):
     background_summary: str = ""
     target_cycle: str = ""
     time_budget_min: int = 30
+    full_cycle_plan: List[str] = []
+    weekly_focus: str = ""
+    active_tasks: List[str] = []
+    next_action: str = ""
 
 
 class DirectionProfileSuggestion(BaseModel):

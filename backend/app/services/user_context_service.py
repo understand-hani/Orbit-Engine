@@ -82,25 +82,39 @@ class UserContextService:
     ) -> DirectionProfileSuggestion:
         direction = request.current_direction.strip() or "当前方向"
         stage = request.current_stage.strip() or "当前阶段"
-        return DirectionProfileSuggestion(
-            full_cycle_plan=[
+        full_cycle_plan = [item.strip() for item in request.full_cycle_plan if item.strip()]
+        if not full_cycle_plan:
+            full_cycle_plan = [
                 f"第 1 阶段：围绕「{direction}」建立材料地图和关键词体系",
                 "第 2 阶段：完成 2-4 次 Deep Dive，形成可复用笔记和判断",
                 "第 3 阶段：选择一个小项目、案例或输出物验证学习结果",
-            ],
-            weekly_focus=f"围绕「{direction}」选择一份能服务 {stage} 的材料，完成一次可归档 Deep Dive。",
-            next_action="让 Agent 自动检索候选材料，先确认一份今天最值得读的主材料。",
-            active_tasks=[
-                "生成 3-5 个候选材料",
-                "选择 1 个主材料和 1 个备选材料",
-                "完成一次 Deep Dive 并记录关键判断",
-            ],
+            ]
+
+        current_milestone = full_cycle_plan[0]
+        weekly_focus = request.weekly_focus.strip() or (
+            f"围绕「{current_milestone}」推进第一周动作，并确保它服务「{direction}」这个总方向。"
+        )
+        active_tasks = [item.strip() for item in request.active_tasks if item.strip()]
+        if not active_tasks:
+            active_tasks = [
+                f"把「{current_milestone}」拆成 2-3 个本周可验证动作",
+                "生成 3-5 个候选材料并筛掉明显不匹配的内容",
+                "完成一次 Deep Dive，并记录判断、证据和下一步",
+            ]
+        next_action = request.next_action.strip() or "让 Agent 根据本周重点生成候选材料，并先确认一份今天最值得读的主材料。"
+
+        return DirectionProfileSuggestion(
+            full_cycle_plan=full_cycle_plan,
+            weekly_focus=weekly_focus,
+            next_action=next_action,
+            active_tasks=active_tasks,
             tracking_keywords=[
                 item
                 for item in [
                     direction,
                     request.long_term_goal.strip(),
                     stage,
+                    current_milestone,
                 ]
                 if item
             ],

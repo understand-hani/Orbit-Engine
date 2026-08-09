@@ -161,6 +161,10 @@ struct DirectionProfileView: View {
                             .lineLimit(4...10)
                     }
                 case .week:
+                    Section("已确认的全周期计划") {
+                        planPreviewSectionItems(splitLines(fullCyclePlanText), emptyText: "还没有全周期计划。")
+                    }
+
                     Section("第一周计划") {
                         Text("确认全周期计划后，再确认第一周要推进什么。")
                             .font(.caption)
@@ -173,6 +177,16 @@ struct DirectionProfileView: View {
                             .lineLimit(3...8)
                     }
                 case .strategy:
+                    Section("全周期计划") {
+                        planPreviewSectionItems(splitLines(fullCyclePlanText), emptyText: "还没有全周期计划。")
+                    }
+
+                    Section("第一周计划") {
+                        LabeledContent("本周 focus", value: weeklyFocus.isEmpty ? "未填写" : weeklyFocus)
+                        LabeledContent("下一步动作", value: nextAction.isEmpty ? "未填写" : nextAction)
+                        planPreviewSectionItems(splitLines(activeTasksText), emptyText: "还没有当前任务。")
+                    }
+
                     Section("Agent 检索策略") {
                         Text("最后确认 Agent 用什么关键词和材料源来筛选 Deep Dive 材料。")
                             .font(.caption)
@@ -233,6 +247,7 @@ struct DirectionProfileView: View {
         do {
             let loaded = try await api.get()
             context = loaded
+            apply(loaded)
             message = "这些配置会用于下一步 Agent 自动检索今天 Deep Dive 材料。"
         } catch {
             message = "加载失败：\(error.localizedDescription)"
@@ -252,7 +267,11 @@ struct DirectionProfileView: View {
                     currentStage: currentStage,
                     backgroundSummary: backgroundSummary,
                     targetCycle: targetCycle,
-                    timeBudgetMin: timeBudget
+                    timeBudgetMin: timeBudget,
+                    fullCyclePlan: [],
+                    weeklyFocus: "",
+                    activeTasks: [],
+                    nextAction: ""
                 )
             )
             apply(suggestion)
@@ -271,8 +290,10 @@ struct DirectionProfileView: View {
     private func confirmCurrentPlanStep() async {
         switch planStep {
         case .fullCycle:
+            await regenerateWeekPlanFromEditedFullCycle()
             planStep = .week
         case .week:
+            await regenerateStrategyFromEditedWeekPlan()
             planStep = .strategy
         case .strategy:
             await save()
@@ -346,6 +367,75 @@ struct DirectionProfileView: View {
         sourcePreferences = Set(suggestion.sourcePreferences)
     }
 
+    private func regenerateWeekPlanFromEditedFullCycle() async {
+        isGenerating = true
+        defer { isGenerating = false }
+
+        do {
+            let suggestion = try await api.suggestDirection(
+                buildSuggestionRequest(
+                    fullCyclePlan: splitLines(fullCyclePlanText),
+                    weeklyFocus: "",
+                    activeTasks: [],
+                    nextAction: ""
+                )
+            )
+            weeklyFocus = suggestion.weeklyFocus
+            nextAction = suggestion.nextAction
+            activeTasksText = suggestion.activeTasks.joined(separator: "\n")
+            keywordsText = suggestion.trackingKeywords.joined(separator: "\n")
+            fieldsText = suggestion.fields.joined(separator: "\n")
+            constraintsText = suggestion.constraints.joined(separator: "\n")
+            sourcePreferences = Set(suggestion.sourcePreferences)
+            message = "已根据你修改后的全周期计划重新生成第一周计划。"
+        } catch {
+            message = "基于全周期计划生成第一周计划失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func regenerateStrategyFromEditedWeekPlan() async {
+        isGenerating = true
+        defer { isGenerating = false }
+
+        do {
+            let suggestion = try await api.suggestDirection(
+                buildSuggestionRequest(
+                    fullCyclePlan: splitLines(fullCyclePlanText),
+                    weeklyFocus: weeklyFocus,
+                    activeTasks: splitLines(activeTasksText),
+                    nextAction: nextAction
+                )
+            )
+            keywordsText = suggestion.trackingKeywords.joined(separator: "\n")
+            fieldsText = suggestion.fields.joined(separator: "\n")
+            constraintsText = suggestion.constraints.joined(separator: "\n")
+            sourcePreferences = Set(suggestion.sourcePreferences)
+            message = "已根据你确认后的第一周计划重新生成检索策略。"
+        } catch {
+            message = "基于第一周计划生成检索策略失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func buildSuggestionRequest(
+        fullCyclePlan: [String],
+        weeklyFocus: String,
+        activeTasks: [String],
+        nextAction: String
+    ) -> DirectionProfileSuggestionRequest {
+        DirectionProfileSuggestionRequest(
+            longTermGoal: longTermGoal,
+            currentDirection: goal,
+            currentStage: currentStage,
+            backgroundSummary: backgroundSummary,
+            targetCycle: targetCycle,
+            timeBudgetMin: timeBudget,
+            fullCyclePlan: fullCyclePlan,
+            weeklyFocus: weeklyFocus,
+            activeTasks: activeTasks,
+            nextAction: nextAction
+        )
+    }
+
     private func toggleSource(_ source: String) {
         if sourcePreferences.contains(source) {
             sourcePreferences.remove(source)
@@ -368,6 +458,21 @@ struct DirectionProfileView: View {
 
     private func nonEmptyList(_ value: [String], fallback: [String]) -> [String] {
         value.isEmpty ? fallback : value
+    }
+
+    @ViewBuilder
+    private func planPreviewSectionItems(_ items: [String], emptyText: String) -> some View {
+        if items.isEmpty {
+            Text(emptyText)
+                .foregroundStyle(.secondary)
+        } else {
+            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(index + 1). \(item)")
+                }
+                .padding(.vertical, 2)
+            }
+        }
     }
 }
 

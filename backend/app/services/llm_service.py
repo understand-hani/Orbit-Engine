@@ -276,6 +276,10 @@ supplied schema.
 Rules:
 - Do not assume the user is in 4DGS, world models, AI, software, or research.
 - Adapt to the domain described by the user.
+- If full_cycle_plan is provided, treat it as the user-confirmed plan and generate
+  downstream content based on that edited version instead of replacing it.
+- If weekly_focus or active_tasks are provided, preserve that confirmed week-level
+  intent and mainly improve downstream retrieval strategy fields.
 - Keep weekly_focus concrete enough to generate search queries this week.
 - Use target_cycle to create a full_cycle_plan, with 3-6 editable milestones.
 - active_tasks should be small, observable actions.

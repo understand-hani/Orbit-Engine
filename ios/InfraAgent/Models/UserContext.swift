@@ -106,6 +106,10 @@ struct DirectionProfileSuggestionRequest: Codable {
     let backgroundSummary: String
     let targetCycle: String
     let timeBudgetMin: Int
+    let fullCyclePlan: [String]
+    let weeklyFocus: String
+    let activeTasks: [String]
+    let nextAction: String
 
     enum CodingKeys: String, CodingKey {
         case longTermGoal = "long_term_goal"
@@ -114,6 +118,10 @@ struct DirectionProfileSuggestionRequest: Codable {
         case backgroundSummary = "background_summary"
         case targetCycle = "target_cycle"
         case timeBudgetMin = "time_budget_min"
+        case fullCyclePlan = "full_cycle_plan"
+        case weeklyFocus = "weekly_focus"
+        case activeTasks = "active_tasks"
+        case nextAction = "next_action"
     }
 }
 
