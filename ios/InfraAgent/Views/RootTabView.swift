@@ -157,8 +157,15 @@ struct PlanView: View {
         defer { isLoading = false }
 
         do {
-            context = try await api.get()
-            message = "这里展示的是当前已保存到用户上下文的计划，Agent 会直接引用这些内容。"
+            let loaded = try await api.get()
+            let normalized = PlanNormalizer.normalizedContext(loaded)
+            context = normalized.context
+            if normalized.changed {
+                _ = try await api.save(normalized.context)
+                message = "已自动整理旧计划：全周期计划现在控制在 3-4 个具体阶段。"
+            } else {
+                message = "这里展示的是当前已保存到用户上下文的计划，Agent 会直接引用这些内容。"
+            }
         } catch {
             message = "加载计划失败：\(error.localizedDescription)"
         }
@@ -169,8 +176,9 @@ struct PlanView: View {
         defer { isSaving = false }
 
         do {
-            let saved = try await api.save(updated)
-            context = saved
+            let normalized = PlanNormalizer.normalizedContext(updated)
+            let saved = try await api.save(normalized.context)
+            context = PlanNormalizer.normalizedContext(saved).context
             message = "计划已保存。Today 和 Agent 将优先使用这份更新后的计划。"
             isShowingQuickEdit = false
         } catch {
@@ -201,9 +209,10 @@ private struct PlanQuickEditView: View {
         self.initialContext = initialContext
         self.isSaving = isSaving
         self.onSave = onSave
+        let normalized = PlanNormalizer.normalizedContext(initialContext).context
         _longTermGoal = State(initialValue: initialContext.plan.longTermGoal)
         _targetCycle = State(initialValue: initialContext.plan.targetCycle)
-        _fullCyclePlanText = State(initialValue: initialContext.plan.fullCyclePlan.joined(separator: "\n"))
+        _fullCyclePlanText = State(initialValue: normalized.plan.fullCyclePlan.joined(separator: "\n"))
         _weeklyFocus = State(initialValue: initialContext.plan.weeklyFocus)
         _nextAction = State(initialValue: initialContext.plan.nextAction)
         _activeTasksText = State(initialValue: initialContext.plan.activeTasks.joined(separator: "\n"))
@@ -272,7 +281,10 @@ private struct PlanQuickEditView: View {
         let now = Date()
         updated.plan.longTermGoal = nonEmpty(longTermGoal, fallback: initialContext.plan.longTermGoal)
         updated.plan.targetCycle = nonEmpty(targetCycle, fallback: initialContext.plan.targetCycle)
-        updated.plan.fullCyclePlan = nonEmptyList(splitLines(fullCyclePlanText), fallback: initialContext.plan.fullCyclePlan)
+        updated.plan.fullCyclePlan = PlanNormalizer.normalizedFullCyclePlan(
+            nonEmptyList(splitLines(fullCyclePlanText), fallback: initialContext.plan.fullCyclePlan),
+            direction: updated.profile.goal.isEmpty ? updated.plan.longTermGoal : updated.profile.goal
+        )
         updated.plan.weeklyFocus = nonEmpty(weeklyFocus, fallback: initialContext.plan.weeklyFocus)
         updated.plan.nextAction = nonEmpty(nextAction, fallback: initialContext.plan.nextAction)
         updated.plan.activeTasks = nonEmptyList(splitLines(activeTasksText), fallback: initialContext.plan.activeTasks)
@@ -298,26 +310,7 @@ private struct PlanQuickEditView: View {
     }
 
     private var fullCyclePlanValidationMessage: String? {
-        let planItems = splitLines(fullCyclePlanText)
-        if planItems.count < 3 || planItems.count > 4 {
-            return "全周期计划需要控制在 3-4 个阶段。当前阶段数：\(planItems.count)。"
-        }
-        if let vagueItem = planItems.first(where: isVaguePlanItem) {
-            return "有阶段写得太空泛：\(vagueItem)。请把该阶段要做什么、产出什么写清楚。"
-        }
-        return nil
-    }
-
-    private func isVaguePlanItem(_ item: String) -> Bool {
-        let trimmed = item.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.count <= 12 {
-            return true
-        }
-        let lowered = trimmed.lowercased()
-        let vagueTokens = ["等", "等等", "相关", "基础", "入门", "掌握", "了解", "学习", "vista", "dreamer", "world models"]
-        let hasVagueToken = vagueTokens.contains { lowered.contains($0) }
-        let hasDetailMarker = ["，", "。", "：", "、", "并", "完成", "整理", "形成", "输出", "复现", "对比"].contains { trimmed.contains($0) }
-        return hasVagueToken && !hasDetailMarker
+        PlanNormalizer.validationMessage(for: splitLines(fullCyclePlanText))
     }
 }
 
