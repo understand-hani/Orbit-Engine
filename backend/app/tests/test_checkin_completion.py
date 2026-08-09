@@ -5,8 +5,11 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.db.migrations import init_db
+from app.schemas.chat import AIChatThreadCreate
 from app.schemas.common import SessionStatus, TaskType
 from app.schemas.completion import CompletionConfirmRequest, CompletionDraftRequest, CompletionSuggestion
+from app.schemas.research_feeder import ConfirmedResearchMaterial
+from app.services.chat_service import ChatService
 from app.services.checkin_service import CheckinService
 from app.services.feed_service import FeedService
 
@@ -96,6 +99,58 @@ def test_draft_completion_returns_mock_or_llm_backed_fields():
         else:
             os.environ["OPENROUTER_API_KEY"] = original_key
         get_settings.cache_clear()
+
+
+def test_deep_dive_draft_payload_includes_material_reader_and_discussion_context():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_completion_context_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        feed = FeedService()
+        session = feed.generate_and_save_mock_session(task_type=TaskType.research_feeder)
+        paper = session.payload.papers[0]
+        session = feed.save_selected_materials(
+            session.id,
+            [
+                ConfirmedResearchMaterial(
+                    id="selected_material_primary",
+                    paper_id=paper.id,
+                    title=paper.title,
+                    summary=paper.summary,
+                    url=paper.url,
+                    source_type="public_source",
+                )
+            ],
+        )
+        chat_service = ChatService()
+        thread = chat_service.create_thread(
+            AIChatThreadCreate(session_id=session.id, context_refs=[paper.id])
+        )
+        assert thread is not None
+        response = chat_service.send_message(thread.id, "这篇论文最值得归档的判断是什么？")
+        assert response is not None
+
+        payload = CheckinService()._draft_payload(
+            session,
+            CompletionDraftRequest(duration_min=30, user_notes="用户补充了一条归档笔记。"),
+        )
+
+        deep_dive = payload["deep_dive"]
+        assert deep_dive["selected_materials"][0]["title"] == paper.title
+        assert deep_dive["paper_reader"]["sections"]
+        assert deep_dive["paper_reader"]["selected_passages"]
+        assert deep_dive["paper_reader"]["key_figures"]
+        assert deep_dive["agent_discussions"][0]["messages"]
+        assert "用户补充了一条归档笔记" in payload["source"]["user_notes"]
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
 
 def test_delete_session_marks_session_skipped_without_checkin():
     original_path = os.environ.get("DATABASE_PATH")

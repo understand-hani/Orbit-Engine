@@ -2,7 +2,8 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from uuid import uuid4
 
-from app.db.repositories import CheckinRepository, SessionRepository
+from app.db.repositories import ChatRepository, CheckinRepository, SessionRepository
+from app.schemas.chat import ChatRole
 from app.schemas.checkin import Checkin, CheckinCreate, CheckinStatus
 from app.schemas.common import SessionStatus, TaskType
 from app.schemas.completion import (
@@ -25,6 +26,7 @@ class CheckinService:
     def __init__(self) -> None:
         self.checkins = CheckinRepository()
         self.sessions = SessionRepository()
+        self.chats = ChatRepository()
         self.settings = get_settings()
         self.llm = OpenRouterChatService()
 
@@ -137,9 +139,87 @@ class CheckinService:
                 "research_context": session.payload.research_context.model_dump(mode="json"),
                 "reading_pack": session.payload.reading_pack.model_dump(mode="json"),
                 "primary_paper": primary_paper.model_dump(mode="json") if primary_paper else None,
+                "selected_materials": [
+                    material.model_dump(mode="json") for material in session.payload.selected_materials
+                ],
+                "paper_reader": self._reader_payload(session.payload, primary_paper.id if primary_paper else ""),
                 "notes": session.payload.notes.model_dump(mode="json"),
+                "agent_discussions": self._discussion_payload(session.id),
             }
         return payload
+
+    def _reader_payload(self, payload: ResearchFeederPayload, paper_id: str) -> dict:
+        reader = next((item for item in payload.paper_readers if item.paper_id == paper_id), None)
+        if reader is None and payload.paper_reader and payload.paper_reader.paper_id == paper_id:
+            reader = payload.paper_reader
+        if reader is None:
+            return {}
+
+        return {
+            "paper_id": reader.paper_id,
+            "pdf_url": str(reader.pdf_url) if reader.pdf_url else "",
+            "sections": [
+                {
+                    "id": section.id,
+                    "section_name": section.section_name,
+                    "page_start": section.page_start,
+                    "page_end": section.page_end,
+                    "read_mode": section.read_mode.value,
+                    "extracted_text": section.extracted_text,
+                    "why_read": section.why_read,
+                    "agent_instruction": section.agent_instruction,
+                    "knowledge_points": section.knowledge_points,
+                    "status": section.status.value,
+                }
+                for section in reader.sections[:5]
+            ],
+            "selected_passages": [
+                {
+                    "id": passage.id,
+                    "page": passage.page,
+                    "section_name": passage.section_name,
+                    "text_excerpt": passage.text_excerpt,
+                    "why_selected": passage.why_selected,
+                    "reading_question": passage.reading_question,
+                    "status": passage.status.value,
+                }
+                for passage in reader.selected_passages[:5]
+            ],
+            "key_figures": [
+                {
+                    "id": figure.id,
+                    "page": figure.page,
+                    "figure_label": figure.figure_label,
+                    "caption": figure.visual.caption,
+                    "why_important": figure.why_important,
+                    "reading_question": figure.reading_question,
+                }
+                for figure in reader.key_figures[:5]
+            ],
+        }
+
+    def _discussion_payload(self, session_id: str) -> list[dict[str, object]]:
+        threads = self.chats.get_by_session(session_id)
+        discussion_payload = []
+        for thread in threads[:3]:
+            messages = [
+                {
+                    "role": message.role.value,
+                    "content": message.content,
+                    "created_at": message.created_at.isoformat(),
+                }
+                for message in thread.messages[-6:]
+                if message.role in {ChatRole.user, ChatRole.assistant}
+            ]
+            if messages:
+                discussion_payload.append(
+                    {
+                        "thread_id": thread.id,
+                        "context_refs": thread.context_refs,
+                        "messages": messages,
+                    }
+                )
+        return discussion_payload
 
     def _mock_draft(
         self,

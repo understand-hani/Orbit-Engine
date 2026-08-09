@@ -259,6 +259,8 @@ Rules:
 - summary: one or two sentences describing what was done in this reading session.
 - key_insight: the most useful learning, judgment, or evidence captured.
 - next_action: one concrete next step the user can do later.
+- Prefer concrete evidence from selected_materials, primary_paper, paper_reader,
+  user notes, and agent_discussions when they are present.
 - If source/user notes are thin, produce a safe, specific draft based on the
 available reading goal and completion criteria. Do not invent paper facts.
 """.strip()

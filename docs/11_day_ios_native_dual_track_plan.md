@@ -75,7 +75,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 开发线：
 
 - [x] iOS APIClient 指向 GOAI FastAPI backend。
-- [x] 默认后端 URL 改为 `https://times-com-submit-vids.trycloudflare.com`。
+- [x] 默认后端 URL 改为 `https://sequences-careers-present-exhaust.trycloudflare.com`。
 - [x] 保留后端 URL 可配置能力，不把 tunnel 完全写死；优先继续使用 `UserDefaults` / 设置页覆盖。
 - [x] iOS 验证 `/api/health`。
 - [x] iOS 验证 `/api/sessions/today`。
@@ -160,10 +160,10 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] `我的笔记` 不能只是临时本地输入；至少要在归档时并入 Archive，可回看“标题 / 链接 / 主旨 / 用户笔记 / Check-in 总结”。
 - [x] Archive 详情页需要稳定显示原文标题、链接、简介和用户笔记；对旧记录若缺 source metadata，需要通过 session 关联补展示。
 - [x] 顶部右上角 `完成/归档` 入口也要带上当前材料上下文，不能只在研究页主按钮路径下才写入原文信息。
-- [ ] Agent 生成的 Check-in 草稿后续应升级为基于材料 + 用户笔记 + Agent 讨论摘要生成，而不是规则模板填充。
+- [x] Agent 生成的 Check-in 草稿后续应升级为基于材料 + 用户笔记 + Agent 讨论摘要生成，而不是规则模板填充。
 - [x] Deep Dive LLM 下一阶段优先跑通“真材料闭环”：材料确认后，Agent prompt 必须拿到真实材料标题、摘要、URL、PDF metadata、推荐理由，而不是只拿 `mock_paper_primary` / `paper_id` 占位。
-- [ ] `论文 -> Agent 讨论` 需要绑定当前论文内容：自动注入 paper title、summary、why_selected、selected_passages、sections 和当前阅读问题，让用户无需手动复制材料上下文。
-- [ ] `Check-in / 归档 -> Agent 生成初稿` 需要基于当前论文、用户笔记、Agent 讨论记录、完成标准生成可归档摘要，而不是泛泛模板。
+- [x] `论文 -> Agent 讨论` 需要绑定当前论文内容：自动注入 paper title、summary、why_selected、selected_passages、sections 和当前阅读问题，让用户无需手动复制材料上下文。
+- [x] `Check-in / 归档 -> Agent 生成初稿` 需要基于当前论文、用户笔记、Agent 讨论记录、完成标准生成可归档摘要，而不是泛泛模板。
 - [ ] Deep Dive 暂存标题一致性 bug 在真实材料上下文之后立即修复：session 从进行中 / 未完成移动到暂存 / 完成归档时，标题和序号必须保持不变。
 - [ ] Deep Dive UI polish 放在数据闭环之后：先确保真实材料、讨论、初稿、归档数据一致，再优化视觉层和交互动效。
 
@@ -448,7 +448,7 @@ PPT/PDF 建议页：
 - [x] 明确目标底部栏：`今日 / 归档 / 计划 / 我的`。
 - [x] 明确 Day 2 优先验证 endpoint：`/api/health`、`/api/sessions/today`、`/api/user-context`。
 - [x] 根据用户评审要求扩展 Day 2 开发项：Scheduled / Manual、四类 session 入口、底部四栏、移除独立 JD 栏、后端默认 URL 更新但保留覆盖能力。
-- [x] 完成 Day2 iOS 代码线：默认后端 URL 更新为 `https://times-com-submit-vids.trycloudflare.com`，仍保留 `UserDefaults` / 设置页覆盖。
+- [x] 完成 Day2 iOS 代码线：默认后端 URL 更新为 `https://sequences-careers-present-exhaust.trycloudflare.com`，仍保留 `UserDefaults` / 设置页覆盖。
 - [x] iOS 底部栏改为 `今日 / 归档 / 计划 / 我的`；`JD` 不再作为底部栏，`设置` 并入 `我的`。
 - [x] iOS Today 增加 Scheduled / Manual segmented control。
 - [x] Manual 增加四个入口：Radar、Deep Dive、Weekly Studio、Opportunity Alignment。
@@ -479,7 +479,7 @@ PPT/PDF 建议页：
 - [x] 论文详情页调整阅读流程：先进入 PDF 阅读器 / Agent 讨论，再点击 `Agent 自动读取并提取关键段落`，点击后才显示阅读章节、精选段落和关键图。
 - [x] `我的笔记` 从内联输入改成入口卡片 `写入笔记`，弹出 sheet 后支持 `自己编辑` 和 `Agent 生成初稿` 两种方式。
 - [x] 修复 Codemagic / Xcode build 中两类 SwiftUI `Section + footer` initializer 编译错误。
-- [x] 后端默认 tunnel 多次随测试更新，当前默认 URL 为 `https://times-com-submit-vids.trycloudflare.com`，仍保留 `UserDefaults` 覆盖和旧默认 URL 迁移。
+- [x] 后端默认 tunnel 多次随测试更新，当前默认 URL 为 `https://sequences-careers-present-exhaust.trycloudflare.com`，仍保留 `UserDefaults` 覆盖和旧默认 URL 迁移。
 - [!] 本机仍无 `xcodebuild`，iOS 编译验证依赖 Web/Codemagic build log。
 - [x] Deep Dive 材料生成后新增 `完成标准` 区块，优先读取 session completion criteria；为空时使用 Deep Dive 默认完成标准。
 - [x] Deep Dive 材料生成后新增 `30 / 60 / 90 分钟路径`，用于展示不同时间预算下的阅读收束方式。
@@ -491,3 +491,8 @@ PPT/PDF 建议页：
 - [!] Deep Dive 暂存标题一致性仍未验收通过：用户反馈进行中 / 未完成卡片暂存后，在归档页 `暂存` 区仍显示为 `Deep Dive-日期-1`，与原卡片序号不一致。下一轮需先重走真实 iOS 流程或加端到端可观测日志，确认后端 session title、checkin summary、iOS HistoryView 展示源三者完全一致。
 - [x] LLM 接入成功后确认 Deep Dive 下一阶段优先级：先做真实材料上下文注入，再做论文 Agent 讨论绑定当前论文内容，再做基于材料 / 笔记 / 讨论 / 完成标准的 Check-in 初稿，随后修复暂存标题一致性，最后做 UI polish。
 - [x] Deep Dive Agent 讨论已注入真实材料上下文：后端会根据 session payload 和 context_refs 解析 confirmed materials、paper、reader sections、selected passages、key figures、notes，再发给 LLM。
+
+### 2026-08-09
+
+- [x] 默认后端 URL 更新为 `https://sequences-careers-present-exhaust.trycloudflare.com`，并通过 `/api/health` 验证 OpenRouter 配置正常。
+- [x] `Check-in / 归档 -> Agent 生成初稿` 已升级为 LLM 上下文草稿：后端 draft payload 注入 selected materials、primary paper、paper reader、用户笔记、完成标准和最近 Agent 讨论记录。
