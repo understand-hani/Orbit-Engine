@@ -117,14 +117,18 @@ class UserContextService:
         now = datetime.now(timezone.utc)
         profile = PersonalProfile(
             display_name="Demo User",
-            goal="针对一个自定义方向建立周期性的学习、探索、记录和反馈闭环。",
-            background_summary="用户可以维护个人简历/情况、已有能力、阶段约束和当前目标。比赛 demo 使用通用示例，避免绑定到单一论文或岗位场景。",
-            current_stage="先跑通 Deep Dive 主链路，再扩展 Radar、Opportunity Alignment 和 Weekly Studio。",
+            goal="建立 SLAM 几何直觉 x 4DGS 动态重建 x 自动驾驶工程经验的差异化能力线，形成可展示的研究/工程证据。",
+            background_summary=(
+                "硕士导航制导与控制，本科自动化；约 7 年自动驾驶量产高精定位经验，"
+                "熟悉 GNSS/IMU 融合、SLAM、位姿估计、HD Map 和车道级定位。"
+                "当前希望把既有几何和工程背景迁移到 4DGS / World Model / Driving Video Generation 方向。"
+            ),
+            current_stage="先完成 StreetGaussian / 4DGS 动态重建证据，再判断是否进入轻量 World Model / driving video generation pipeline。",
             updated_at=now,
         )
         plan = WorkLearningPlan(
-            long_term_goal="把目标领域里的材料、现实信号和个人行动组织成可持续的能力建设系统。",
-            weekly_focus="本周重点是验证 Deep Dive 闭环：选择材料、明确阅读目标、完成打卡、写入历史。",
+            long_term_goal="建立 SLAM 几何直觉 x 4DGS 动态重建 x 自动驾驶工程经验的差异化能力线，形成可展示的研究/工程证据。",
+            weekly_focus="本周聚焦 4DGS / World Model 方向判断：优先读能帮助比较 reconstruction 与 generation 路线的材料。",
             active_tasks=[
                 "维护一个可追踪的个人目标",
                 "登记一份用户材料或公开材料",

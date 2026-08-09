@@ -48,7 +48,7 @@ struct DirectionProfileView: View {
                 DirectionQuestionField(
                     title: "1. 你长期想达成什么目标？",
                     help: "例如：建立某个领域的能力、准备转岗、形成研究判断、做出一个项目。",
-                    placeholder: "写下你的长期目标",
+                    placeholder: "",
                     text: $longTermGoal,
                     lineLimit: 2...4
                 )
@@ -56,7 +56,7 @@ struct DirectionProfileView: View {
                 DirectionQuestionField(
                     title: "2. 你现在最想推进的方向是什么？",
                     help: "这是 Agent 自动检索材料的核心输入。可以是技术、行业、岗位、学科或任何自定义方向。",
-                    placeholder: "写下当前方向",
+                    placeholder: "",
                     text: $goal,
                     lineLimit: 2...4
                 )
@@ -64,7 +64,7 @@ struct DirectionProfileView: View {
                 DirectionQuestionField(
                     title: "3. 你现在处在哪个阶段？",
                     help: "例如：入门、补基础、追前沿、做项目、准备输出、准备面试。",
-                    placeholder: "写下当前阶段",
+                    placeholder: "",
                     text: $currentStage,
                     lineLimit: 2...4
                 )
@@ -72,7 +72,7 @@ struct DirectionProfileView: View {
                 DirectionQuestionField(
                     title: "4. Agent 还需要知道你的哪些背景或基础？",
                     help: "写下已有经验、限制条件、熟悉/不熟悉的内容，帮助 Agent 避免推荐不合适的材料。",
-                    placeholder: "写下背景、基础或限制",
+                    placeholder: "",
                     text: $backgroundSummary,
                     lineLimit: 3...6
                 )
@@ -87,7 +87,7 @@ struct DirectionProfileView: View {
                     HStack {
                         Spacer()
                         Label(
-                            isGenerating ? "Agent 正在生成" : "提交方向，让 Agent 生成后续配置",
+                            isGenerating ? "Agent 正在生成" : "提交方向，让 Agent 生成计划",
                             systemImage: "sparkles"
                         )
                         Spacer()
