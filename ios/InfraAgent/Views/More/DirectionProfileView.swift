@@ -45,25 +45,55 @@ struct DirectionProfileView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                TextField("长期目标", text: $longTermGoal, axis: .vertical)
-                    .lineLimit(2...4)
-                TextField("当前方向", text: $goal, axis: .vertical)
-                    .lineLimit(2...4)
-                TextField("当前阶段", text: $currentStage, axis: .vertical)
-                    .lineLimit(2...4)
-                TextField("背景 / 已有基础", text: $backgroundSummary, axis: .vertical)
-                    .lineLimit(3...6)
+                DirectionQuestionField(
+                    title: "1. 你长期想达成什么目标？",
+                    help: "例如：建立某个领域的能力、准备转岗、形成研究判断、做出一个项目。",
+                    placeholder: "写下你的长期目标",
+                    text: $longTermGoal,
+                    lineLimit: 2...4
+                )
+
+                DirectionQuestionField(
+                    title: "2. 你现在最想推进的方向是什么？",
+                    help: "这是 Agent 自动检索材料的核心输入。可以是技术、行业、岗位、学科或任何自定义方向。",
+                    placeholder: "写下当前方向",
+                    text: $goal,
+                    lineLimit: 2...4
+                )
+
+                DirectionQuestionField(
+                    title: "3. 你现在处在哪个阶段？",
+                    help: "例如：入门、补基础、追前沿、做项目、准备输出、准备面试。",
+                    placeholder: "写下当前阶段",
+                    text: $currentStage,
+                    lineLimit: 2...4
+                )
+
+                DirectionQuestionField(
+                    title: "4. Agent 还需要知道你的哪些背景或基础？",
+                    help: "写下已有经验、限制条件、熟悉/不熟悉的内容，帮助 Agent 避免推荐不合适的材料。",
+                    placeholder: "写下背景、基础或限制",
+                    text: $backgroundSummary,
+                    lineLimit: 3...6
+                )
 
                 Stepper("时间预算 \(timeBudget) 分钟", value: $timeBudget, in: 15...120, step: 15)
+            }
 
+            Section {
                 Button {
                     Task { await generateSuggestion() }
                 } label: {
-                    Label(
-                        isGenerating ? "Agent 正在生成" : "提交方向，让 Agent 生成后续配置",
-                        systemImage: "sparkles"
-                    )
+                    HStack {
+                        Spacer()
+                        Label(
+                            isGenerating ? "Agent 正在生成" : "提交方向，让 Agent 生成后续配置",
+                            systemImage: "sparkles"
+                        )
+                        Spacer()
+                    }
                 }
+                .buttonStyle(.borderedProminent)
                 .disabled(isGenerating || context == nil || goal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
 
@@ -245,6 +275,29 @@ struct DirectionProfileView: View {
             .components(separatedBy: CharacterSet(charactersIn: ",，\n"))
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+}
+
+private struct DirectionQuestionField: View {
+    let title: String
+    let help: String
+    let placeholder: String
+    @Binding var text: String
+    let lineLimit: ClosedRange<Int>
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+            Text(help)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField(placeholder, text: $text, axis: .vertical)
+                .lineLimit(lineLimit)
+                .textFieldStyle(.roundedBorder)
+        }
+        .padding(.vertical, 6)
     }
 }
 
