@@ -29,7 +29,9 @@ struct RootTabView: View {
 struct PlanView: View {
     @State private var context: UserContext?
     @State private var isLoading = false
+    @State private var isSaving = false
     @State private var message: String?
+    @State private var isShowingQuickEdit = false
 
     private let api = UserContextAPI()
 
@@ -111,6 +113,13 @@ struct PlanView: View {
             }
             .navigationTitle("计划")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("快编") {
+                        isShowingQuickEdit = true
+                    }
+                    .disabled(context == nil)
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink("编辑") {
                         DirectionProfileView()
@@ -122,6 +131,21 @@ struct PlanView: View {
             }
             .refreshable {
                 await load(force: true)
+            }
+            .sheet(isPresented: $isShowingQuickEdit) {
+                NavigationStack {
+                    if let context {
+                        PlanQuickEditView(
+                            initialContext: context,
+                            isSaving: isSaving,
+                            onSave: { updated in
+                                await saveQuickEdit(updated)
+                            }
+                        )
+                    } else {
+                        ProgressView("加载计划中")
+                    }
+                }
             }
         }
     }
@@ -138,6 +162,131 @@ struct PlanView: View {
         } catch {
             message = "加载计划失败：\(error.localizedDescription)"
         }
+    }
+
+    private func saveQuickEdit(_ updated: UserContext) async {
+        isSaving = true
+        defer { isSaving = false }
+
+        do {
+            let saved = try await api.save(updated)
+            context = saved
+            message = "计划已保存。Today 和 Agent 将优先使用这份更新后的计划。"
+            isShowingQuickEdit = false
+        } catch {
+            message = "保存计划失败：\(error.localizedDescription)"
+        }
+    }
+}
+
+private struct PlanQuickEditView: View {
+    let initialContext: UserContext
+    let isSaving: Bool
+    let onSave: (UserContext) async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var longTermGoal: String
+    @State private var targetCycle: String
+    @State private var fullCyclePlanText: String
+    @State private var weeklyFocus: String
+    @State private var nextAction: String
+    @State private var activeTasksText: String
+    @State private var trackingKeywordsText: String
+
+    init(
+        initialContext: UserContext,
+        isSaving: Bool,
+        onSave: @escaping (UserContext) async -> Void
+    ) {
+        self.initialContext = initialContext
+        self.isSaving = isSaving
+        self.onSave = onSave
+        _longTermGoal = State(initialValue: initialContext.plan.longTermGoal)
+        _targetCycle = State(initialValue: initialContext.plan.targetCycle)
+        _fullCyclePlanText = State(initialValue: initialContext.plan.fullCyclePlan.joined(separator: "\n"))
+        _weeklyFocus = State(initialValue: initialContext.plan.weeklyFocus)
+        _nextAction = State(initialValue: initialContext.plan.nextAction)
+        _activeTasksText = State(initialValue: initialContext.plan.activeTasks.joined(separator: "\n"))
+        _trackingKeywordsText = State(initialValue: initialContext.plan.trackingKeywords.joined(separator: "\n"))
+    }
+
+    var body: some View {
+        Form {
+            Section("方向级目标") {
+                TextField("长期目标", text: $longTermGoal, axis: .vertical)
+                    .lineLimit(2...4)
+                TextField("目标周期", text: $targetCycle)
+            }
+
+            Section("全周期计划") {
+                Text("建议保留 3-4 个阶段。每个阶段直接写清楚目标、动作或产出，不要只写一个名词。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("每行一个阶段", text: $fullCyclePlanText, axis: .vertical)
+                    .lineLimit(4...10)
+            }
+
+            Section("本周计划") {
+                TextField("本周重点", text: $weeklyFocus, axis: .vertical)
+                    .lineLimit(2...5)
+                TextField("下一步", text: $nextAction, axis: .vertical)
+                    .lineLimit(2...4)
+                TextField("当前任务，每行一个", text: $activeTasksText, axis: .vertical)
+                    .lineLimit(3...8)
+            }
+
+            Section("Tracking Keywords") {
+                TextField("每行一个关键词", text: $trackingKeywordsText, axis: .vertical)
+                    .lineLimit(2...6)
+            }
+        }
+        .navigationTitle("快速编辑计划")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("取消") {
+                    dismiss()
+                }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button(isSaving ? "保存中" : "保存") {
+                    Task {
+                        await onSave(buildUpdatedContext())
+                    }
+                }
+                .disabled(isSaving)
+            }
+        }
+    }
+
+    private func buildUpdatedContext() -> UserContext {
+        var updated = initialContext
+        let now = Date()
+        updated.plan.longTermGoal = nonEmpty(longTermGoal, fallback: initialContext.plan.longTermGoal)
+        updated.plan.targetCycle = nonEmpty(targetCycle, fallback: initialContext.plan.targetCycle)
+        updated.plan.fullCyclePlan = nonEmptyList(splitLines(fullCyclePlanText), fallback: initialContext.plan.fullCyclePlan)
+        updated.plan.weeklyFocus = nonEmpty(weeklyFocus, fallback: initialContext.plan.weeklyFocus)
+        updated.plan.nextAction = nonEmpty(nextAction, fallback: initialContext.plan.nextAction)
+        updated.plan.activeTasks = nonEmptyList(splitLines(activeTasksText), fallback: initialContext.plan.activeTasks)
+        updated.plan.trackingKeywords = nonEmptyList(splitLines(trackingKeywordsText), fallback: initialContext.plan.trackingKeywords)
+        updated.plan.updatedAt = now
+        return updated
+    }
+
+    private func splitLines(_ text: String) -> [String] {
+        text
+            .components(separatedBy: CharacterSet(charactersIn: ",，\n"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func nonEmpty(_ value: String, fallback: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? fallback : trimmed
+    }
+
+    private func nonEmptyList(_ value: [String], fallback: [String]) -> [String] {
+        value.isEmpty ? fallback : value
     }
 }
 

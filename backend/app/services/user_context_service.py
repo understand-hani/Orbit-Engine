@@ -85,21 +85,21 @@ class UserContextService:
         full_cycle_plan = [item.strip() for item in request.full_cycle_plan if item.strip()]
         if not full_cycle_plan:
             full_cycle_plan = [
-                f"第 1 阶段：围绕「{direction}」建立材料地图和关键词体系",
-                "第 2 阶段：完成 2-4 次 Deep Dive，形成可复用笔记和判断",
-                "第 3 阶段：选择一个小项目、案例或输出物验证学习结果",
+                f"第 1 阶段：围绕「{direction}」建立基础地图，整理 10-15 个核心概念、代表材料和可直接检索的关键词。",
+                f"第 2 阶段：围绕「{direction}」完成 2-4 次 Deep Dive，把关键路线、方法差异和适用边界写成可复用笔记。",
+                f"第 3 阶段：围绕「{direction}」做一个小型输出，如对比清单、案例拆解或实践草稿，用来验证前两阶段结论。",
             ]
 
         current_milestone = full_cycle_plan[0]
         weekly_focus = request.weekly_focus.strip() or (
-            f"围绕「{current_milestone}」推进第一周动作，并确保它服务「{direction}」这个总方向。"
+            f"本周先推进「{current_milestone}」，至少完成一次材料筛选、一次 Deep Dive，以及一份可回看的阶段笔记。"
         )
         active_tasks = [item.strip() for item in request.active_tasks if item.strip()]
         if not active_tasks:
             active_tasks = [
-                f"把「{current_milestone}」拆成 2-3 个本周可验证动作",
-                "生成 3-5 个候选材料并筛掉明显不匹配的内容",
-                "完成一次 Deep Dive，并记录判断、证据和下一步",
+                f"从「{current_milestone}」里拆出 2-3 个本周必须回答的具体问题，并写成检索目标。",
+                "生成 3-5 个候选材料，标记每份材料能回答什么问题、需要多少时间、为什么值得读。",
+                "完成一次 Deep Dive，并产出一份包含关键判断、证据、未解决问题和下一步动作的笔记。",
             ]
         next_action = request.next_action.strip() or "让 Agent 根据本周重点生成候选材料，并先确认一份今天最值得读的主材料。"
 

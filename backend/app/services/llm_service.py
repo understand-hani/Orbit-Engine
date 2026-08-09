@@ -281,8 +281,12 @@ Rules:
 - If weekly_focus or active_tasks are provided, preserve that confirmed week-level
   intent and mainly improve downstream retrieval strategy fields.
 - Keep weekly_focus concrete enough to generate search queries this week.
-- Use target_cycle to create a full_cycle_plan, with 3-6 editable milestones.
+- Use target_cycle to create a full_cycle_plan, with 3-4 editable milestones only.
+- Do not output vague labels like just a tool, framework, or topic name.
+- Each milestone should describe a concrete phase objective plus the specific
+  work to do or output to produce in that phase.
 - active_tasks should be small, observable actions.
+- active_tasks must be specific enough that a user can immediately act on them.
 - tracking_keywords should be useful search keywords, not generic motivation.
 - source_preferences must use only: pdf, url, manual, public_source, arxiv,
   github, official_doc.

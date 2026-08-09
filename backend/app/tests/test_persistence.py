@@ -109,6 +109,7 @@ def test_direction_profile_suggestion_falls_back_without_llm(tmp_path):
         )
 
         assert suggestion.full_cycle_plan
+        assert 3 <= len(suggestion.full_cycle_plan) <= 4
         assert "新能源行业研究" in suggestion.weekly_focus
         assert suggestion.next_action
         assert suggestion.active_tasks

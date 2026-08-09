@@ -154,7 +154,7 @@ struct DirectionProfileView: View {
                 switch planStep {
                 case .fullCycle:
                     Section("全周期计划") {
-                        Text("先确认整个目标周期的阶段安排。你可以直接修改，每行一个阶段。")
+                        Text("先确认整个目标周期的阶段安排。建议控制在 3-4 个阶段，每行一个阶段，并把该阶段要做什么、产出什么写清楚。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         TextField("全周期计划，每行一个阶段", text: $fullCyclePlanText, axis: .vertical)
