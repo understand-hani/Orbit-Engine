@@ -20,7 +20,8 @@ struct DirectionProfileView: View {
     @State private var isLoading = false
     @State private var isSaving = false
     @State private var isGenerating = false
-    @State private var showGeneratedSections = false
+    @State private var isShowingPlanSheet = false
+    @State private var planStep: DirectionPlanStep = .fullCycle
 
     private let api = UserContextAPI()
     private let sourceOptions = [
@@ -92,7 +93,7 @@ struct DirectionProfileView: View {
 
             Section {
                 Button {
-                    Task { await generateSuggestion() }
+                    Task { await beginPlanGeneration() }
                 } label: {
                     HStack {
                         Spacer()
@@ -103,65 +104,6 @@ struct DirectionProfileView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(isGenerating || context == nil || goal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-
-            if showGeneratedSections {
-                Section("全周期计划") {
-                    Text("这是 Agent 根据你的目标周期生成的阶段计划；每行一个阶段，保存后会进入个人上下文。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    TextField("全周期计划，每行一个阶段", text: $fullCyclePlanText, axis: .vertical)
-                        .lineLimit(4...10)
-                }
-
-                Section("本周计划") {
-                    Text("Agent 会根据你的方向先生成一版计划；你可以直接修改。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    TextField("本周 focus", text: $weeklyFocus, axis: .vertical)
-                        .lineLimit(2...5)
-                    TextField("下一步动作", text: $nextAction, axis: .vertical)
-                        .lineLimit(2...4)
-                    TextField("当前任务，每行一个", text: $activeTasksText, axis: .vertical)
-                        .lineLimit(3...8)
-                }
-
-                Section("Agent 检索策略") {
-                    Text("这些字段会用于下一步自动生成搜索 query 和筛选今天的 Deep Dive 材料。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    TextField("领域关键词，用逗号或换行分隔", text: $keywordsText, axis: .vertical)
-                        .lineLimit(2...6)
-                    TextField("关注领域，用逗号或换行分隔", text: $fieldsText, axis: .vertical)
-                        .lineLimit(2...5)
-
-                    ForEach(sourceOptions, id: \.0) { option in
-                        Button {
-                            toggleSource(option.0)
-                        } label: {
-                            HStack {
-                                Text(option.1)
-                                Spacer()
-                                if sourcePreferences.contains(option.0) {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-
-                Section("约束") {
-                    Text("约束会帮助 Agent 避免推荐太泛、太难或不适合当前时间窗口的材料。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    TextField("约束，每行一个", text: $constraintsText, axis: .vertical)
-                        .lineLimit(2...6)
-                }
             }
         }
         .navigationTitle("方向配置")
@@ -179,6 +121,106 @@ struct DirectionProfileView: View {
         .overlay {
             if isLoading {
                 ProgressView("加载中")
+            }
+        }
+        .sheet(isPresented: $isShowingPlanSheet) {
+            NavigationStack {
+                planSheetContent
+                    .navigationTitle(planStep.title)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("取消") {
+                                isShowingPlanSheet = false
+                            }
+                        }
+                    }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var planSheetContent: some View {
+        if isGenerating {
+            VStack(spacing: 12) {
+                ProgressView()
+                Text("Agent 正在根据你的方向生成计划")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            Form {
+                switch planStep {
+                case .fullCycle:
+                    Section("全周期计划") {
+                        Text("先确认整个目标周期的阶段安排。你可以直接修改，每行一个阶段。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("全周期计划，每行一个阶段", text: $fullCyclePlanText, axis: .vertical)
+                            .lineLimit(4...10)
+                    }
+                case .week:
+                    Section("第一周计划") {
+                        Text("确认全周期计划后，再确认第一周要推进什么。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("本周 focus", text: $weeklyFocus, axis: .vertical)
+                            .lineLimit(2...5)
+                        TextField("下一步动作", text: $nextAction, axis: .vertical)
+                            .lineLimit(2...4)
+                        TextField("当前任务，每行一个", text: $activeTasksText, axis: .vertical)
+                            .lineLimit(3...8)
+                    }
+                case .strategy:
+                    Section("Agent 检索策略") {
+                        Text("最后确认 Agent 用什么关键词和材料源来筛选 Deep Dive 材料。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("领域关键词，用逗号或换行分隔", text: $keywordsText, axis: .vertical)
+                            .lineLimit(2...6)
+                        TextField("关注领域，用逗号或换行分隔", text: $fieldsText, axis: .vertical)
+                            .lineLimit(2...5)
+
+                        ForEach(sourceOptions, id: \.0) { option in
+                            Button {
+                                toggleSource(option.0)
+                            } label: {
+                                HStack {
+                                    Text(option.1)
+                                    Spacer()
+                                    if sourcePreferences.contains(option.0) {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    Section("约束") {
+                        Text("约束会帮助 Agent 避免推荐太泛、太难或不适合当前时间窗口的材料。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("约束，每行一个", text: $constraintsText, axis: .vertical)
+                            .lineLimit(2...6)
+                    }
+                }
+
+                Section {
+                    Button {
+                        Task { await confirmCurrentPlanStep() }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text(planStep.confirmTitle(isSaving: isSaving))
+                                .fontWeight(.semibold)
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isSaving)
+                }
             }
         }
     }
@@ -214,11 +256,29 @@ struct DirectionProfileView: View {
                 )
             )
             apply(suggestion)
-            showGeneratedSections = true
-            message = "Agent 已生成后续配置，请检查并按你的真实情况修改后保存。"
+            message = "Agent 已生成计划，请按步骤确认后保存。"
         } catch {
-            showGeneratedSections = true
             message = "Agent 生成失败，你仍可以手动编辑后续配置：\(error.localizedDescription)"
+        }
+    }
+
+    private func beginPlanGeneration() async {
+        planStep = .fullCycle
+        isShowingPlanSheet = true
+        await generateSuggestion()
+    }
+
+    private func confirmCurrentPlanStep() async {
+        switch planStep {
+        case .fullCycle:
+            planStep = .week
+        case .week:
+            planStep = .strategy
+        case .strategy:
+            await save()
+            if message?.hasPrefix("已保存") == true {
+                isShowingPlanSheet = false
+            }
         }
     }
 
@@ -308,6 +368,37 @@ struct DirectionProfileView: View {
 
     private func nonEmptyList(_ value: [String], fallback: [String]) -> [String] {
         value.isEmpty ? fallback : value
+    }
+}
+
+private enum DirectionPlanStep {
+    case fullCycle
+    case week
+    case strategy
+
+    var title: String {
+        switch self {
+        case .fullCycle:
+            return "确认全周期计划"
+        case .week:
+            return "确认第一周计划"
+        case .strategy:
+            return "确认检索策略"
+        }
+    }
+
+    func confirmTitle(isSaving: Bool) -> String {
+        if isSaving {
+            return "保存中"
+        }
+        switch self {
+        case .fullCycle:
+            return "确认全周期计划，生成第一周计划"
+        case .week:
+            return "确认第一周计划，生成检索策略"
+        case .strategy:
+            return "确认并保存到个人情况"
+        }
     }
 }
 
