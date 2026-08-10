@@ -55,6 +55,10 @@ struct MoreView: View {
                 }
 
                 Section("应用设置") {
+                    if let context {
+                        MorePreferenceSummaryView(context: context)
+                    }
+
                     NavigationLink {
                         SettingsView()
                     } label: {
@@ -64,7 +68,11 @@ struct MoreView: View {
 
                 Section("本地数据") {
                     LabeledContent("资料记录", value: "本地优先")
+                    LabeledContent("用户上下文", value: context == nil ? "未加载" : "已连接")
                     LabeledContent("后端地址", value: AppConfig.backendBaseURL.host ?? AppConfig.backendBaseURL.absoluteString)
+                    Text("方向、计划、偏好和材料 metadata 会通过当前 FastAPI 后端保存；当前版本不包含登录、多用户和云同步。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("我的")
@@ -138,6 +146,59 @@ private struct SummaryLine: View {
     private var displayValue: String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "未设置" : trimmed
+    }
+}
+
+private struct MorePreferenceSummaryView: View {
+    let context: UserContext
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SummaryLine(title: "领域偏好", value: fieldsSummary)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("材料源偏好")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if sourceLabels.isEmpty {
+                    Text("未设置")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    TagRow(tags: sourceLabels)
+                }
+            }
+            LabeledContent("单次 Session 时间", value: "\(context.preferences.sessionTimeBudgetMin) 分钟")
+        }
+        .padding(.vertical, 6)
+    }
+
+    private var fieldsSummary: String {
+        context.preferences.fields.isEmpty ? "未设置" : context.preferences.fields.joined(separator: "、")
+    }
+
+    private var sourceLabels: [String] {
+        context.preferences.sourcePreferences.map(sourceLabel)
+    }
+
+    private func sourceLabel(_ source: String) -> String {
+        switch source {
+        case "arxiv":
+            return "arXiv"
+        case "github":
+            return "GitHub"
+        case "official_doc":
+            return "官方文档"
+        case "url":
+            return "网页"
+        case "pdf":
+            return "PDF"
+        case "manual":
+            return "手动材料"
+        case "public_source":
+            return "公开源"
+        default:
+            return source
+        }
     }
 }
 
