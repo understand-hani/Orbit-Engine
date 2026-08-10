@@ -302,6 +302,10 @@ Rules:
 - Execution steps must be detailed enough for the user to act without guessing:
   name the questions to answer, material types to collect, comparison dimensions,
   validation task shape, and the concrete note/result to write.
+- Execution steps must cover the whole phase time range. If a phase spans 3
+  months, create week blocks through about Week 12; if it spans 1 month, create
+  week blocks through about Week 4. Do not create only two weeks for a
+  multi-month phase.
 - Avoid non-actionable steps such as "complete a project", "learn basics",
   "do research", or "improve ability" unless they are immediately followed by
   specific week/day actions and observable completion criteria.

@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 struct RootTabView: View {
@@ -32,6 +33,7 @@ struct PlanView: View {
     @State private var isSaving = false
     @State private var message: String?
     @State private var isShowingQuickEdit = false
+    @State private var selectedPhase: PlanPhase?
 
     private let api = UserContextAPI()
 
@@ -70,7 +72,12 @@ struct PlanView: View {
                                 .foregroundStyle(.secondary)
                         } else {
                             ForEach(Array(context.plan.fullCyclePlan.enumerated()), id: \.offset) { index, item in
-                                PlanPhaseBlockView(index: index + 1, text: item)
+                                Button {
+                                    selectedPhase = PlanPhase(index: index + 1, text: item)
+                                } label: {
+                                    PlanPhaseCardView(phase: PlanPhase(index: index + 1, text: item))
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -139,6 +146,11 @@ struct PlanView: View {
                     } else {
                         ProgressView("加载计划中")
                     }
+                }
+            }
+            .sheet(item: $selectedPhase) { phase in
+                NavigationStack {
+                    PlanPhaseDetailView(phase: phase)
                 }
             }
         }
@@ -316,37 +328,147 @@ private struct PlanQuickEditView: View {
     }
 }
 
-private struct PlanPhaseBlockView: View {
+private struct PlanPhase: Identifiable {
     let index: Int
     let text: String
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-            ForEach(bodyLines, id: \.self) { line in
-                Text(line)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 6)
-    }
+    var id: Int { index }
 
-    private var lines: [String] {
+    var lines: [String] {
         text
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
     }
 
-    private var title: String {
+    var title: String {
         lines.first ?? "阶段 \(index)"
     }
 
-    private var bodyLines: [String] {
-        Array(lines.dropFirst())
+    var goals: [String] {
+        sectionLines(after: "目标：", before: "具体执行计划：")
+    }
+
+    var executionSteps: [String] {
+        sectionLines(after: "具体执行计划：", before: "产出：")
+    }
+
+    var outputs: [String] {
+        sectionLines(after: "产出：", before: nil)
+    }
+
+    var summary: String {
+        goals.first ?? "点击查看阶段目标、执行计划和产出。"
+    }
+
+    var weekCoverage: String {
+        let maxWeek = executionSteps.map(highestWeekNumber).max() ?? 0
+        guard maxWeek > 0 else { return "未拆分到 Week" }
+        return "覆盖到 Week \(maxWeek)"
+    }
+
+    private func sectionLines(after startMarker: String, before endMarker: String?) -> [String] {
+        guard let start = lines.firstIndex(of: startMarker) else { return [] }
+        let end = endMarker.flatMap { marker in lines.firstIndex(of: marker) } ?? lines.endIndex
+        guard start + 1 < end else { return [] }
+        return Array(lines[(start + 1)..<end])
+    }
+
+    private func highestWeekNumber(in text: String) -> Int {
+        guard let regex = try? NSRegularExpression(pattern: #"Week\s+\d+(?:\s*[-—~～至到]\s*(\d+))?"#) else {
+            return 0
+        }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex.matches(in: text, range: range)
+            .compactMap { match -> Int? in
+                guard let matchRange = Range(match.range, in: text) else { return nil }
+                return numbers(in: String(text[matchRange])).last
+            }
+            .max() ?? 0
+    }
+
+    private func numbers(in text: String) -> [Int] {
+        guard let regex = try? NSRegularExpression(pattern: #"\d+"#) else {
+            return []
+        }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex.matches(in: text, range: range).compactMap { match in
+            guard let matchRange = Range(match.range, in: text) else { return nil }
+            return Int(String(text[matchRange]))
+        }
+    }
+}
+
+private struct PlanPhaseCardView: View {
+    let phase: PlanPhase
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(phase.title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            Text(phase.summary)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            HStack(spacing: 12) {
+                Label("\(phase.goals.count) 个目标", systemImage: "target")
+                Label("\(phase.executionSteps.count) 个执行块", systemImage: "calendar")
+                Text(phase.weekCoverage)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+private struct PlanPhaseDetailView: View {
+    let phase: PlanPhase
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List {
+            PlanPhaseDetailSection(title: "目标", lines: phase.goals)
+            PlanPhaseDetailSection(title: "具体执行计划", lines: phase.executionSteps)
+            PlanPhaseDetailSection(title: "产出", lines: phase.outputs)
+        }
+        .navigationTitle(phase.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("关闭") {
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+
+private struct PlanPhaseDetailSection: View {
+    let title: String
+    let lines: [String]
+
+    var body: some View {
+        Section(title) {
+            if lines.isEmpty {
+                Text("暂无内容")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(lines, id: \.self) { line in
+                    Text(line)
+                        .font(.subheadline)
+                }
+            }
+        }
     }
 }
 
