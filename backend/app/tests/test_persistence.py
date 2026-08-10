@@ -121,6 +121,8 @@ def test_direction_profile_suggestion_falls_back_without_llm(tmp_path):
         assert "具体执行计划：" in suggestion.full_cycle_plan[0]
         assert "产出：" in suggestion.full_cycle_plan[0]
         assert "\n1. " in suggestion.full_cycle_plan[0]
+        assert "Week 1 / Day" in suggestion.full_cycle_plan[0]
+        assert "材料" in suggestion.full_cycle_plan[0]
         assert "新能源行业研究" in suggestion.weekly_focus
         assert suggestion.next_action
         assert suggestion.active_tasks
@@ -174,9 +176,13 @@ def test_direction_profile_suggestion_uses_edited_full_cycle_plan(tmp_path):
         assert all("目标：\n1. " in item for item in suggestion.full_cycle_plan)
         assert all("具体执行计划：\n1. " in item for item in suggestion.full_cycle_plan)
         assert all("产出：\n1. " in item for item in suggestion.full_cycle_plan)
+        assert all("Week 1 / Day" in item and "Week 2 / Day" in item for item in suggestion.full_cycle_plan)
         assert "先搭建储能产业链地图并划分关键公司" in suggestion.full_cycle_plan[0]
         assert "跟踪政策、价格和龙头公司季度变化" in suggestion.full_cycle_plan[1]
         assert "形成一份储能公司对比和后续跟踪模板" in suggestion.full_cycle_plan[2]
+        assert "必须回答的问题" in suggestion.full_cycle_plan[0]
+        assert "比较维度" in suggestion.full_cycle_plan[1]
+        assert "最小验证任务" in suggestion.full_cycle_plan[2]
         execution_sections = [item.split("具体执行计划：", 1)[1].split("产出：", 1)[0] for item in suggestion.full_cycle_plan]
         output_sections = [item.split("产出：", 1)[1] for item in suggestion.full_cycle_plan]
         assert len(set(execution_sections)) == len(suggestion.full_cycle_plan)
@@ -259,7 +265,8 @@ def test_old_structured_phases_are_migrated_without_repeating_content():
     )
 
     assert len(normalized) == 3
-    assert all(item.count("搭建行业地图") == 1 for item in normalized)
+    objective_sections = [item.split("目标：", 1)[1].split("具体执行计划：", 1)[0] for item in normalized]
+    assert all(section.count("搭建行业地图") == 1 for section in objective_sections)
     assert all("目标：\n1. 搭建行业地图。\n2. 明确重点公司。" in item for item in normalized)
     assert all("子阶段：" not in item and "动作：" not in item for item in normalized)
     assert all("目标：\n1. " in item and "具体执行计划：\n1. " in item and "产出：\n1. " in item for item in normalized)
@@ -295,3 +302,32 @@ def test_legacy_nested_phase_text_is_reparsed_as_numbered_goals():
     assert all(item.split("目标：", 1)[1].split("具体执行计划：", 1)[0].count("目标：") == 0 for item in normalized)
     execution_sections = [item.split("具体执行计划：", 1)[1].split("产出：", 1)[0] for item in normalized]
     assert len(set(execution_sections)) == len(normalized)
+
+
+def test_structured_but_generic_phase_is_upgraded_to_week_day_plan():
+    service = UserContextService()
+    generic_phase = (
+        "第 1 阶段（第 1 个月）\n"
+        "目标：\n"
+        "1. 学习世界模型基础。\n"
+        "具体执行计划：\n"
+        "1. 界定研究范围、核心概念与判断标准。\n"
+        "2. 收集代表性材料，建立关键词、来源与问题之间的索引。\n"
+        "产出：\n"
+        "1. 一份概念地图。"
+    )
+
+    normalized = service._normalize_plan_items(
+        [
+            generic_phase,
+            generic_phase.replace("第 1 阶段", "第 2 阶段"),
+            generic_phase.replace("第 1 阶段", "第 3 阶段"),
+        ],
+        "自动驾驶世界模型",
+        "3 个月",
+    )
+
+    assert len(normalized) == 3
+    assert all("Week 1 / Day" in item and "Week 2 / Day" in item for item in normalized)
+    assert "状态表示、时序预测、训练信号、评估指标" in normalized[0]
+    assert "界定研究范围、核心概念与判断标准" not in normalized[0]

@@ -215,7 +215,7 @@ class UserContextService:
 
     def _format_phase(self, index: int, time_range: str, body: str, direction: str) -> str:
         goals = self._phase_goals(body)
-        execution_steps, outputs = self._phase_details(index, direction)
+        execution_steps, outputs = self._phase_details(index, direction, goals)
         return "\n".join(
             [
                 f"第 {index} 阶段（{time_range}）",
@@ -232,29 +232,32 @@ class UserContextService:
         goals = self._goal_candidates(body)
         return [goal for goal in goals if goal][:3] or ["完成本阶段目标"]
 
-    def _phase_details(self, index: int, direction: str) -> tuple[list[str], list[str]]:
+    def _phase_details(self, index: int, direction: str, goals: list[str]) -> tuple[list[str], list[str]]:
+        goal_focus = self._goal_focus(goals, direction)
         if index == 1:
             return (
                 [
-                    "界定研究范围、核心概念与判断标准。",
-                    "收集代表性材料，建立关键词、来源与问题之间的索引。",
-                    "整理关键问题，形成后续阶段可直接使用的研究框架。",
+                    f"Week 1 / Day 1-2：把「{goal_focus}」拆成 3 个必须回答的问题，列出每个问题对应的关键词、反向关键词和判断标准。",
+                    f"Week 1 / Day 3-5：围绕「{goal_focus}」筛出 5-8 份锚点材料，至少包含综述/经典论文、代表项目或官方文档、一个反例或争议来源。",
+                    "Week 2 / Day 1-3：逐份材料记录核心概念、方法假设、输入输出、适用边界和与个人方向的关系，每份材料形成 5-8 行证据卡。",
+                    "Week 2 / Day 4-5：把证据卡整理成概念地图，标记下一阶段要比较的 2-3 条路线或方法。",
                 ],
                 [
                     f"一份「{direction}」概念与问题地图。",
-                    "一份按优先级整理的核心材料目录。",
+                    "一份含材料类型、阅读优先级、对应问题和预计阅读时间的核心材料目录。",
                     "一份需要在后续阶段验证的关键问题清单。",
                 ],
             )
         if index == 2:
             return (
                 [
-                    "选择关键路线、方法或案例，建立统一的比较维度。",
-                    "逐项完成材料深读，记录支持证据、反例与适用边界。",
-                    "汇总差异并形成阶段判断，标记仍需验证的争议点。",
+                    f"Week 1 / Day 1：从上一阶段清单中选择 2-3 条和「{goal_focus}」最相关的路线，统一比较维度：问题定义、数据/输入、关键模块、训练或执行成本、失败场景。",
+                    "Week 1 / Day 2-4：每天 Deep Dive 一条路线或一个代表案例，记录它解决了什么、没有解决什么、证据来自哪里。",
+                    "Week 2 / Day 1-3：把路线放进同一张对比矩阵，补齐反例、边界条件和自己现有背景能切入的位置。",
+                    "Week 2 / Day 4-5：写出阶段判断：哪条路线继续追、哪条暂缓、下一阶段应该用什么小验证来确认。",
                 ],
                 [
-                    "一份关键路线、方法或案例的对比矩阵。",
+                    "一份包含问题定义、证据、边界和取舍理由的路线对比矩阵。",
                     "一组带来源的证据卡片与边界说明。",
                     "一份可供下一阶段验证的阶段判断。",
                 ],
@@ -262,21 +265,23 @@ class UserContextService:
         if index == 3:
             return (
                 [
-                    "把前期判断转化为案例拆解、实验或可执行验证任务。",
-                    "按统一标准记录过程、结果、偏差与失败原因。",
-                    "复盘验证结果，决定保留、修正或放弃哪些路线。",
+                    f"Week 1 / Day 1：把「{goal_focus}」转成一个最小验证任务，写清输入、操作步骤、成功标准和失败时要记录的现象。",
+                    "Week 1 / Day 2-4：完成第一个案例拆解、代码复现、实验草稿或数据整理任务，每天记录阻塞点、解决动作和中间结果。",
+                    "Week 2 / Day 1-3：根据第一次结果做一次小改动或对照验证，明确变化来自材料理解、方法选择还是执行条件。",
+                    "Week 2 / Day 4-5：复盘验证结果，决定保留、修正或放弃哪些路线，并写出下一步可展示产出的结构。",
                 ],
                 [
                     "一个可复查的案例、实验或实践结果。",
-                    "一份问题、偏差与改进项记录。",
+                    "一份包含阻塞点、偏差原因、改动记录和结果截图/链接的问题日志。",
                     "一份基于验证结果的路线取舍结论。",
                 ],
             )
         return (
             [
-                "整合前序阶段的证据、判断与实践结果。",
-                "补齐影响最终结论的关键缺口，并完成交叉检查。",
-                "形成最终交付物，明确下一周期的延伸方向。",
+                f"Week 1 / Day 1-2：按「{goal_focus}」回收前序阶段的证据、判断和实践结果，标记缺口、重复结论和仍不可靠的判断。",
+                "Week 1 / Day 3-5：补齐 2-3 个影响最终结论的关键缺口，优先补证据来源、对照案例或失败边界。",
+                "Week 2 / Day 1-3：把材料目录、对比矩阵、验证结果整合成最终交付物初稿，明确每个结论对应的证据。",
+                "Week 2 / Day 4-5：完成最终版，写清局限性、下一周期优先级和可以直接交给 Agent 继续推进的任务清单。",
             ],
             [
                 f"一份完整的「{direction}」阶段成果。",
@@ -284,6 +289,13 @@ class UserContextService:
                 "一份下一周期的优先级路线图。",
             ],
         )
+
+    def _goal_focus(self, goals: list[str], direction: str) -> str:
+        for goal in goals:
+            cleaned = goal.strip("。；;，, ")
+            if cleaned and cleaned != "完成本阶段目标":
+                return cleaned
+        return direction
 
     def _phase_source_text(self, item: str) -> str:
         text = self._strip_phase_prefix(item)
@@ -392,13 +404,22 @@ class UserContextService:
 
     def _expand_vague_plan_item(self, item: str, direction: str, index: int) -> str:
         topic = self._normalize_vague_topic(item)
+        lowered = topic.lower()
+        if "世界模型" in topic or "world models" in lowered or "world model" in lowered:
+            if index == 1:
+                return "梳理世界模型的状态表示、时序预测、训练信号、评估指标和自动驾驶场景输入输出。"
+            if index == 2:
+                return "对比 World Models、Dreamer、VISTA 等路线的问题定义、模型输入、关键模块、训练成本和失败场景。"
+            if index == 3:
+                return "完成一个最小世界模型验证任务，记录输入数据、运行步骤、结果现象和路线取舍。"
+            return "整合世界模型路线判断、证据链、可复用材料目录和下一周期验证任务。"
         if index == 1:
-            return f"围绕「{topic}」补齐 {direction} 所需的基础概念、代表材料和检索关键词，并整理一份阶段地图。"
+            return f"明确「{topic}」的核心概念、代表材料、检索关键词和判断标准。"
         if index == 2:
-            return f"围绕「{topic}」完成关键方法或路线对比，记录它和 {direction} 的关系、适用边界以及值得继续追的点。"
+            return f"对比「{topic}」相关的关键方法、路线或案例，记录适用边界和继续追踪价值。"
         if index == 3:
-            return f"围绕「{topic}」完成一次复现、案例拆解或实验草稿，把结果写成可展示的阶段输出。"
-        return f"围绕「{topic}」把前面阶段的判断落到一个明确产出上，并说明它如何服务 {direction}。"
+            return f"围绕「{topic}」完成一次复现、案例拆解或实验草稿，并写清结果和失败原因。"
+        return f"把「{topic}」沉淀成明确交付物，说明它如何服务 {direction}。"
 
     def _normalize_vague_topic(self, item: str) -> str:
         topic = item.strip("。；， ")
@@ -424,11 +445,14 @@ class UserContextService:
         ):
             return False
         objective = item.split("目标：", 1)[1].split("具体执行计划：", 1)[0]
+        execution = item.split("具体执行计划：", 1)[1].split("产出：", 1)[0]
         if "目标：" in objective or re.search(r"第\s*\d+\s*阶段", objective):
             return False
         goals = self._goal_candidates(objective)
         return (
             bool(goals)
+            and "Week" in execution
+            and "Day" in execution
             and all("\n1. " in item.split(marker, 1)[1] for marker in ["目标：", "具体执行计划：", "产出："])
         )
 
