@@ -165,7 +165,7 @@ class UserContextService:
 
     def _normalize_plan_items(self, items: list[str], direction: str, target_cycle: str = "") -> list[str]:
         formatted = [item.strip() for item in items if item.strip()]
-        if 3 <= len(formatted) <= 4 and all(self._is_formatted_phase(item) for item in formatted):
+        if 3 <= len(formatted) <= 4 and all(self._is_structured_phase(item) for item in formatted):
             return formatted
 
         cleaned = [self._strip_phase_prefix(item) for item in items if item.strip()]
@@ -214,14 +214,37 @@ class UserContextService:
 
     def _format_phase(self, index: int, time_range: str, body: str, direction: str) -> str:
         objective = body.rstrip("。")
+        subitems = self._phase_subitems(objective)
         return "\n".join(
             [
                 f"第 {index} 阶段（{time_range}）",
                 f"目标：{objective}。",
-                "动作：拆出本阶段最关键的 2-3 个问题，围绕这些问题选择材料、完成 Deep Dive，并记录证据。",
-                f"产出：形成一份能说明「{direction}」阶段进展的笔记、对比清单或小型实践结果。",
+                "子阶段：",
+                *[f"- {item}" for item in subitems],
+                "动作：",
+                "- 拆出本阶段最关键的 2-3 个问题，并写成材料检索目标。",
+                "- 围绕每个问题选择材料、完成 Deep Dive，并记录证据和判断。",
+                "- 在阶段结束前做一次整理，标记已解决问题和下一阶段要追的问题。",
+                "产出：",
+                f"- 一份能说明「{direction}」阶段进展的笔记。",
+                "- 一份方法、材料或案例对比清单。",
+                "- 一个可继续迭代的小型实践结果或下一步任务列表。",
             ]
         )
+
+    def _phase_subitems(self, objective: str) -> list[str]:
+        parts = [
+            part.strip("。；，, ")
+            for part in objective.replace("。", "；").replace("，", "；").split("；")
+            if part.strip("。；，, ")
+        ]
+        if len(parts) >= 2:
+            return parts[:4]
+        return [
+            "明确本阶段需要回答的核心问题和判断标准。",
+            "围绕核心问题完成材料筛选、阅读和证据记录。",
+            "把阶段判断整理成可复用笔记，并决定下一阶段是否继续推进。",
+        ]
 
     def _phase_time_ranges(self, target_cycle: str, count: int) -> list[str]:
         total_months = self._parse_total_months(target_cycle)
@@ -316,8 +339,16 @@ class UserContextService:
             topic = topic[:-1].strip()
         return topic
 
-    def _is_formatted_phase(self, item: str) -> bool:
-        return "目标：" in item and "动作：" in item and "产出：" in item and "（" in item and "）" in item
+    def _is_structured_phase(self, item: str) -> bool:
+        return (
+            "目标：" in item
+            and "子阶段：" in item
+            and "动作：" in item
+            and "产出：" in item
+            and "\n- " in item
+            and "（" in item
+            and "）" in item
+        )
 
     def _default_context(self) -> UserContext:
         now = datetime.now(timezone.utc)

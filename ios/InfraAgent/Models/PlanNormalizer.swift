@@ -20,7 +20,7 @@ struct PlanNormalizer {
         let formatted = items
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        if formatted.count >= 3, formatted.count <= 4, formatted.allSatisfy(isFormattedPhase) {
+        if formatted.count >= 3, formatted.count <= 4, formatted.allSatisfy(isStructuredPhase) {
             return formatted
         }
 
@@ -97,12 +97,38 @@ struct PlanNormalizer {
 
     private static func formatPhase(index: Int, timeRange: String, body: String, direction: String) -> String {
         let objective = body.trimmingCharacters(in: CharacterSet(charactersIn: "。 "))
+        let subitems = phaseSubitems(objective)
         return [
             "第 \(index) 阶段（\(timeRange)）",
             "目标：\(objective)。",
-            "动作：拆出本阶段最关键的 2-3 个问题，围绕这些问题选择材料、完成 Deep Dive，并记录证据。",
-            "产出：形成一份能说明「\(direction)」阶段进展的笔记、对比清单或小型实践结果。"
+            "子阶段："
+        ] + subitems.map { "- \($0)" } + [
+            "动作：",
+            "- 拆出本阶段最关键的 2-3 个问题，并写成材料检索目标。",
+            "- 围绕每个问题选择材料、完成 Deep Dive，并记录证据和判断。",
+            "- 在阶段结束前做一次整理，标记已解决问题和下一阶段要追的问题。",
+            "产出：",
+            "- 一份能说明「\(direction)」阶段进展的笔记。",
+            "- 一份方法、材料或案例对比清单。",
+            "- 一个可继续迭代的小型实践结果或下一步任务列表。"
         ].joined(separator: "\n")
+    }
+
+    private static func phaseSubitems(_ objective: String) -> [String] {
+        let parts = objective
+            .replacingOccurrences(of: "。", with: "；")
+            .replacingOccurrences(of: "，", with: "；")
+            .components(separatedBy: "；")
+            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "。；，, ")) }
+            .filter { !$0.isEmpty }
+        if parts.count >= 2 {
+            return Array(parts.prefix(4))
+        }
+        return [
+            "明确本阶段需要回答的核心问题和判断标准。",
+            "围绕核心问题完成材料筛选、阅读和证据记录。",
+            "把阶段判断整理成可复用笔记，并决定下一阶段是否继续推进。"
+        ]
     }
 
     private static func expandVaguePlanItem(_ item: String, direction: String, phaseIndex: Int) -> String {
@@ -152,10 +178,12 @@ struct PlanNormalizer {
         return text
     }
 
-    private static func isFormattedPhase(_ item: String) -> Bool {
+    private static func isStructuredPhase(_ item: String) -> Bool {
         item.contains("目标：") &&
+            item.contains("子阶段：") &&
             item.contains("动作：") &&
             item.contains("产出：") &&
+            item.contains("\n- ") &&
             item.contains("（") &&
             item.contains("）")
     }

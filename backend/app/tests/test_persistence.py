@@ -118,8 +118,10 @@ def test_direction_profile_suggestion_falls_back_without_llm(tmp_path):
         assert 3 <= len(suggestion.full_cycle_plan) <= 4
         assert "（" in suggestion.full_cycle_plan[0]
         assert "目标：" in suggestion.full_cycle_plan[0]
+        assert "子阶段：" in suggestion.full_cycle_plan[0]
         assert "动作：" in suggestion.full_cycle_plan[0]
         assert "产出：" in suggestion.full_cycle_plan[0]
+        assert "\n- " in suggestion.full_cycle_plan[0]
         assert "新能源行业研究" in suggestion.weekly_focus
         assert suggestion.next_action
         assert suggestion.active_tasks
@@ -171,9 +173,9 @@ def test_direction_profile_suggestion_uses_edited_full_cycle_plan(tmp_path):
         )
 
         assert suggestion.full_cycle_plan == [
-            "第 1 阶段（第 1 个月）\n目标：先搭建储能产业链地图并划分关键公司。\n动作：拆出本阶段最关键的 2-3 个问题，围绕这些问题选择材料、完成 Deep Dive，并记录证据。\n产出：形成一份能说明「储能产业链研究」阶段进展的笔记、对比清单或小型实践结果。",
-            "第 2 阶段（第 2 个月）\n目标：跟踪政策、价格和龙头公司季度变化。\n动作：拆出本阶段最关键的 2-3 个问题，围绕这些问题选择材料、完成 Deep Dive，并记录证据。\n产出：形成一份能说明「储能产业链研究」阶段进展的笔记、对比清单或小型实践结果。",
-            "第 3 阶段（第 3 个月）\n目标：形成一份储能公司对比和后续跟踪模板。\n动作：拆出本阶段最关键的 2-3 个问题，围绕这些问题选择材料、完成 Deep Dive，并记录证据。\n产出：形成一份能说明「储能产业链研究」阶段进展的笔记、对比清单或小型实践结果。",
+            "第 1 阶段（第 1 个月）\n目标：先搭建储能产业链地图并划分关键公司。\n子阶段：\n- 明确本阶段需要回答的核心问题和判断标准。\n- 围绕核心问题完成材料筛选、阅读和证据记录。\n- 把阶段判断整理成可复用笔记，并决定下一阶段是否继续推进。\n动作：\n- 拆出本阶段最关键的 2-3 个问题，并写成材料检索目标。\n- 围绕每个问题选择材料、完成 Deep Dive，并记录证据和判断。\n- 在阶段结束前做一次整理，标记已解决问题和下一阶段要追的问题。\n产出：\n- 一份能说明「储能产业链研究」阶段进展的笔记。\n- 一份方法、材料或案例对比清单。\n- 一个可继续迭代的小型实践结果或下一步任务列表。",
+            "第 2 阶段（第 2 个月）\n目标：跟踪政策、价格和龙头公司季度变化。\n子阶段：\n- 明确本阶段需要回答的核心问题和判断标准。\n- 围绕核心问题完成材料筛选、阅读和证据记录。\n- 把阶段判断整理成可复用笔记，并决定下一阶段是否继续推进。\n动作：\n- 拆出本阶段最关键的 2-3 个问题，并写成材料检索目标。\n- 围绕每个问题选择材料、完成 Deep Dive，并记录证据和判断。\n- 在阶段结束前做一次整理，标记已解决问题和下一阶段要追的问题。\n产出：\n- 一份能说明「储能产业链研究」阶段进展的笔记。\n- 一份方法、材料或案例对比清单。\n- 一个可继续迭代的小型实践结果或下一步任务列表。",
+            "第 3 阶段（第 3 个月）\n目标：形成一份储能公司对比和后续跟踪模板。\n子阶段：\n- 明确本阶段需要回答的核心问题和判断标准。\n- 围绕核心问题完成材料筛选、阅读和证据记录。\n- 把阶段判断整理成可复用笔记，并决定下一阶段是否继续推进。\n动作：\n- 拆出本阶段最关键的 2-3 个问题，并写成材料检索目标。\n- 围绕每个问题选择材料、完成 Deep Dive，并记录证据和判断。\n- 在阶段结束前做一次整理，标记已解决问题和下一阶段要追的问题。\n产出：\n- 一份能说明「储能产业链研究」阶段进展的笔记。\n- 一份方法、材料或案例对比清单。\n- 一个可继续迭代的小型实践结果或下一步任务列表。",
         ]
         assert "储能产业链地图" in suggestion.weekly_focus
         assert any("阶段" in task or "本周" in task for task in suggestion.active_tasks)
@@ -224,7 +226,8 @@ def test_existing_context_plan_is_normalized_on_read(tmp_path):
 
         assert len(loaded.plan.full_cycle_plan) == 4
         assert all(item.startswith("第 ") for item in loaded.plan.full_cycle_plan)
-        assert all("目标：" in item and "动作：" in item and "产出：" in item for item in loaded.plan.full_cycle_plan)
+        assert all("目标：" in item and "子阶段：" in item and "动作：" in item and "产出：" in item for item in loaded.plan.full_cycle_plan)
+        assert all("\n- " in item for item in loaded.plan.full_cycle_plan)
         assert all("Dreamer；vista等" not in item for item in loaded.plan.full_cycle_plan)
         assert all("vista等" not in item for item in loaded.plan.full_cycle_plan)
     finally:
