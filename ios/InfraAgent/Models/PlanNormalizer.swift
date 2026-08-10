@@ -98,11 +98,13 @@ struct PlanNormalizer {
     private static func formatPhase(index: Int, timeRange: String, body: String, direction: String) -> String {
         let objective = body.trimmingCharacters(in: CharacterSet(charactersIn: "。 "))
         let subitems = phaseSubitems(objective)
-        return [
+        var lines: [String] = [
             "第 \(index) 阶段（\(timeRange)）",
             "目标：\(objective)。",
             "子阶段："
-        ] + subitems.map { "- \($0)" } + [
+        ]
+        lines.append(contentsOf: subitems.map { "- \($0)" })
+        lines.append(contentsOf: [
             "动作：",
             "- 拆出本阶段最关键的 2-3 个问题，并写成材料检索目标。",
             "- 围绕每个问题选择材料、完成 Deep Dive，并记录证据和判断。",
@@ -111,7 +113,8 @@ struct PlanNormalizer {
             "- 一份能说明「\(direction)」阶段进展的笔记。",
             "- 一份方法、材料或案例对比清单。",
             "- 一个可继续迭代的小型实践结果或下一步任务列表。"
-        ].joined(separator: "\n")
+        ])
+        return lines.joined(separator: "\n")
     }
 
     private static func phaseSubitems(_ objective: String) -> [String] {
