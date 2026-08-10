@@ -150,7 +150,13 @@ struct PlanView: View {
             }
             .sheet(item: $selectedPhase) { phase in
                 NavigationStack {
-                    PlanPhaseDetailView(phase: phase)
+                    PlanPhaseDetailView(
+                        phase: phase,
+                        isSaving: isSaving,
+                        onSave: { updatedPhase in
+                            await savePhase(updatedPhase)
+                        }
+                    )
                 }
             }
         }
@@ -189,6 +195,27 @@ struct PlanView: View {
             isShowingQuickEdit = false
         } catch {
             message = "保存计划失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func savePhase(_ phase: PlanPhase) async {
+        guard var updated = context else { return }
+        let planIndex = phase.index - 1
+        guard updated.plan.fullCyclePlan.indices.contains(planIndex) else { return }
+
+        isSaving = true
+        defer { isSaving = false }
+
+        updated.plan.fullCyclePlan[planIndex] = phase.rebuiltText()
+        updated.plan.updatedAt = Date()
+
+        do {
+            let saved = try await api.save(updated)
+            context = PlanNormalizer.normalizedContext(saved).context
+            message = "阶段 \(phase.index) 已保存，Agent 会使用更新后的计划。"
+            selectedPhase = nil
+        } catch {
+            message = "保存阶段失败：\(error.localizedDescription)"
         }
     }
 }
@@ -331,6 +358,10 @@ private struct PlanQuickEditView: View {
 private struct PlanPhase: Identifiable {
     let index: Int
     let text: String
+    var titleOverride: String? = nil
+    var editedGoals: [String]? = nil
+    var editedExecutionSteps: [String]? = nil
+    var editedOutputs: [String]? = nil
 
     var id: Int { index }
 
@@ -342,19 +373,19 @@ private struct PlanPhase: Identifiable {
     }
 
     var title: String {
-        lines.first ?? "阶段 \(index)"
+        titleOverride ?? lines.first ?? "阶段 \(index)"
     }
 
     var goals: [String] {
-        sectionLines(after: "目标：", before: "具体执行计划：")
+        editedGoals ?? sectionLines(after: "目标：", before: "具体执行计划：")
     }
 
     var executionSteps: [String] {
-        sectionLines(after: "具体执行计划：", before: "产出：")
+        editedExecutionSteps ?? sectionLines(after: "具体执行计划：", before: "产出：")
     }
 
     var outputs: [String] {
-        sectionLines(after: "产出：", before: nil)
+        editedOutputs ?? sectionLines(after: "产出：", before: nil)
     }
 
     var summary: String {
@@ -372,6 +403,13 @@ private struct PlanPhase: Identifiable {
         let end = endMarker.flatMap { marker in lines.firstIndex(of: marker) } ?? lines.endIndex
         guard start + 1 < end else { return [] }
         return Array(lines[(start + 1)..<end])
+    }
+
+    func rebuiltText() -> String {
+        ([title, "目标："] + goals + ["具体执行计划："] + executionSteps + ["产出："] + outputs)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
     }
 
     private func highestWeekNumber(in text: String) -> Int {
@@ -418,30 +456,89 @@ private struct PlanPhaseCardView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
-            HStack(spacing: 12) {
-                Label("\(phase.goals.count) 个目标", systemImage: "target")
-                Label("\(phase.executionSteps.count) 个执行块", systemImage: "calendar")
-                Text(phase.weekCoverage)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    PlanPhaseMetric(text: "\(phase.goals.count) 目标", systemImage: "target")
+                    PlanPhaseMetric(text: "\(phase.executionSteps.count) 执行块", systemImage: "calendar")
+                }
+                PlanPhaseMetric(text: phase.weekCoverage, systemImage: "clock")
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
         .padding(.vertical, 8)
     }
 }
 
-private struct PlanPhaseDetailView: View {
-    let phase: PlanPhase
-
-    @Environment(\.dismiss) private var dismiss
+private struct PlanPhaseMetric: View {
+    let text: String
+    let systemImage: String
 
     var body: some View {
-        List {
-            PlanPhaseDetailSection(title: "目标", lines: phase.goals)
-            PlanPhaseDetailSection(title: "具体执行计划", lines: phase.executionSteps)
-            PlanPhaseDetailSection(title: "产出", lines: phase.outputs)
+        Label(text, systemImage: systemImage)
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color(.secondarySystemGroupedBackground), in: Capsule())
+    }
+}
+
+private struct PlanPhaseDetailView: View {
+    let phase: PlanPhase
+    let isSaving: Bool
+    let onSave: (PlanPhase) async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var titleText: String
+    @State private var goalsText: String
+    @State private var executionText: String
+    @State private var outputsText: String
+
+    init(
+        phase: PlanPhase,
+        isSaving: Bool,
+        onSave: @escaping (PlanPhase) async -> Void
+    ) {
+        self.phase = phase
+        self.isSaving = isSaving
+        self.onSave = onSave
+        _titleText = State(initialValue: phase.title)
+        _goalsText = State(initialValue: phase.goals.joined(separator: "\n"))
+        _executionText = State(initialValue: phase.executionSteps.joined(separator: "\n"))
+        _outputsText = State(initialValue: phase.outputs.joined(separator: "\n"))
+    }
+
+    var body: some View {
+        Form {
+            Section("阶段") {
+                TextField("阶段标题", text: $titleText, axis: .vertical)
+                    .lineLimit(1...3)
+            }
+
+            EditablePlanPhaseSection(title: "目标", text: $goalsText, lineLimit: 3...8)
+            EditablePlanPhaseSection(title: "具体执行计划", text: $executionText, lineLimit: 8...18)
+            EditablePlanPhaseSection(title: "产出", text: $outputsText, lineLimit: 3...8)
+
+            Section {
+                Button {
+                    Task {
+                        await onSave(buildUpdatedPhase())
+                    }
+                } label: {
+                    HStack {
+                        Spacer()
+                        if isSaving {
+                            ProgressView()
+                        } else {
+                            Text("保存阶段")
+                                .fontWeight(.semibold)
+                        }
+                        Spacer()
+                    }
+                }
+                .disabled(isSaving || !canSave)
+            }
         }
-        .navigationTitle(phase.title)
+        .navigationTitle("编辑阶段")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -451,23 +548,43 @@ private struct PlanPhaseDetailView: View {
             }
         }
     }
+
+    private var canSave: Bool {
+        !titleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !splitLines(goalsText).isEmpty &&
+            !splitLines(executionText).isEmpty &&
+            !splitLines(outputsText).isEmpty
+    }
+
+    private func buildUpdatedPhase() -> PlanPhase {
+        PlanPhase(
+            index: phase.index,
+            text: phase.text,
+            titleOverride: titleText.trimmingCharacters(in: .whitespacesAndNewlines),
+            editedGoals: splitLines(goalsText),
+            editedExecutionSteps: splitLines(executionText),
+            editedOutputs: splitLines(outputsText)
+        )
+    }
+
+    private func splitLines(_ text: String) -> [String] {
+        text
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
 }
 
-private struct PlanPhaseDetailSection: View {
+private struct EditablePlanPhaseSection: View {
     let title: String
-    let lines: [String]
+    @Binding var text: String
+    let lineLimit: ClosedRange<Int>
 
     var body: some View {
         Section(title) {
-            if lines.isEmpty {
-                Text("暂无内容")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(lines, id: \.self) { line in
-                    Text(line)
-                        .font(.subheadline)
-                }
-            }
+            TextField(title, text: $text, axis: .vertical)
+                .font(.subheadline)
+                .lineLimit(lineLimit)
         }
     }
 }
