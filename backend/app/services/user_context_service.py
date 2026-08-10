@@ -168,7 +168,7 @@ class UserContextService:
         if 3 <= len(formatted) <= 4 and all(self._is_structured_phase(item) for item in formatted):
             return formatted
 
-        cleaned = [self._strip_phase_prefix(item) for item in items if item.strip()]
+        cleaned = [self._phase_source_text(item) for item in items if item.strip()]
         if not cleaned:
             return []
 
@@ -214,37 +214,32 @@ class UserContextService:
 
     def _format_phase(self, index: int, time_range: str, body: str, direction: str) -> str:
         objective = body.rstrip("。")
-        subitems = self._phase_subitems(objective)
         return "\n".join(
             [
                 f"第 {index} 阶段（{time_range}）",
-                f"目标：{objective}。",
-                "子阶段：",
-                *[f"- {item}" for item in subitems],
-                "动作：",
-                "- 拆出本阶段最关键的 2-3 个问题，并写成材料检索目标。",
-                "- 围绕每个问题选择材料、完成 Deep Dive，并记录证据和判断。",
-                "- 在阶段结束前做一次整理，标记已解决问题和下一阶段要追的问题。",
+                "目标：",
+                f"1. {objective}。",
+                "具体执行计划：",
+                "1. 明确本阶段需要解决的 2-3 个关键问题和判断标准。",
+                "2. 按关键问题筛选材料、完成 Deep Dive，并记录证据与结论。",
+                "3. 阶段结束前复盘进度，整理未解决问题并确定下一阶段重点。",
                 "产出：",
-                f"- 一份能说明「{direction}」阶段进展的笔记。",
-                "- 一份方法、材料或案例对比清单。",
-                "- 一个可继续迭代的小型实践结果或下一步任务列表。",
+                f"1. 一份「{direction}」阶段研究笔记。",
+                "2. 一份关键材料、方法或案例的对比清单。",
+                "3. 一份下一阶段可直接执行的任务列表。",
             ]
         )
 
-    def _phase_subitems(self, objective: str) -> list[str]:
-        parts = [
-            part.strip("。；，, ")
-            for part in objective.replace("。", "；").replace("，", "；").split("；")
-            if part.strip("。；，, ")
-        ]
-        if len(parts) >= 2:
-            return parts[:4]
-        return [
-            "明确本阶段需要回答的核心问题和判断标准。",
-            "围绕核心问题完成材料筛选、阅读和证据记录。",
-            "把阶段判断整理成可复用笔记，并决定下一阶段是否继续推进。",
-        ]
+    def _phase_source_text(self, item: str) -> str:
+        text = self._strip_phase_prefix(item)
+        if "目标：" not in text:
+            return text
+        objective = text.split("目标：", 1)[1]
+        for marker in ["具体执行计划：", "子阶段：", "动作：", "产出："]:
+            objective = objective.split(marker, 1)[0]
+        lines = [line.strip().lstrip("- ").strip() for line in objective.splitlines()]
+        lines = [line[2:].strip() if len(line) > 2 and line[0].isdigit() and line[1] in ".、" else line for line in lines]
+        return "；".join(line.rstrip("。；") for line in lines if line)
 
     def _phase_time_ranges(self, target_cycle: str, count: int) -> list[str]:
         total_months = self._parse_total_months(target_cycle)
@@ -342,10 +337,9 @@ class UserContextService:
     def _is_structured_phase(self, item: str) -> bool:
         return (
             "目标：" in item
-            and "子阶段：" in item
-            and "动作：" in item
+            and "具体执行计划：" in item
             and "产出：" in item
-            and "\n- " in item
+            and "\n1. " in item
             and "（" in item
             and "）" in item
         )

@@ -25,7 +25,7 @@ struct PlanNormalizer {
         }
 
         let cleaned = items
-            .map(stripPhasePrefix)
+            .map(phaseSourceText)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
@@ -97,41 +97,46 @@ struct PlanNormalizer {
 
     private static func formatPhase(index: Int, timeRange: String, body: String, direction: String) -> String {
         let objective = body.trimmingCharacters(in: CharacterSet(charactersIn: "。 "))
-        let subitems = phaseSubitems(objective)
-        var lines: [String] = [
+        let lines: [String] = [
             "第 \(index) 阶段（\(timeRange)）",
-            "目标：\(objective)。",
-            "子阶段："
-        ]
-        lines.append(contentsOf: subitems.map { "- \($0)" })
-        lines.append(contentsOf: [
-            "动作：",
-            "- 拆出本阶段最关键的 2-3 个问题，并写成材料检索目标。",
-            "- 围绕每个问题选择材料、完成 Deep Dive，并记录证据和判断。",
-            "- 在阶段结束前做一次整理，标记已解决问题和下一阶段要追的问题。",
+            "目标：",
+            "1. \(objective)。",
+            "具体执行计划：",
+            "1. 明确本阶段需要解决的 2-3 个关键问题和判断标准。",
+            "2. 按关键问题筛选材料、完成 Deep Dive，并记录证据与结论。",
+            "3. 阶段结束前复盘进度，整理未解决问题并确定下一阶段重点。",
             "产出：",
-            "- 一份能说明「\(direction)」阶段进展的笔记。",
-            "- 一份方法、材料或案例对比清单。",
-            "- 一个可继续迭代的小型实践结果或下一步任务列表。"
-        ])
+            "1. 一份「\(direction)」阶段研究笔记。",
+            "2. 一份关键材料、方法或案例的对比清单。",
+            "3. 一份下一阶段可直接执行的任务列表。"
+        ]
         return lines.joined(separator: "\n")
     }
 
-    private static func phaseSubitems(_ objective: String) -> [String] {
-        let parts = objective
-            .replacingOccurrences(of: "。", with: "；")
-            .replacingOccurrences(of: "，", with: "；")
-            .components(separatedBy: "；")
-            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "。；，, ")) }
-            .filter { !$0.isEmpty }
-        if parts.count >= 2 {
-            return Array(parts.prefix(4))
+    private static func phaseSourceText(_ item: String) -> String {
+        let text = stripPhasePrefix(item)
+        guard let goalRange = text.range(of: "目标：") else { return text }
+        var objective = String(text[goalRange.upperBound...])
+        for marker in ["具体执行计划：", "子阶段：", "动作：", "产出："] {
+            if let range = objective.range(of: marker) {
+                objective = String(objective[..<range.lowerBound])
+            }
         }
-        return [
-            "明确本阶段需要回答的核心问题和判断标准。",
-            "围绕核心问题完成材料筛选、阅读和证据记录。",
-            "把阶段判断整理成可复用笔记，并决定下一阶段是否继续推进。"
-        ]
+        return objective
+            .components(separatedBy: .newlines)
+            .map { line in
+                var value = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                if value.hasPrefix("- ") { value.removeFirst(2) }
+                if value.count > 2 {
+                    let prefix = value.prefix(2)
+                    if prefix.first?.isNumber == true && (prefix.last == "." || prefix.last == "、") {
+                        value.removeFirst(2)
+                    }
+                }
+                return value.trimmingCharacters(in: CharacterSet(charactersIn: "。； "))
+            }
+            .filter { !$0.isEmpty }
+            .joined(separator: "；")
     }
 
     private static func expandVaguePlanItem(_ item: String, direction: String, phaseIndex: Int) -> String {
@@ -183,10 +188,9 @@ struct PlanNormalizer {
 
     private static func isStructuredPhase(_ item: String) -> Bool {
         item.contains("目标：") &&
-            item.contains("子阶段：") &&
-            item.contains("动作：") &&
+            item.contains("具体执行计划：") &&
             item.contains("产出：") &&
-            item.contains("\n- ") &&
+            item.contains("\n1. ") &&
             item.contains("（") &&
             item.contains("）")
     }

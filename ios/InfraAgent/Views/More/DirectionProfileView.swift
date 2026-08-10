@@ -154,7 +154,7 @@ struct DirectionProfileView: View {
                 switch planStep {
                 case .fullCycle:
                     Section("全周期计划") {
-                        Text("建议控制在 3-4 个阶段。每个阶段可用多行写目标、动作和产出；阶段之间用空行分隔。")
+                        Text("建议控制在 3-4 个阶段。每个阶段按条目填写目标、具体执行计划和产出；阶段之间用空行分隔。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         TextField("阶段之间用空行分隔", text: $fullCyclePlanText, axis: .vertical)
