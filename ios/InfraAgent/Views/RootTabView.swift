@@ -389,7 +389,7 @@ private struct PlanPhase: Identifiable {
     }
 
     var summary: String {
-        goals.first ?? "点击查看阶段目标、执行计划和产出。"
+        goals.first.map(cleanListMarker) ?? "点击查看阶段目标、执行计划和产出。"
     }
 
     var weekCoverage: String {
@@ -403,6 +403,21 @@ private struct PlanPhase: Identifiable {
         let end = endMarker.flatMap { marker in lines.firstIndex(of: marker) } ?? lines.endIndex
         guard start + 1 < end else { return [] }
         return Array(lines[(start + 1)..<end])
+    }
+
+    private func cleanListMarker(_ line: String) -> String {
+        let patterns = [
+            #"^\d+[.、]\s*"#,
+            #"^[-•]\s*"#,
+        ]
+        var value = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        for pattern in patterns {
+            if let range = value.range(of: pattern, options: .regularExpression) {
+                value.removeSubrange(range)
+                value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        return value
     }
 
     func rebuiltText() -> String {
@@ -456,11 +471,9 @@ private struct PlanPhaseCardView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    PlanPhaseMetric(text: "\(phase.goals.count) 目标", systemImage: "target")
-                    PlanPhaseMetric(text: "\(phase.executionSteps.count) 执行块", systemImage: "calendar")
-                }
+            HStack(spacing: 6) {
+                PlanPhaseMetric(text: "\(phase.goals.count) 目标", systemImage: "target")
+                PlanPhaseMetric(text: "\(phase.executionSteps.count) 执行块", systemImage: "calendar")
                 PlanPhaseMetric(text: phase.weekCoverage, systemImage: "clock")
             }
         }
@@ -474,10 +487,11 @@ private struct PlanPhaseMetric: View {
 
     var body: some View {
         Label(text, systemImage: systemImage)
-            .font(.caption2)
+            .font(.system(size: 10, weight: .medium))
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .labelStyle(.titleAndIcon)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
             .background(Color(.secondarySystemGroupedBackground), in: Capsule())
     }
 }
@@ -489,9 +503,9 @@ private struct PlanPhaseDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var titleText: String
-    @State private var goalsText: String
-    @State private var executionText: String
-    @State private var outputsText: String
+    @State private var goals: [String]
+    @State private var executionSteps: [String]
+    @State private var outputs: [String]
 
     init(
         phase: PlanPhase,
@@ -502,9 +516,9 @@ private struct PlanPhaseDetailView: View {
         self.isSaving = isSaving
         self.onSave = onSave
         _titleText = State(initialValue: phase.title)
-        _goalsText = State(initialValue: phase.goals.joined(separator: "\n"))
-        _executionText = State(initialValue: phase.executionSteps.joined(separator: "\n"))
-        _outputsText = State(initialValue: phase.outputs.joined(separator: "\n"))
+        _goals = State(initialValue: phase.goals)
+        _executionSteps = State(initialValue: phase.executionSteps)
+        _outputs = State(initialValue: phase.outputs)
     }
 
     var body: some View {
@@ -514,9 +528,9 @@ private struct PlanPhaseDetailView: View {
                     .lineLimit(1...3)
             }
 
-            EditablePlanPhaseSection(title: "目标", text: $goalsText, lineLimit: 3...8)
-            EditablePlanPhaseSection(title: "具体执行计划", text: $executionText, lineLimit: 8...18)
-            EditablePlanPhaseSection(title: "产出", text: $outputsText, lineLimit: 3...8)
+            EditablePlanPhaseItemsSection(title: "目标", items: $goals, lineLimit: 1...4)
+            EditablePlanPhaseItemsSection(title: "具体执行计划", items: $executionSteps, lineLimit: 3...8)
+            EditablePlanPhaseItemsSection(title: "产出", items: $outputs, lineLimit: 1...4)
 
             Section {
                 Button {
@@ -551,9 +565,9 @@ private struct PlanPhaseDetailView: View {
 
     private var canSave: Bool {
         !titleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            !splitLines(goalsText).isEmpty &&
-            !splitLines(executionText).isEmpty &&
-            !splitLines(outputsText).isEmpty
+            !cleanedItems(goals).isEmpty &&
+            !cleanedItems(executionSteps).isEmpty &&
+            !cleanedItems(outputs).isEmpty
     }
 
     private func buildUpdatedPhase() -> PlanPhase {
@@ -561,30 +575,31 @@ private struct PlanPhaseDetailView: View {
             index: phase.index,
             text: phase.text,
             titleOverride: titleText.trimmingCharacters(in: .whitespacesAndNewlines),
-            editedGoals: splitLines(goalsText),
-            editedExecutionSteps: splitLines(executionText),
-            editedOutputs: splitLines(outputsText)
+            editedGoals: cleanedItems(goals),
+            editedExecutionSteps: cleanedItems(executionSteps),
+            editedOutputs: cleanedItems(outputs)
         )
     }
 
-    private func splitLines(_ text: String) -> [String] {
-        text
-            .components(separatedBy: .newlines)
+    private func cleanedItems(_ items: [String]) -> [String] {
+        items
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
     }
 }
 
-private struct EditablePlanPhaseSection: View {
+private struct EditablePlanPhaseItemsSection: View {
     let title: String
-    @Binding var text: String
+    @Binding var items: [String]
     let lineLimit: ClosedRange<Int>
 
     var body: some View {
         Section(title) {
-            TextField(title, text: $text, axis: .vertical)
-                .font(.subheadline)
-                .lineLimit(lineLimit)
+            ForEach(items.indices, id: \.self) { index in
+                TextField("\(title) \(index + 1)", text: $items[index], axis: .vertical)
+                    .font(.subheadline)
+                    .lineLimit(lineLimit)
+            }
         }
     }
 }
