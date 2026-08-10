@@ -187,6 +187,8 @@ struct TechRadarView: View {
                 introduction: introduction(for: item, input: input),
                 observation: observation(for: item),
                 validationQuestions: validationQuestions(for: item),
+                sourceReference: sourceReference(for: item, input: input),
+                keyPassages: keyPassages(for: item),
                 sourceType: input.sourceLabel,
                 sourceDetail: input.sourceDetail,
                 sourceURL: item.url?.absoluteString
@@ -281,6 +283,116 @@ struct TechRadarView: View {
             "如果转入 Deep Dive，最小验证问题是什么：机制、应用场景、风险，还是行动机会？",
             "如果暂不深入，下一次复查应该看什么触发条件？"
         ]
+    }
+
+    private func sourceReference(for item: RadarItem, input: RadarInput) -> RadarSourceReference {
+        if let url = item.url {
+            return RadarSourceReference(
+                title: item.title,
+                displayType: input.source == .url ? "网页 / 原文链接" : "外部来源链接",
+                detail: url.absoluteString,
+                url: url,
+                note: "点击链接可打开原始网页。当前 Radar 先保存链接和 Agent 判断；网页正文抓取、截图和引用定位后续接后端。"
+            )
+        }
+
+        switch input.source {
+        case .pdf:
+            return RadarSourceReference(
+                title: item.title,
+                displayType: "PDF / 文件登记",
+                detail: input.titleOrFallback,
+                url: nil,
+                note: "当前版本先登记文件标题和说明作为原文入口；真实 PDF 上传、正文抽取、页码定位需要后端文件接口。"
+            )
+        case .manual:
+            return RadarSourceReference(
+                title: item.title,
+                displayType: "手动材料",
+                detail: input.summaryOrFallback,
+                url: nil,
+                note: "这条信号来自用户手动输入，原文以输入内容保存。"
+            )
+        case .topic:
+            return RadarSourceReference(
+                title: item.title,
+                displayType: "主题扫描",
+                detail: input.titleOrFallback,
+                url: nil,
+                note: "这条信号由 Agent 围绕主题生成，后续如果进入 Deep Dive，需要补充一手材料或链接。"
+            )
+        case .agent:
+            return RadarSourceReference(
+                title: item.title,
+                displayType: "Agent 自动扫描",
+                detail: item.source.isEmpty ? input.sourceDetail : item.source,
+                url: nil,
+                note: "这条信号来自当前 Radar payload。若没有 URL，说明后端暂未提供可点击原文。"
+            )
+        case .url:
+            return RadarSourceReference(
+                title: item.title,
+                displayType: "网页 / 原文链接",
+                detail: input.sourceDetail,
+                url: nil,
+                note: "输入中没有可解析 URL，当前仅保存标题和说明。"
+            )
+        }
+    }
+
+    private func keyPassages(for item: RadarItem) -> [RadarKeyPassage] {
+        let summary = item.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        let substance = item.technicalSubstance.trimmingCharacters(in: .whitespacesAndNewlines)
+        let relevance = item.whyItMatters.trimmingCharacters(in: .whitespacesAndNewlines)
+        let noise = item.marketingNoise.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        var passages: [RadarKeyPassage] = []
+        if !summary.isEmpty {
+            passages.append(
+                RadarKeyPassage(
+                    title: "变化摘要",
+                    excerpt: summary,
+                    analysis: "这是判断是否值得继续追踪的第一层信息：先明确发生了什么，再判断它是否足够具体。"
+                )
+            )
+        }
+        if !substance.isEmpty, substance != summary {
+            passages.append(
+                RadarKeyPassage(
+                    title: "技术 / 事实内容",
+                    excerpt: substance,
+                    analysis: "这段用于区分真实进展和泛泛表述；如果要转 Deep Dive，应优先验证这里的事实、机制或实现细节。"
+                )
+            )
+        }
+        if !relevance.isEmpty {
+            passages.append(
+                RadarKeyPassage(
+                    title: "与当前计划的关系",
+                    excerpt: relevance,
+                    analysis: "这段回答为什么它和用户有关；如果关系薄弱，应暂存或忽略，而不是进入深读。"
+                )
+            )
+        }
+        if !noise.isEmpty {
+            passages.append(
+                RadarKeyPassage(
+                    title: "噪音判断",
+                    excerpt: noise,
+                    analysis: "这段用于提醒可能的营销、热度或证据不足问题，避免把表面热闹误判成行动信号。"
+                )
+            )
+        }
+        if passages.isEmpty {
+            passages.append(
+                RadarKeyPassage(
+                    title: "待补材料",
+                    excerpt: "当前信号缺少可提取段落。",
+                    analysis: "需要补充原文链接、PDF 或手动材料后，Agent 才能进一步提取关键段落。"
+                )
+            )
+        }
+        return passages
     }
 
     private func manualRadarItem(
@@ -456,9 +568,26 @@ private struct RadarDecision: Identifiable {
     let introduction: String
     let observation: String
     let validationQuestions: [String]
+    let sourceReference: RadarSourceReference
+    let keyPassages: [RadarKeyPassage]
     let sourceType: String
     let sourceDetail: String
     let sourceURL: String?
+}
+
+private struct RadarSourceReference {
+    let title: String
+    let displayType: String
+    let detail: String
+    let url: URL?
+    let note: String
+}
+
+private struct RadarKeyPassage: Identifiable {
+    let id = UUID()
+    let title: String
+    let excerpt: String
+    let analysis: String
 }
 
 private struct RadarInputSheet: View {
@@ -663,6 +792,26 @@ private struct RadarDecisionDetailView: View {
                 RadarSummaryLine(title: "噪音 / 可信度判断", value: decision.noiseJudgement)
             }
 
+            Section("原文 / 材料入口") {
+                RadarSummaryLine(title: "展示方式", value: decision.sourceReference.displayType)
+                RadarSummaryLine(title: "原文标题", value: decision.sourceReference.title)
+                RadarSummaryLine(title: "原文信息", value: decision.sourceReference.detail)
+                if let url = decision.sourceReference.url {
+                    Link(destination: url) {
+                        Label("打开原文链接", systemImage: "safari")
+                    }
+                }
+                Text(decision.sourceReference.note)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("关键信息段落") {
+                ForEach(decision.keyPassages) { passage in
+                    RadarPassageView(passage: passage)
+                }
+            }
+
             Section("具体观察") {
                 Text(decision.observation)
                     .font(.subheadline)
@@ -708,6 +857,30 @@ private struct RadarDecisionDetailView: View {
             )
         }
         .navigationTitle("Radar 详情")
+    }
+}
+
+private struct RadarPassageView: View {
+    let passage: RadarKeyPassage
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(passage.title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+            Text(passage.excerpt)
+                .font(.subheadline)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Agent 解析")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(passage.analysis)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.top, 2)
+        }
+        .padding(.vertical, 4)
     }
 }
 
