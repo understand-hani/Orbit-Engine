@@ -231,6 +231,8 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] 方向配置保存位置明确：方向 / 背景写入 `UserContext.profile`；周期 / 全周期计划 / 本周计划 / 关键词写入 `UserContext.plan`；材料源偏好 / 时间预算写入 `UserContext.preferences`。
 - [x] 后端新增 `PUT /api/user-context`，用于保存单用户本地 UserContext；暂不做登录、多用户和云同步。
 - [x] 后端新增 `POST /api/user-context/direction/suggest`，用于根据用户方向生成可编辑的后续配置；OpenRouter 不可用时提供规则 fallback。
+- [ ] 计划阶段编辑体验后续增强：支持在阶段详情里新增 / 删除 / 重排目标、执行块和产出，而不是只能编辑已有条目。
+- [ ] 计划生成质量后续增强：Agent 需要结合目标周期、每周时间预算、用户背景和材料库生成更贴合的 week/day 任务，减少固定模板扩展。
 - [ ] iOS `我的` 页面显示领域偏好。
 - [ ] iOS `我的` 页面显示材料源偏好。
 - [ ] iOS `我的` 页面显示本地数据说明。
