@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#20242b"/>
+    </marker>
+    <linearGradient id="soft" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f9fbff"/>
+      <stop offset="1" stop-color="#f4f0ff"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#ff8d7a"/>
+      <stop offset="0.55" stop-color="#7eb8ff"/>
+      <stop offset="1" stop-color="#c4b4ff"/>
+    </linearGradient>
+    <style>
+      .bg { fill: #fbfaf7; }
+      .title { font-family: "Noto Sans CJK SC", "Microsoft YaHei", Arial, sans-serif; font-size: 40px; font-weight: 700; fill: #17191f; }
+      .subtitle { font-family: "Noto Sans CJK SC", "Microsoft YaHei", Arial, sans-serif; font-size: 20px; fill: #5c6370; }
+      .card { fill: url(#soft); stroke: #20242b; stroke-width: 2.2; rx: 20; }
+      .thin { stroke: #20242b; stroke-width: 2.2; fill: none; }
+      .arrow { stroke: #20242b; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+      .stepNo { font-family: Arial, sans-serif; font-size: 22px; font-weight: 700; fill: #ffffff; }
+      .stepTitle { font-family: "Noto Sans CJK SC", "Microsoft YaHei", Arial, sans-serif; font-size: 24px; font-weight: 700; fill: #17191f; }
+      .stepBody { font-family: "Noto Sans CJK SC", "Microsoft YaHei", Arial, sans-serif; font-size: 16px; fill: #414753; }
+      .impl { font-family: "Noto Sans CJK SC", "Microsoft YaHei", Arial, sans-serif; font-size: 14px; fill: #6a5360; }
+      .pill { fill: #ffffff; stroke: #d9d8df; stroke-width: 1.4; rx: 18; }
+      .planCard { fill: #fff7f3; stroke: #ff9a83; stroke-width: 2; rx: 20; }
+      .planArrow { stroke: #ff8d7a; stroke-width: 2.6; fill: none; marker-end: url(#arrow); }
+      .feedbackArrow { stroke: #7eb8ff; stroke-width: 2.4; fill: none; marker-end: url(#arrow); stroke-dasharray: 8 7; }
+      .pillText { font-family: "Noto Sans CJK SC", "Microsoft YaHei", Arial, sans-serif; font-size: 16px; font-weight: 600; fill: #20242b; }
+      .small { font-family: "Noto Sans CJK SC", "Microsoft YaHei", Arial, sans-serif; font-size: 14px; fill: #686f7a; }
+      .caption { font-family: "Noto Sans CJK SC", "Microsoft YaHei", Arial, sans-serif; font-size: 18px; font-weight: 700; fill: #20242b; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1600" height="900"/>
+  <text class="title" x="80" y="82">两层节奏设计，六步完整闭环</text>
+  <text class="subtitle" x="80" y="118">用户目标与长短期计划是上下文底座：它驱动材料包生成，也接收 Opportunity Alignment / Weekly Studio 的任务回写。</text>
+  <rect x="80" y="142" width="1440" height="6" rx="3" fill="url(#accent)"/>
+
+  <g transform="translate(90 176)">
+    <rect class="planCard" width="360" height="168"/>
+    <text class="caption" x="26" y="36">用户目标与计划上下文</text>
+    <text class="stepBody" x="26" y="70">长期目标：职业/研究/创作方向</text>
+    <text class="stepBody" x="26" y="98">短期计划：本周重点、下一步任务</text>
+    <text class="stepBody" x="26" y="126">偏好约束：时间预算、材料类型、能力画像</text>
+    <text class="impl" x="26" y="153">UserContext / Plan / Skill Profile</text>
+  </g>
+
+  <rect class="pill" x="120" y="374" width="265" height="46"/>
+  <text class="pillText" x="154" y="403">Scheduled Mode：系统按周期触发</text>
+  <rect class="pill" x="120" y="432" width="265" height="46"/>
+  <text class="pillText" x="166" y="461">Manual Mode：用户临时切换</text>
+  <path class="arrow" d="M385 397 C430 397 432 294 480 294"/>
+  <path class="arrow" d="M385 455 C430 455 432 320 480 320"/>
+  <path class="planArrow" d="M450 232 C555 178 650 178 772 214"/>
+  <path class="planArrow" d="M450 260 C535 268 620 272 772 266"/>
+
+  <g transform="translate(500 176)">
+    <rect class="card" width="215" height="140"/>
+    <circle cx="34" cy="34" r="20" fill="#20242b"/>
+    <text class="stepNo" x="27" y="42">1</text>
+    <text class="stepTitle" x="24" y="76">节奏触发</text>
+    <text class="stepBody" x="24" y="106">周期 + 用户目标决定</text>
+    <text class="stepBody" x="24" y="129">今天进入哪类 Session</text>
+    <text class="impl" x="24" y="164">WeeklyCoordinator + Plan</text>
+  </g>
+  <path class="arrow" d="M715 246 L772 246"/>
+
+  <g transform="translate(790 176)">
+    <rect class="card" width="215" height="140"/>
+    <circle cx="34" cy="34" r="20" fill="#20242b"/>
+    <text class="stepNo" x="27" y="42">2</text>
+    <text class="stepTitle" x="24" y="76">材料包生成</text>
+    <text class="stepBody" x="24" y="106">基于目标/计划筛材料，</text>
+    <text class="stepBody" x="24" y="129">生成理由、路径与标准</text>
+    <text class="impl" x="24" y="164">FeedService / UserContext</text>
+  </g>
+  <path class="arrow" d="M1005 246 L1062 246"/>
+
+  <g transform="translate(1080 176)">
+    <rect class="card" width="300" height="140"/>
+    <circle cx="34" cy="34" r="20" fill="#20242b"/>
+    <text class="stepNo" x="27" y="42">3</text>
+    <text class="stepTitle" x="24" y="76">任务执行</text>
+    <text class="stepBody" x="24" y="106">进入工作区，完成一次</text>
+    <text class="stepBody" x="24" y="129">30/60/90 分钟可执行任务</text>
+    <text class="impl" x="24" y="164">Web Workspace / iOS Views</text>
+  </g>
+
+  <path class="arrow" d="M1230 316 C1230 392 1230 410 1230 456"/>
+
+  <g transform="translate(1080 476)">
+    <rect class="card" width="300" height="140"/>
+    <circle cx="34" cy="34" r="20" fill="#20242b"/>
+    <text class="stepNo" x="27" y="42">4</text>
+    <text class="stepTitle" x="24" y="76">打卡记录</text>
+    <text class="stepBody" x="24" y="106">用户确认完成/部分完成，</text>
+    <text class="stepBody" x="24" y="129">沉淀 summary 与 next action</text>
+    <text class="impl" x="24" y="164">completion/confirm</text>
+  </g>
+  <path class="arrow" d="M1080 546 L1022 546"/>
+
+  <g transform="translate(790 476)">
+    <rect class="card" width="215" height="140"/>
+    <circle cx="34" cy="34" r="20" fill="#20242b"/>
+    <text class="stepNo" x="27" y="42">5</text>
+    <text class="stepTitle" x="24" y="76">Agent 反馈</text>
+    <text class="stepBody" x="24" y="106">生成草稿、讨论材料、</text>
+    <text class="stepBody" x="24" y="129">补齐洞察和下一步</text>
+    <text class="impl" x="24" y="164">CheckinService / Chat</text>
+  </g>
+  <path class="arrow" d="M790 546 L732 546"/>
+
+  <g transform="translate(500 476)">
+    <rect class="card" width="215" height="140"/>
+    <circle cx="34" cy="34" r="20" fill="#20242b"/>
+    <text class="stepNo" x="27" y="42">6</text>
+    <text class="stepTitle" x="24" y="76">复盘沉淀</text>
+    <text class="stepBody" x="24" y="106">写入 History，归档，</text>
+    <text class="stepBody" x="24" y="129">反哺下个周期选择</text>
+    <text class="impl" x="24" y="164">Repositories / History</text>
+  </g>
+
+  <path class="feedbackArrow" d="M500 546 C404 546 402 348 450 304"/>
+  <text class="small" x="198" y="526">History / Check-in / 归档结果</text>
+  <text class="small" x="198" y="550">更新能力画像、材料偏好和下一步计划</text>
+
+  <g transform="translate(120 660)">
+    <text class="caption" x="0" y="0">四类 Session 与计划的关系</text>
+    <rect class="pill" x="0" y="24" width="220" height="46"/>
+    <text class="pillText" x="28" y="54">Radar：发现外部信号</text>
+    <rect class="pill" x="250" y="24" width="265" height="46"/>
+    <text class="pillText" x="272" y="54">Opportunity：校准真实诉求</text>
+    <rect class="pill" x="545" y="24" width="250" height="46"/>
+    <text class="pillText" x="579" y="54">Deep Dive：深度处理材料</text>
+    <rect class="pill" x="825" y="24" width="260" height="46"/>
+    <text class="pillText" x="851" y="54">Weekly Studio：归档复盘</text>
+    <path class="arrow" d="M220 47 L248 47"/>
+    <path class="arrow" d="M515 47 L543 47"/>
+    <path class="arrow" d="M795 47 L823 47"/>
+    <path class="arrow" d="M955 70 C955 112 122 112 122 72"/>
+    <path class="planArrow" d="M382 24 C382 -36 70 -392 70 -316"/>
+    <text class="small" x="300" y="-24">外部机会 / JD / 评价标准</text>
+    <text class="small" x="300" y="-2">可转成计划任务或能力缺口</text>
+  </g>
+
+  <g transform="translate(120 790)">
+    <text class="caption" x="0" y="0">建议在 PPT page5 上强化的一句话</text>
+    <text class="subtitle" x="0" y="36">不是“6 个操作步骤”，而是“用户目标/计划 → 材料与任务 → 执行打卡 → 计划更新”的成长循环。</text>
+  </g>
+</svg>
