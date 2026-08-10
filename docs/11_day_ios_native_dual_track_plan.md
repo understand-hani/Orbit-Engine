@@ -255,10 +255,10 @@ Web 仅保留为后端 API smoke / 兜底演示。
 开发线：
 
 - [x] Today / Manual 中的 `Radar` 入口进入原生轻量工作区，而不是只停留在占位卡片。
-- [x] Radar 工作区显示当前计划关键词、近期材料/归档信号、Agent 可扫描的 3 类信号：新材料、方向变化、下一步机会。
-- [x] Radar 支持 `新建 Radar`，生成一份轻量扫描草稿：3-5 条信号、每条为什么相关、建议动作。
+- [x] Radar 工作区显示当前计划关键词、近期材料/归档信号、Agent 可扫描的 3 类信号：外部变化、方向变化、下一步机会。
+- [x] Radar 支持 `新建 Radar`，直接生成本轮扫描结果：3-5 条信号、发生了什么、为什么相关、噪音判断和路由动作。
 - [x] Radar 页面显示 `Agent 能做什么`：根据计划和归档发现值得追踪的新信号，帮助用户决定是否进入 Deep Dive。
-- [x] Radar 结果先只支持查看和进入 Deep Dive / 暂存建议，不做完整信号 CRUD。
+- [x] Radar 结果先只支持查看、转 Deep Dive / 暂存决策，不做完整信号 CRUD。
 - [ ] Today / Manual 中的 `Weekly Studio` 入口进入原生轻量工作区。
 - [ ] Weekly Studio 工作区显示本周重点、当前任务、已完成/未完成归档摘要和下周候选动作。
 - [ ] Weekly Studio 支持 `新建 Weekly Studio`，生成一份轻量周复盘草稿：本周完成、卡点、下周 3 个优先任务。
@@ -271,7 +271,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [ ] Opportunity Alignment 结果先只支持查看、编辑和转成当前任务，不做完整 JD / opportunity CRUD。
 - [ ] 三类轻量 session 都要显示来源说明：它们引用了哪些用户上下文字段、计划字段或归档摘要。（Radar 已完成）
 - [ ] 三类轻量 session 都要有空状态、新建中状态、生成失败状态和返回 Today 的路径。
-- [ ] 三类轻量 session 的样式保持一致：顶部说明、当前工作区、Agent 能做什么、新建按钮、草稿结果卡片。
+- [ ] 三类轻量 session 的样式保持一致：顶部说明、当前工作区、Agent 能做什么、新建按钮、结果卡片。
 - [ ] 不做完整 CRUD；Day 7 只完成可录屏、可解释、可从主链路进入的轻量版本。
 
 文档 / PPT / PDF 线：
@@ -291,7 +291,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 完成标准：
 
 - [ ] 四类 session 在 iOS 可见，且都能从 Today / Manual 进入。
-- [x] Radar 可生成或展示一份轻量信号扫描草稿。
+- [x] Radar 可生成或展示一份轻量信号扫描结果。
 - [ ] Weekly Studio 可生成或展示一份轻量周复盘草稿。
 - [ ] Opportunity Alignment 可生成或展示一份轻量机会匹配草稿。
 - [ ] 三类轻量 session 都能解释 `Agent 能做什么` 和引用了哪些上下文。

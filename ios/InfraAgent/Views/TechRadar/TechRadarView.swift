@@ -6,8 +6,8 @@ struct TechRadarView: View {
     let payload: TechRadarPayload
 
     @State private var context: UserContext?
-    @State private var draft: RadarDraft?
-    @State private var isGeneratingDraft = false
+    @State private var radarRun: RadarRun?
+    @State private var isGeneratingRadar = false
     @State private var message: String?
 
     private let contextAPI = UserContextAPI()
@@ -37,7 +37,7 @@ struct TechRadarView: View {
             Section("当前工作区") {
                 VStack(alignment: .leading, spacing: 10) {
                     RadarSummaryLine(title: "本周重点", value: context?.plan.weeklyFocus ?? payload.digest.summary)
-                    RadarSummaryLine(title: "下一步动作", value: context?.plan.nextAction ?? "从当前信号中选择一个进入 Deep Dive。")
+                    RadarSummaryLine(title: "下一步动作", value: context?.plan.nextAction ?? "生成本轮 Radar 后，把最重要的信号分流到 Deep Dive、暂存或忽略。")
                     if let context, !context.plan.trackingKeywords.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("计划关键词")
@@ -53,8 +53,8 @@ struct TechRadarView: View {
             Section("Agent 能做什么") {
                 RadarCapabilityRow(
                     systemImage: "sparkle.magnifyingglass",
-                    title: "扫描新材料",
-                    detail: "根据计划关键词、材料源偏好和当前 Radar 信号，筛出值得追踪的新材料。"
+                    title: "扫描外部信号",
+                    detail: "根据计划关键词、材料源偏好和外部信号，直接判断哪些变化值得追。"
                 )
                 RadarCapabilityRow(
                     systemImage: "arrow.triangle.branch",
@@ -63,43 +63,43 @@ struct TechRadarView: View {
                 )
                 RadarCapabilityRow(
                     systemImage: "arrow.right.doc.on.clipboard",
-                    title: "生成下一步机会",
-                    detail: "把信号转成 Deep Dive 候选、暂存建议或本周任务。"
+                    title: "做路由决策",
+                    detail: "把信号分流为转 Deep Dive、暂存、忽略或加入本周任务。"
                 )
             }
 
             Section("新建 Radar") {
                 Button {
-                    generateDraft()
+                    generateRadar()
                 } label: {
                     HStack {
-                        Label("生成轻量扫描草稿", systemImage: "dot.radiowaves.left.and.right")
+                        Label("生成本轮 Radar", systemImage: "dot.radiowaves.left.and.right")
                         Spacer()
-                        if isGeneratingDraft {
+                        if isGeneratingRadar {
                             ProgressView()
                         }
                     }
                 }
-                .disabled(isGeneratingDraft)
+                .disabled(isGeneratingRadar)
 
-                Text("当前版本先生成可录屏的轻量草稿：3-5 条信号、相关理由和建议动作；暂不做完整信号 CRUD。")
+                Text("Radar 不做候选池；点击后直接生成本轮扫描结果：发生了什么、为什么和我有关、噪音判断和路由动作。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            if let draft {
-                Section("Radar 草稿") {
+            if let radarRun {
+                Section("本轮 Radar") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(draft.title)
+                        Text(radarRun.title)
                             .font(.headline)
-                        Text(draft.summary)
+                        Text(radarRun.summary)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 4)
 
-                    ForEach(draft.signals) { signal in
-                        RadarDraftSignalView(signal: signal)
+                    ForEach(radarRun.decisions) { decision in
+                        RadarDecisionView(decision: decision)
                     }
                 }
             }
@@ -108,25 +108,6 @@ struct TechRadarView: View {
                 Text(contextSources)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            }
-
-            Section("信号") {
-                ForEach(payload.digest.items) { item in
-                    NavigationLink {
-                        TechRadarItemDetailView(session: session, item: item)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(item.title)
-                                .font(.headline)
-                            Text(item.summary)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(3)
-                            TagRow(tags: item.tags)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
             }
 
             if !payload.digest.followUpQuestions.isEmpty {
@@ -159,7 +140,7 @@ struct TechRadarView: View {
 
     private var contextSources: String {
         if context == nil {
-            return "当前草稿引用 Radar payload 中的 scope、top signals 和候选信号；用户上下文加载后会补充计划关键词、领域偏好和材料源偏好。"
+            return "当前 Radar 引用 payload 中的 scope、top signals 和外部信号；用户上下文加载后会补充计划关键词、领域偏好和材料源偏好。"
         }
         return "引用字段：UserContext.plan.weekly_focus、next_action、tracking_keywords，UserContext.preferences.fields、source_preferences，以及当前 Radar payload 的 top_signals、items 和 noise_filtered。"
     }
@@ -172,57 +153,71 @@ struct TechRadarView: View {
         }
     }
 
-    private func generateDraft() {
-        isGeneratingDraft = true
-        defer { isGeneratingDraft = false }
+    private func generateRadar() {
+        isGeneratingRadar = true
+        defer { isGeneratingRadar = false }
 
-        let signals = Array(payload.digest.items.prefix(5)).enumerated().map { index, item in
-            RadarDraftSignal(
+        let decisions = Array(payload.digest.items.prefix(5)).enumerated().map { index, item in
+            RadarDecision(
                 id: item.id,
                 title: item.title,
-                whyRelevant: item.whyItMatters.isEmpty ? item.summary : item.whyItMatters,
-                suggestedAction: suggestedAction(for: item, index: index)
+                whatChanged: item.summary,
+                whyRelevant: item.whyItMatters.isEmpty ? item.technicalSubstance : item.whyItMatters,
+                noiseJudgement: noiseJudgement(for: item),
+                route: route(for: item, index: index)
             )
         }
 
-        draft = RadarDraft(
-            title: "Radar 扫描草稿",
-            summary: draftSummary,
-            signals: signals
+        radarRun = RadarRun(
+            title: "本轮 Radar 扫描",
+            summary: radarSummary,
+            decisions: decisions
         )
     }
 
-    private var draftSummary: String {
+    private var radarSummary: String {
         let focus = context?.plan.weeklyFocus.trimmingCharacters(in: .whitespacesAndNewlines)
         if let focus, !focus.isEmpty {
-            return "围绕本周重点「\(focus)」筛出 \(min(payload.digest.items.count, 5)) 条可追踪信号，优先判断是否值得进入 Deep Dive。"
+            return "围绕本周重点「\(focus)」完成一次广度扫描，输出 \(min(payload.digest.items.count, 5)) 条信号的追踪优先级和路由决策。"
         }
-        return "基于当前 Radar payload 筛出 \(min(payload.digest.items.count, 5)) 条可追踪信号，先判断哪些值得继续追。"
+        return "基于当前 Radar payload 完成一次广度扫描，输出 \(min(payload.digest.items.count, 5)) 条信号的追踪优先级和路由决策。"
     }
 
-    private func suggestedAction(for item: RadarItem, index: Int) -> String {
+    private func route(for item: RadarItem, index: Int) -> String {
         if index == 0 {
-            return "优先进入 Deep Dive，验证它是否改变当前计划。"
+            return "转 Deep Dive：优先验证它是否改变当前计划。"
         }
         if item.recommendedDepth.lowercased().contains("deep") {
-            return "暂存为 Deep Dive 候选，补一条具体阅读问题。"
+            return "暂存：补一条具体问题后再决定是否 Deep Dive。"
         }
-        return "先暂存为 Radar 信号，下次 Weekly Studio 再决定是否推进。"
+        if item.marketingNoise.isEmpty {
+            return "加入本周任务：用 15 分钟确认是否有后续价值。"
+        }
+        return "忽略或低优先级：下次 Weekly Studio 再复查。"
+    }
+
+    private func noiseJudgement(for item: RadarItem) -> String {
+        if item.marketingNoise.isEmpty {
+            return "噪音较低：当前摘要中没有明显营销噪音，需要继续看证据。"
+        }
+        return "需要降噪：\(item.marketingNoise)"
     }
 }
 
-private struct RadarDraft: Identifiable {
+private struct RadarRun: Identifiable {
     let id = UUID()
     let title: String
     let summary: String
-    let signals: [RadarDraftSignal]
+    let decisions: [RadarDecision]
 }
 
-private struct RadarDraftSignal: Identifiable {
+private struct RadarDecision: Identifiable {
     let id: String
     let title: String
+    let whatChanged: String
     let whyRelevant: String
-    let suggestedAction: String
+    let noiseJudgement: String
+    let route: String
 }
 
 private struct RadarCapabilityRow: View {
@@ -248,26 +243,28 @@ private struct RadarCapabilityRow: View {
     }
 }
 
-private struct RadarDraftSignalView: View {
-    let signal: RadarDraftSignal
+private struct RadarDecisionView: View {
+    let decision: RadarDecision
 
     @State private var localMark: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(signal.title)
+            Text(decision.title)
                 .font(.subheadline)
                 .fontWeight(.semibold)
-            RadarSummaryLine(title: "为什么相关", value: signal.whyRelevant)
-            RadarSummaryLine(title: "建议动作", value: signal.suggestedAction)
+            RadarSummaryLine(title: "发生了什么", value: decision.whatChanged)
+            RadarSummaryLine(title: "为什么和我有关", value: decision.whyRelevant)
+            RadarSummaryLine(title: "噪音 / 可信度判断", value: decision.noiseJudgement)
+            RadarSummaryLine(title: "路由动作", value: decision.route)
             HStack {
-                Button("作为 Deep Dive 候选") {
-                    localMark = "已标记为 Deep Dive 候选"
+                Button("转 Deep Dive") {
+                    localMark = "已标记为待转 Deep Dive"
                 }
                 .buttonStyle(.bordered)
 
                 Button("暂存建议") {
-                    localMark = "已暂存为 Radar 建议"
+                    localMark = "已暂存为 Radar 决策"
                 }
                 .buttonStyle(.bordered)
             }
