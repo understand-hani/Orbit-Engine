@@ -96,21 +96,53 @@ struct PlanNormalizer {
     }
 
     private static func formatPhase(index: Int, timeRange: String, body: String, direction: String) -> String {
-        let objective = body.trimmingCharacters(in: CharacterSet(charactersIn: "。 "))
-        let lines: [String] = [
+        let goals = phaseGoals(body)
+        let details = phaseDetails(index: index, direction: direction)
+        var lines: [String] = [
             "第 \(index) 阶段（\(timeRange)）",
-            "目标：",
-            "1. \(objective)。",
-            "具体执行计划：",
-            "1. 明确本阶段需要解决的 2-3 个关键问题和判断标准。",
-            "2. 按关键问题筛选材料、完成 Deep Dive，并记录证据与结论。",
-            "3. 阶段结束前复盘进度，整理未解决问题并确定下一阶段重点。",
-            "产出：",
-            "1. 一份「\(direction)」阶段研究笔记。",
-            "2. 一份关键材料、方法或案例的对比清单。",
-            "3. 一份下一阶段可直接执行的任务列表。"
+            "目标："
         ]
+        lines.append(contentsOf: goals.enumerated().map { "\($0.offset + 1). \($0.element)。" })
+        lines.append("具体执行计划：")
+        lines.append(contentsOf: details.steps.enumerated().map { "\($0.offset + 1). \($0.element)" })
+        lines.append("产出：")
+        lines.append(contentsOf: details.outputs.enumerated().map { "\($0.offset + 1). \($0.element)" })
         return lines.joined(separator: "\n")
+    }
+
+    private static func phaseGoals(_ body: String) -> [String] {
+        let goals = body
+            .replacingOccurrences(of: "\n", with: "；")
+            .replacingOccurrences(of: "。", with: "；")
+            .components(separatedBy: "；")
+            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "。； ")) }
+            .filter { !$0.isEmpty }
+        return goals.isEmpty ? ["完成本阶段目标"] : Array(goals.prefix(3))
+    }
+
+    private static func phaseDetails(index: Int, direction: String) -> (steps: [String], outputs: [String]) {
+        switch index {
+        case 1:
+            return (
+                ["界定研究范围、核心概念与判断标准。", "收集代表性材料，建立关键词、来源与问题之间的索引。", "整理关键问题，形成后续阶段可直接使用的研究框架。"],
+                ["一份「\(direction)」概念与问题地图。", "一份按优先级整理的核心材料目录。", "一份需要在后续阶段验证的关键问题清单。"]
+            )
+        case 2:
+            return (
+                ["选择关键路线、方法或案例，建立统一的比较维度。", "逐项完成材料深读，记录支持证据、反例与适用边界。", "汇总差异并形成阶段判断，标记仍需验证的争议点。"],
+                ["一份关键路线、方法或案例的对比矩阵。", "一组带来源的证据卡片与边界说明。", "一份可供下一阶段验证的阶段判断。"]
+            )
+        case 3:
+            return (
+                ["把前期判断转化为案例拆解、实验或可执行验证任务。", "按统一标准记录过程、结果、偏差与失败原因。", "复盘验证结果，决定保留、修正或放弃哪些路线。"],
+                ["一个可复查的案例、实验或实践结果。", "一份问题、偏差与改进项记录。", "一份基于验证结果的路线取舍结论。"]
+            )
+        default:
+            return (
+                ["整合前序阶段的证据、判断与实践结果。", "补齐影响最终结论的关键缺口，并完成交叉检查。", "形成最终交付物，明确下一周期的延伸方向。"],
+                ["一份完整的「\(direction)」阶段成果。", "一份结论、证据链与局限性说明。", "一份下一周期的优先级路线图。"]
+            )
+        }
     }
 
     private static func phaseSourceText(_ item: String) -> String {

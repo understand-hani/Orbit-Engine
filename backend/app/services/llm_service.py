@@ -297,6 +297,8 @@ Rules:
   1. ...
 - Keep goals, execution steps, and outputs semantically distinct. Do not repeat
   the same statement in more than one section.
+- Generate execution steps and outputs specifically for each milestone's goal.
+  Never reuse the same execution plan or output list across different phases.
 - active_tasks should be small, observable actions.
 - active_tasks must be specific enough that a user can immediately act on them.
 - tracking_keywords should be useful search keywords, not generic motivation.

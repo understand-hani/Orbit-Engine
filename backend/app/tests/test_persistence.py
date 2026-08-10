@@ -177,6 +177,10 @@ def test_direction_profile_suggestion_uses_edited_full_cycle_plan(tmp_path):
         assert "先搭建储能产业链地图并划分关键公司" in suggestion.full_cycle_plan[0]
         assert "跟踪政策、价格和龙头公司季度变化" in suggestion.full_cycle_plan[1]
         assert "形成一份储能公司对比和后续跟踪模板" in suggestion.full_cycle_plan[2]
+        execution_sections = [item.split("具体执行计划：", 1)[1].split("产出：", 1)[0] for item in suggestion.full_cycle_plan]
+        output_sections = [item.split("产出：", 1)[1] for item in suggestion.full_cycle_plan]
+        assert len(set(execution_sections)) == len(suggestion.full_cycle_plan)
+        assert len(set(output_sections)) == len(suggestion.full_cycle_plan)
         assert "储能产业链地图" in suggestion.weekly_focus
         assert any("阶段" in task or "本周" in task for task in suggestion.active_tasks)
     finally:
@@ -242,7 +246,7 @@ def test_old_structured_phases_are_migrated_without_repeating_content():
     service = UserContextService()
     old_phase = (
         "第 1 阶段（第 1 个月）\n"
-        "目标：搭建行业地图。\n"
+        "目标：搭建行业地图。明确重点公司。\n"
         "子阶段：\n- 搭建行业地图。\n"
         "动作：\n- 搜集资料。\n"
         "产出：\n- 行业地图。"
@@ -256,5 +260,6 @@ def test_old_structured_phases_are_migrated_without_repeating_content():
 
     assert len(normalized) == 3
     assert all(item.count("搭建行业地图") == 1 for item in normalized)
+    assert all("目标：\n1. 搭建行业地图。\n2. 明确重点公司。" in item for item in normalized)
     assert all("子阶段：" not in item and "动作：" not in item for item in normalized)
     assert all("目标：\n1. " in item and "具体执行计划：\n1. " in item and "产出：\n1. " in item for item in normalized)
