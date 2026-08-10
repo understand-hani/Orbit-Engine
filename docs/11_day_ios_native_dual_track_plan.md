@@ -254,25 +254,48 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 开发线：
 
-- [ ] Radar 原生轻量入口：当前工作区 + 新建入口。
-- [ ] Weekly Studio 原生轻量入口：当前工作区 + 新建入口。
-- [ ] Opportunity Alignment 原生轻量入口：当前工作区 + 新建入口。
-- [ ] 三类页面显示 `Agent 能做什么`。
-- [ ] 不做完整 CRUD。
+- [ ] Today / Manual 中的 `Radar` 入口进入原生轻量工作区，而不是只停留在占位卡片。
+- [ ] Radar 工作区显示当前计划关键词、近期材料/归档信号、Agent 可扫描的 3 类信号：新材料、方向变化、下一步机会。
+- [ ] Radar 支持 `新建 Radar`，生成一份轻量扫描草稿：3-5 条信号、每条为什么相关、建议动作。
+- [ ] Radar 页面显示 `Agent 能做什么`：根据计划和归档发现值得追踪的新信号，帮助用户决定是否进入 Deep Dive。
+- [ ] Radar 结果先只支持查看和进入 Deep Dive / 暂存建议，不做完整信号 CRUD。
+- [ ] Today / Manual 中的 `Weekly Studio` 入口进入原生轻量工作区。
+- [ ] Weekly Studio 工作区显示本周重点、当前任务、已完成/未完成归档摘要和下周候选动作。
+- [ ] Weekly Studio 支持 `新建 Weekly Studio`，生成一份轻量周复盘草稿：本周完成、卡点、下周 3 个优先任务。
+- [ ] Weekly Studio 页面显示 `Agent 能做什么`：把归档记录、计划和未完成项整理成可执行的下一周安排。
+- [ ] Weekly Studio 结果先只支持编辑草稿和保存到计划上下文，不做完整周报系统。
+- [ ] Today / Manual 中的 `Opportunity Alignment` 入口进入原生轻量工作区。
+- [ ] Opportunity Alignment 工作区显示当前方向、目标版本、能力证据和机会/岗位/项目匹配维度。
+- [ ] Opportunity Alignment 支持 `新建 Alignment`，生成一份轻量匹配草稿：机会描述、匹配点、缺口、下一步动作。
+- [ ] Opportunity Alignment 页面显示 `Agent 能做什么`：把个人背景、计划产出和外部机会对齐，指出需要补的证据。
+- [ ] Opportunity Alignment 结果先只支持查看、编辑和转成当前任务，不做完整 JD / opportunity CRUD。
+- [ ] 三类轻量 session 都要显示来源说明：它们引用了哪些用户上下文字段、计划字段或归档摘要。
+- [ ] 三类轻量 session 都要有空状态、新建中状态、生成失败状态和返回 Today 的路径。
+- [ ] 三类轻量 session 的样式保持一致：顶部说明、当前工作区、Agent 能做什么、新建按钮、草稿结果卡片。
+- [ ] 不做完整 CRUD；Day 7 只完成可录屏、可解释、可从主链路进入的轻量版本。
 
 文档 / PPT / PDF 线：
 
 - [ ] 写 `domain mapping table` 独立页。
-- [ ] 映射职业能力建设。
-- [ ] 映射研究方向探索。
-- [ ] 映射创作者 / 视觉 IP 运营。
-- [ ] 映射创业 / 产品探索。
-- [ ] 映射语言学习。
+- [ ] 为 Radar 写 demo 叙事：用户不用主动搜资讯，Agent 基于计划和归档提示“今天值得看什么信号”。
+- [ ] 为 Weekly Studio 写 demo 叙事：用户不用从零复盘，Agent 把本周记录转成下周行动。
+- [ ] 为 Opportunity Alignment 写 demo 叙事：用户不用手动对齐机会，Agent 把目标、能力证据和机会缺口连起来。
+- [ ] 在 `domain mapping table` 中映射职业能力建设：Deep Dive=能力证据，Radar=行业信号，Weekly Studio=节奏管理，Opportunity Alignment=岗位/机会匹配。
+- [ ] 在 `domain mapping table` 中映射研究方向探索：Deep Dive=论文/技术路线，Radar=新论文/新项目，Weekly Studio=研究节奏，Opportunity Alignment=课题/合作机会。
+- [ ] 在 `domain mapping table` 中映射创作者 / 视觉 IP 运营：Deep Dive=案例拆解，Radar=趋势/平台信号，Weekly Studio=内容节奏，Opportunity Alignment=商业合作/选题匹配。
+- [ ] 在 `domain mapping table` 中映射创业 / 产品探索：Deep Dive=用户/竞品研究，Radar=市场信号，Weekly Studio=实验复盘，Opportunity Alignment=机会优先级。
+- [ ] 在 `domain mapping table` 中映射语言学习：Deep Dive=材料精读，Radar=输入源发现，Weekly Studio=学习复盘，Opportunity Alignment=考试/工作/表达场景匹配。
+- [ ] 准备一页 `three lightweight sessions` 截图占位：三个卡片分别说明输入、Agent 处理、输出。
+- [ ] 更新 demo 录屏脚本：Deep Dive 作为主链路，Radar / Weekly Studio / Opportunity Alignment 作为轻量扩展镜头。
 
 完成标准：
 
-- [ ] 四类 session 在 iOS 可见。
-- [ ] 领域复用映射表完成。
+- [ ] 四类 session 在 iOS 可见，且都能从 Today / Manual 进入。
+- [ ] Radar 可生成或展示一份轻量信号扫描草稿。
+- [ ] Weekly Studio 可生成或展示一份轻量周复盘草稿。
+- [ ] Opportunity Alignment 可生成或展示一份轻量机会匹配草稿。
+- [ ] 三类轻量 session 都能解释 `Agent 能做什么` 和引用了哪些上下文。
+- [ ] 领域复用映射表完成，并能放入 proposal draft。
 
 ### Day 8（2026-08-13）：调试冻结 + Proposal Draft
 
