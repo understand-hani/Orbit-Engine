@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -228,7 +229,7 @@ class UserContextService:
         )
 
     def _phase_goals(self, body: str) -> list[str]:
-        goals = [part.strip("。； ") for part in body.replace("\n", "；").replace("。", "；").split("；")]
+        goals = self._goal_candidates(body)
         return [goal for goal in goals if goal][:3] or ["完成本阶段目标"]
 
     def _phase_details(self, index: int, direction: str) -> tuple[list[str], list[str]]:
@@ -291,9 +292,33 @@ class UserContextService:
         objective = text.split("目标：", 1)[1]
         for marker in ["具体执行计划：", "子阶段：", "动作：", "产出："]:
             objective = objective.split(marker, 1)[0]
-        lines = [line.strip().lstrip("- ").strip() for line in objective.splitlines()]
-        lines = [line[2:].strip() if len(line) > 2 and line[0].isdigit() and line[1] in ".、" else line for line in lines]
-        return "；".join(line.rstrip("。；") for line in lines if line)
+        return "；".join(self._goal_candidates(objective))
+
+    def _goal_candidates(self, text: str) -> list[str]:
+        candidates: list[str] = []
+        for line in re.split(r"[\n；;。]+", text):
+            should_split_list = "连续子任务" in line
+            cleaned = self._clean_goal_candidate(line)
+            parts = [part.strip() for part in cleaned.split("、")] if should_split_list else [cleaned]
+            for part in parts:
+                if part and part not in candidates:
+                    candidates.append(part)
+        return candidates
+
+    def _clean_goal_candidate(self, line: str) -> str:
+        value = line.strip().lstrip("- ").strip()
+        value = re.sub(r"^\d+[.、]\s*", "", value).strip()
+        if "目标：" in value:
+            value = value.rsplit("目标：", 1)[1].strip()
+        if "连续子任务：" in value:
+            value = value.rsplit("连续子任务：", 1)[1].strip()
+        value = re.sub(r"^第\s*\d+\s*[-—~～至到]\s*\d+\s*(个月|月|周)\s*[:：]\s*", "", value).strip()
+        value = re.sub(r"^第\s*\d+\s*(个月|月|周)\s*[:：]\s*", "", value).strip()
+        for marker in ["具体执行计划：", "子阶段：", "动作：", "产出："]:
+            value = value.split(marker, 1)[0].strip()
+        value = self._strip_phase_prefix(value)
+        value = re.sub(r"^第\s*\d+\s*阶段[（(][^）)]*[）)]\s*[:：;；,，]?\s*", "", value).strip()
+        return value.strip("。；;，, ")
 
     def _phase_time_ranges(self, target_cycle: str, count: int) -> list[str]:
         total_months = self._parse_total_months(target_cycle)
@@ -360,7 +385,7 @@ class UserContextService:
         vague_tokens = ["等", "等等", "相关", "基础", "入门", "掌握", "了解", "学习", "vista", "dreamer", "world models"]
         lowered = text.lower()
         if any(token in lowered for token in vague_tokens):
-            lacks_detail_markers = all(marker not in text for marker in ["，", "。", "：", "、", "并", "完成", "整理", "形成", "输出", "复现", "对比"])
+            lacks_detail_markers = all(marker not in text for marker in ["，", "。", "；", "：", "、", "并", "完成", "整理", "形成", "输出", "复现", "对比"])
             if lacks_detail_markers:
                 return True
         return False
@@ -389,13 +414,22 @@ class UserContextService:
         return topic
 
     def _is_structured_phase(self, item: str) -> bool:
-        return (
+        if not (
             "目标：" in item
             and "具体执行计划：" in item
             and "产出：" in item
             and "\n1. " in item
             and "（" in item
             and "）" in item
+        ):
+            return False
+        objective = item.split("目标：", 1)[1].split("具体执行计划：", 1)[0]
+        if "目标：" in objective or re.search(r"第\s*\d+\s*阶段", objective):
+            return False
+        goals = self._goal_candidates(objective)
+        return (
+            bool(goals)
+            and all("\n1. " in item.split(marker, 1)[1] for marker in ["目标：", "具体执行计划：", "产出："])
         )
 
     def _default_context(self) -> UserContext:

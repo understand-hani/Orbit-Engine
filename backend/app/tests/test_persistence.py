@@ -263,3 +263,35 @@ def test_old_structured_phases_are_migrated_without_repeating_content():
     assert all("目标：\n1. 搭建行业地图。\n2. 明确重点公司。" in item for item in normalized)
     assert all("子阶段：" not in item and "动作：" not in item for item in normalized)
     assert all("目标：\n1. " in item and "具体执行计划：\n1. " in item and "产出：\n1. " in item for item in normalized)
+
+
+def test_legacy_nested_phase_text_is_reparsed_as_numbered_goals():
+    service = UserContextService()
+    legacy_phase = (
+        "第 1 阶段（第 1-3 个月）\n"
+        "目标：\n"
+        "1. 第1阶段（第1-3个月）；目标：围绕「自动驾驶或具身智能的世界模型方向」完成这一阶段的连续子任务：第1-3个月：学习世界模型基础、阅读5-10篇关键论文、围绕 World Models 方向的核心方法。\n"
+        "具体执行计划：\n"
+        "1. 明确本阶段需要解决的 2-3 个关键问题和判断标准。\n"
+        "2. 按关键词筛选材料，完成 Deep Dive，并记录证据与结论。\n"
+        "产出：\n"
+        "1. 一份阶段研究笔记。"
+    )
+
+    normalized = service._normalize_plan_items(
+        [
+            legacy_phase,
+            legacy_phase.replace("第 1 阶段", "第 2 阶段").replace("第1阶段", "第2阶段"),
+            legacy_phase.replace("第 1 阶段", "第 3 阶段").replace("第1阶段", "第3阶段"),
+            legacy_phase.replace("第 1 阶段", "第 4 阶段").replace("第1阶段", "第4阶段"),
+        ],
+        "自动驾驶世界模型",
+        "12 个月",
+    )
+
+    assert len(normalized) == 4
+    assert all("目标：\n1. 学习世界模型基础。\n2. 阅读5-10篇关键论文。\n3. 围绕 World Models 方向的核心方法。" in item for item in normalized)
+    assert all("第1阶段（第1-3个月）；目标：" not in item for item in normalized)
+    assert all(item.split("目标：", 1)[1].split("具体执行计划：", 1)[0].count("目标：") == 0 for item in normalized)
+    execution_sections = [item.split("具体执行计划：", 1)[1].split("产出：", 1)[0] for item in normalized]
+    assert len(set(execution_sections)) == len(normalized)

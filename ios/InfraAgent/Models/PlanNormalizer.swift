@@ -62,7 +62,7 @@ struct PlanNormalizer {
         let lowered = trimmed.lowercased()
         let vagueTokens = ["等", "等等", "相关", "基础", "入门", "掌握", "了解", "学习", "vista", "dreamer", "world models"]
         let hasVagueToken = vagueTokens.contains { lowered.contains($0) }
-        let hasDetailMarker = ["，", "。", "：", "、", "并", "完成", "整理", "形成", "输出", "复现", "对比"].contains { trimmed.contains($0) }
+        let hasDetailMarker = ["，", "。", "；", "：", "、", "并", "完成", "整理", "形成", "输出", "复现", "对比"].contains { trimmed.contains($0) }
         return hasVagueToken && !hasDetailMarker
     }
 
@@ -111,12 +111,7 @@ struct PlanNormalizer {
     }
 
     private static func phaseGoals(_ body: String) -> [String] {
-        let goals = body
-            .replacingOccurrences(of: "\n", with: "；")
-            .replacingOccurrences(of: "。", with: "；")
-            .components(separatedBy: "；")
-            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "。； ")) }
-            .filter { !$0.isEmpty }
+        let goals = goalCandidates(body)
         return goals.isEmpty ? ["完成本阶段目标"] : Array(goals.prefix(3))
     }
 
@@ -154,21 +149,60 @@ struct PlanNormalizer {
                 objective = String(objective[..<range.lowerBound])
             }
         }
-        return objective
-            .components(separatedBy: .newlines)
-            .map { line in
-                var value = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                if value.hasPrefix("- ") { value.removeFirst(2) }
-                if value.count > 2 {
-                    let prefix = value.prefix(2)
-                    if prefix.first?.isNumber == true && (prefix.last == "." || prefix.last == "、") {
-                        value.removeFirst(2)
-                    }
+        return goalCandidates(objective).joined(separator: "；")
+    }
+
+    private static func goalCandidates(_ text: String) -> [String] {
+        let separators = CharacterSet(charactersIn: "\n；;。")
+        var candidates: [String] = []
+        for line in text.components(separatedBy: separators) {
+            let shouldSplitList = line.contains("连续子任务")
+            let cleaned = cleanGoalCandidate(line)
+            let parts = shouldSplitList ? cleaned.components(separatedBy: "、") : [cleaned]
+            for part in parts {
+                let value = part.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !value.isEmpty, !candidates.contains(value) {
+                    candidates.append(value)
                 }
-                return value.trimmingCharacters(in: CharacterSet(charactersIn: "。； "))
             }
-            .filter { !$0.isEmpty }
-            .joined(separator: "；")
+        }
+        return candidates
+    }
+
+    private static func cleanGoalCandidate(_ line: String) -> String {
+        var value = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.hasPrefix("- ") {
+            value.removeFirst(2)
+            value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let range = value.range(of: #"^\d+[.、]\s*"#, options: .regularExpression) {
+            value.removeSubrange(range)
+            value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let range = value.range(of: "目标：", options: .backwards) {
+            value = String(value[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let range = value.range(of: "连续子任务：", options: .backwards) {
+            value = String(value[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let range = value.range(of: #"^第\s*\d+\s*[-—~～至到]\s*\d+\s*(个月|月|周)\s*[:：]\s*"#, options: .regularExpression) {
+            value.removeSubrange(range)
+            value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let range = value.range(of: #"^第\s*\d+\s*(个月|月|周)\s*[:：]\s*"#, options: .regularExpression) {
+            value.removeSubrange(range)
+            value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        for marker in ["具体执行计划：", "子阶段：", "动作：", "产出："] {
+            if let range = value.range(of: marker) {
+                value = String(value[..<range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        value = stripPhasePrefix(value)
+        if let range = value.range(of: #"^第\s*\d+\s*阶段[（(][^）)]*[）)]\s*[:：;；,，]?\s*"#, options: .regularExpression) {
+            value.removeSubrange(range)
+        }
+        return value.trimmingCharacters(in: CharacterSet(charactersIn: "。；;，, ").union(.whitespacesAndNewlines))
     }
 
     private static func expandVaguePlanItem(_ item: String, direction: String, phaseIndex: Int) -> String {
@@ -219,12 +253,27 @@ struct PlanNormalizer {
     }
 
     private static func isStructuredPhase(_ item: String) -> Bool {
-        item.contains("目标：") &&
-            item.contains("具体执行计划：") &&
-            item.contains("产出：") &&
-            item.contains("\n1. ") &&
-            item.contains("（") &&
-            item.contains("）")
+        guard item.contains("目标："),
+              item.contains("具体执行计划："),
+              item.contains("产出："),
+              item.contains("\n1. "),
+              item.contains("（"),
+              item.contains("）"),
+              let goalRange = item.range(of: "目标："),
+              let executionRange = item.range(of: "具体执行计划：")
+        else {
+            return false
+        }
+
+        let objective = String(item[goalRange.upperBound..<executionRange.lowerBound])
+        if objective.contains("目标：") || objective.range(of: #"第\s*\d+\s*阶段"#, options: .regularExpression) != nil {
+            return false
+        }
+        return !goalCandidates(objective).isEmpty &&
+            ["目标：", "具体执行计划：", "产出："].allSatisfy { marker in
+                guard let range = item.range(of: marker) else { return false }
+                return item[range.upperBound...].contains("\n1. ")
+            }
     }
 
     private static func phaseTimeRanges(targetCycle: String, count: Int) -> [String] {
