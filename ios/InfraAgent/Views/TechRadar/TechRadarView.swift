@@ -101,7 +101,7 @@ struct TechRadarView: View {
 
                     ForEach(radarRun.decisions) { decision in
                         NavigationLink {
-                            RadarDecisionDetailView(decision: decision)
+                            RadarDecisionDetailView(session: session, decision: decision)
                         } label: {
                             RadarDecisionCardView(decision: decision)
                         }
@@ -184,8 +184,12 @@ struct TechRadarView: View {
                 whyRelevant: item.whyItMatters.isEmpty ? item.technicalSubstance : item.whyItMatters,
                 noiseJudgement: noiseJudgement(for: item),
                 route: route(for: item, index: index),
+                introduction: introduction(for: item, input: input),
+                observation: observation(for: item),
+                validationQuestions: validationQuestions(for: item),
                 sourceType: input.sourceLabel,
-                sourceDetail: input.sourceDetail
+                sourceDetail: input.sourceDetail,
+                sourceURL: item.url?.absoluteString
             )
         }
 
@@ -251,6 +255,34 @@ struct TechRadarView: View {
         return "需要降噪：\(item.marketingNoise)"
     }
 
+    private func introduction(for item: RadarItem, input: RadarInput) -> String {
+        let sourcePart = "来源是\(input.sourceLabel)，当前信号指向「\(item.title)」。"
+        let changePart = "它反映的核心变化是：\(item.summary)"
+        let actionPart = "Radar 的作用不是让用户立刻精读，而是先判断这条变化是否会影响当前计划、是否值得转入 Deep Dive。"
+        return [sourcePart, changePart, actionPart].joined(separator: "\n\n")
+    }
+
+    private func observation(for item: RadarItem) -> String {
+        let substance = item.technicalSubstance.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !substance.isEmpty, substance != item.summary {
+            return substance
+        }
+        let relevance = item.whyItMatters.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !relevance.isEmpty {
+            return relevance
+        }
+        return "这条信号需要继续确认：它是否只是信息热度，还是已经对学习路线、项目选择或本周任务产生实际影响。"
+    }
+
+    private func validationQuestions(for item: RadarItem) -> [String] {
+        [
+            "这条信号是否会改变当前计划中的优先级或本周重点？",
+            "是否存在可验证的一手来源、数据、代码、论文、产品发布或真实案例？",
+            "如果转入 Deep Dive，最小验证问题是什么：机制、应用场景、风险，还是行动机会？",
+            "如果暂不深入，下一次复查应该看什么触发条件？"
+        ]
+    }
+
     private func manualRadarItem(
         input: RadarInput,
         suffix: String,
@@ -298,6 +330,36 @@ private enum RadarInputSource: String, CaseIterable, Identifiable {
             return "个人上传"
         case .manual:
             return "手动材料"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .agent:
+            return "按当前计划、关键词和已有 Radar payload 自动扫描。"
+        case .topic:
+            return "输入一个方向或问题，让 Agent 做广度信号判断。"
+        case .url:
+            return "粘贴网页、论文、产品页或新闻链接。"
+        case .pdf:
+            return "登记个人文件或 PDF，先以标题和说明进入 Radar。"
+        case .manual:
+            return "直接写下你观察到的一条变化。"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .agent:
+            return "sparkles"
+        case .topic:
+            return "text.magnifyingglass"
+        case .url:
+            return "link"
+        case .pdf:
+            return "doc.text"
+        case .manual:
+            return "keyboard"
         }
     }
 }
@@ -391,8 +453,12 @@ private struct RadarDecision: Identifiable {
     let whyRelevant: String
     let noiseJudgement: String
     let route: String
+    let introduction: String
+    let observation: String
+    let validationQuestions: [String]
     let sourceType: String
     let sourceDetail: String
+    let sourceURL: String?
 }
 
 private struct RadarInputSheet: View {
@@ -410,12 +476,31 @@ private struct RadarInputSheet: View {
     var body: some View {
         Form {
             Section("来源") {
-                Picker("来源", selection: $source) {
-                    ForEach(RadarInputSource.allCases) { option in
-                        Text(option.title).tag(option)
+                ForEach(RadarInputSource.allCases) { option in
+                    Button {
+                        source = option
+                    } label: {
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: option.systemImage)
+                                .foregroundStyle(source == option ? .blue : .secondary)
+                                .frame(width: 24)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(option.title)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.primary)
+                                Text(option.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if source == option {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.blue)
+                            }
+                        }
                     }
                 }
-                .pickerStyle(.segmented)
             }
 
             switch source {
@@ -555,6 +640,7 @@ private struct RadarDecisionCardView: View {
 }
 
 private struct RadarDecisionDetailView: View {
+    let session: BaseSession
     let decision: RadarDecision
 
     @State private var localMark: String?
@@ -564,6 +650,9 @@ private struct RadarDecisionDetailView: View {
             Section {
                 Text(decision.title)
                     .font(.headline)
+                Text(decision.introduction)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
 
             Section("信号判断") {
@@ -572,6 +661,21 @@ private struct RadarDecisionDetailView: View {
                 RadarSummaryLine(title: "发生了什么", value: decision.whatChanged)
                 RadarSummaryLine(title: "为什么和我有关", value: decision.whyRelevant)
                 RadarSummaryLine(title: "噪音 / 可信度判断", value: decision.noiseJudgement)
+            }
+
+            Section("具体观察") {
+                Text(decision.observation)
+                    .font(.subheadline)
+                ForEach(Array(decision.validationQuestions.enumerated()), id: \.offset) { index, question in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("\(index + 1).")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20, alignment: .leading)
+                        Text(question)
+                            .font(.subheadline)
+                    }
+                }
             }
 
             Section("路由动作") {
@@ -591,6 +695,17 @@ private struct RadarDecisionDetailView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            PartRecordFormView(
+                session: session,
+                defaultSummary: "Radar 判断：\(decision.title)。\(decision.whatChanged)",
+                defaultKeyInsight: decision.whyRelevant,
+                sourceTitle: decision.title,
+                sourceURL: decision.sourceURL,
+                sourceSummary: decision.introduction,
+                userNotes: "来源方式：\(decision.sourceType)\n来源详情：\(decision.sourceDetail)\n噪音判断：\(decision.noiseJudgement)\n路由动作：\(decision.route)",
+                sectionTitle: "Radar Check-in"
+            )
         }
         .navigationTitle("Radar 详情")
     }

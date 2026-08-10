@@ -4,6 +4,11 @@ struct PartRecordFormView: View {
     let session: BaseSession
     let defaultSummary: String
     let defaultKeyInsight: String
+    let sourceTitle: String?
+    let sourceURL: String?
+    let sourceSummary: String?
+    let userNotes: String?
+    let sectionTitle: String
 
     @State private var summary: String
     @State private var keyInsight: String
@@ -14,16 +19,30 @@ struct PartRecordFormView: View {
 
     private let checkinAPI = CheckinAPI()
 
-    init(session: BaseSession, defaultSummary: String, defaultKeyInsight: String) {
+    init(
+        session: BaseSession,
+        defaultSummary: String,
+        defaultKeyInsight: String,
+        sourceTitle: String? = nil,
+        sourceURL: String? = nil,
+        sourceSummary: String? = nil,
+        userNotes: String? = nil,
+        sectionTitle: String = "记录"
+    ) {
         self.session = session
         self.defaultSummary = defaultSummary
         self.defaultKeyInsight = defaultKeyInsight
+        self.sourceTitle = sourceTitle
+        self.sourceURL = sourceURL
+        self.sourceSummary = sourceSummary
+        self.userNotes = userNotes
+        self.sectionTitle = sectionTitle
         _summary = State(initialValue: defaultSummary)
         _keyInsight = State(initialValue: defaultKeyInsight)
     }
 
     var body: some View {
-        Section("记录") {
+        Section(sectionTitle) {
             TextField("总结", text: $summary, axis: .vertical)
                 .lineLimit(2...5)
             TextField("关键洞察", text: $keyInsight, axis: .vertical)
@@ -62,10 +81,10 @@ struct PartRecordFormView: View {
                     summary: summary,
                     keyInsight: keyInsight,
                     nextAction: nextAction,
-                    sourceTitle: nil,
-                    sourceURL: nil,
-                    sourceSummary: nil,
-                    userNotes: nil
+                    sourceTitle: sourceTitle,
+                    sourceURL: sourceURL,
+                    sourceSummary: sourceSummary,
+                    userNotes: userNotes
                 )
             )
             message = "已保存到归档"
