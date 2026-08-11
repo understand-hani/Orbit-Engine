@@ -117,6 +117,22 @@ private struct MoreProfileSummaryView: View {
             SummaryLine(title: "长期目标", value: context.profile.goal)
             SummaryLine(title: "当前阶段", value: context.profile.currentStage)
             SummaryLine(title: "背景 / 已有基础", value: context.profile.backgroundSummary)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("全周期计划")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if context.plan.fullCyclePlan.isEmpty {
+                    Text("未生成")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(context.plan.fullCyclePlan.prefix(3).enumerated()), id: \.offset) { index, item in
+                        Text("阶段 \(index + 1)：\(phaseTitle(item))")
+                            .font(.subheadline)
+                            .lineLimit(2)
+                    }
+                }
+            }
         }
         .padding(.vertical, 6)
     }
@@ -124,6 +140,13 @@ private struct MoreProfileSummaryView: View {
     private var displayName: String {
         let value = context.profile.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? "未设置姓名" : value
+    }
+
+    private func phaseTitle(_ item: String) -> String {
+        item
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty } ?? "未命名阶段"
     }
 }
 

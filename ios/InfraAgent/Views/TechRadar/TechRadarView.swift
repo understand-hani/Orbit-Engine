@@ -808,7 +808,11 @@ private struct RadarDecisionDetailView: View {
 
             Section("关键信息摘录") {
                 ForEach(decision.keyPassages) { passage in
-                    RadarPassageView(passage: passage)
+                    NavigationLink {
+                        RadarPassageDetailView(passage: passage)
+                    } label: {
+                        RadarPassageCardView(passage: passage)
+                    }
                 }
             }
 
@@ -860,7 +864,7 @@ private struct RadarDecisionDetailView: View {
     }
 }
 
-private struct RadarPassageView: View {
+private struct RadarPassageCardView: View {
     let passage: RadarKeyPassage
 
     var body: some View {
@@ -868,19 +872,42 @@ private struct RadarPassageView: View {
             Text(passage.title)
                 .font(.subheadline)
                 .fontWeight(.semibold)
+                .foregroundStyle(.primary)
             Text(passage.excerpt)
                 .font(.subheadline)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Agent 解析")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(passage.analysis)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.top, 2)
+                .foregroundStyle(.secondary)
+                .lineLimit(3)
+            Text("点击查看完整摘录和 Agent 解析")
+                .font(.caption)
+                .foregroundStyle(.blue)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .padding(.vertical, 4)
+    }
+}
+
+private struct RadarPassageDetailView: View {
+    let passage: RadarKeyPassage
+
+    var body: some View {
+        List {
+            Section("Agent 摘录") {
+                Text(passage.excerpt)
+                    .font(.subheadline)
+                    .textSelection(.enabled)
+            }
+
+            Section("Agent 解析") {
+                Text(passage.analysis)
+                    .font(.subheadline)
+                    .textSelection(.enabled)
+            }
+        }
+        .navigationTitle(passage.title)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

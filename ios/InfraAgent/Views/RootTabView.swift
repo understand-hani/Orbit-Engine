@@ -130,6 +130,11 @@ struct PlanView: View {
             .task {
                 await load()
             }
+            .onAppear {
+                Task {
+                    await load(force: true)
+                }
+            }
             .refreshable {
                 await load(force: true)
             }
