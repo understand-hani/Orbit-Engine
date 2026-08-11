@@ -191,6 +191,7 @@ struct TechRadarView: View {
                 keyPassages: keyPassages(for: item),
                 sourceType: input.sourceLabel,
                 sourceDetail: input.sourceDetail,
+                userMark: item.userMark,
                 sourceURL: item.url?.absoluteString
             )
         }
@@ -341,6 +342,18 @@ struct TechRadarView: View {
     }
 
     private func keyPassages(for item: RadarItem) -> [RadarKeyPassage] {
+        if !item.sourcePassages.isEmpty {
+            return item.sourcePassages.prefix(5).map { passage in
+                RadarKeyPassage(
+                    title: passage.title.isEmpty ? "关键段落" : passage.title,
+                    excerpt: passage.excerpt,
+                    analysis: passage.analysis,
+                    sourceURL: passage.sourceURL,
+                    location: passage.location
+                )
+            }
+        }
+
         let substance = item.technicalSubstance.trimmingCharacters(in: .whitespacesAndNewlines)
         let visualEvidence = item.visuals
             .map { "\($0.caption)（来源：\($0.source)）" }
@@ -388,7 +401,9 @@ struct TechRadarView: View {
                 RadarKeyPassage(
                     title: "关键段落 \(passages.count + 1)",
                     excerpt: "当前后端还没有返回更多原文正文摘录。需要接入网页/PDF 正文抽取后，才能在这里补齐更多一手段落。",
-                    analysis: "这是一条占位摘录，用来明确当前数据缺口：Radar 已有结构化判断，但还没有足够的一手正文片段。"
+                    analysis: "这是一条占位摘录，用来明确当前数据缺口：Radar 已有结构化判断，但还没有足够的一手正文片段。",
+                    sourceURL: nil,
+                    location: ""
                 )
             )
         }
@@ -402,7 +417,9 @@ struct TechRadarView: View {
             RadarKeyPassage(
                 title: "关键段落 \(passages.count + 1)",
                 excerpt: trimmed,
-                analysis: analysis
+                analysis: analysis,
+                sourceURL: nil,
+                location: ""
             )
         )
     }
@@ -425,9 +442,12 @@ struct TechRadarView: View {
             technicalSubstance: input.summaryOrFallback,
             marketingNoise: noise,
             whyItMatters: input.relevanceOrFallback(context: context),
+            sourcePassages: [],
             visuals: [],
             recommendedDepth: "radar",
             userMark: "unmarked",
+            archivedAt: nil,
+            archiveNote: "",
             tags: input.tags
         )
     }
@@ -584,6 +604,7 @@ private struct RadarDecision: Identifiable {
     let keyPassages: [RadarKeyPassage]
     let sourceType: String
     let sourceDetail: String
+    let userMark: String
     let sourceURL: String?
 }
 
@@ -600,6 +621,8 @@ private struct RadarKeyPassage: Identifiable {
     let title: String
     let excerpt: String
     let analysis: String
+    let sourceURL: URL?
+    let location: String
 }
 
 private struct RadarInputSheet: View {
@@ -784,7 +807,16 @@ private struct RadarDecisionDetailView: View {
     let session: BaseSession
     let decision: RadarDecision
 
-    @State private var localMark: String?
+    @State private var currentMark: String
+    @State private var statusMessage: String?
+    @State private var isUpdatingMark = false
+    private let materialAPI = MaterialAPI()
+
+    init(session: BaseSession, decision: RadarDecision) {
+        self.session = session
+        self.decision = decision
+        _currentMark = State(initialValue: decision.userMark)
+    }
 
     var body: some View {
         List {
@@ -845,17 +877,25 @@ private struct RadarDecisionDetailView: View {
 
             Section("路由动作") {
                 RadarSummaryLine(title: "Agent 建议", value: decision.route)
+                RadarSummaryLine(title: "当前状态", value: markLabel(currentMark))
                 Button("转 Deep Dive") {
-                    localMark = "已标记为待转 Deep Dive"
+                    updateMark("deep_dive", message: "已标记为待转 Deep Dive")
                 }
+                .disabled(isUpdatingMark)
                 Button("暂存决策") {
-                    localMark = "已暂存为 Radar 决策"
+                    updateMark("track_later", message: "已暂存为 Radar 决策")
                 }
+                .disabled(isUpdatingMark)
                 Button("忽略") {
-                    localMark = "已标记为忽略"
+                    updateMark("noise", message: "已标记为忽略")
                 }
-                if let localMark {
-                    Text(localMark)
+                .disabled(isUpdatingMark)
+                Button("归档") {
+                    archiveItem()
+                }
+                .disabled(isUpdatingMark)
+                if let statusMessage {
+                    Text(statusMessage)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -873,6 +913,63 @@ private struct RadarDecisionDetailView: View {
             )
         }
         .navigationTitle("Radar 详情")
+    }
+
+    private func updateMark(_ mark: String, message: String) {
+        isUpdatingMark = true
+        Task {
+            do {
+                let updated = try await materialAPI.markRadarItem(
+                    sessionID: session.id,
+                    itemID: decision.id,
+                    mark: mark
+                )
+                currentMark = updated.userMark
+                statusMessage = message
+            } catch {
+                statusMessage = "状态更新失败：\(error.localizedDescription)"
+            }
+            isUpdatingMark = false
+        }
+    }
+
+    private func archiveItem() {
+        isUpdatingMark = true
+        Task {
+            do {
+                let updated = try await materialAPI.archiveRadarItem(
+                    sessionID: session.id,
+                    itemID: decision.id,
+                    archiveNote: "从 Radar 详情页归档。"
+                )
+                currentMark = updated.userMark
+                statusMessage = "已归档这条 Radar 推送"
+            } catch {
+                statusMessage = "归档失败：\(error.localizedDescription)"
+            }
+            isUpdatingMark = false
+        }
+    }
+
+    private func markLabel(_ mark: String) -> String {
+        switch mark {
+        case "unread":
+            return "未读"
+        case "valuable":
+            return "有价值"
+        case "noise":
+            return "忽略 / 噪音"
+        case "track_later":
+            return "暂存"
+        case "deep_dive":
+            return "待转 Deep Dive"
+        case "archived":
+            return "已归档"
+        case "done":
+            return "已完成"
+        default:
+            return mark.isEmpty ? "未设置" : mark
+        }
     }
 }
 
@@ -907,6 +1004,14 @@ private struct RadarPassageDetailView: View {
     var body: some View {
         List {
             Section("Agent 摘录") {
+                if let url = passage.sourceURL {
+                    Link(destination: url) {
+                        Label("打开来源", systemImage: "safari")
+                    }
+                }
+                if !passage.location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    RadarSummaryLine(title: "位置", value: passage.location)
+                }
                 Text(passage.excerpt)
                     .font(.subheadline)
                     .textSelection(.enabled)

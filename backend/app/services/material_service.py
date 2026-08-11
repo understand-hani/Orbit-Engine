@@ -1,9 +1,10 @@
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from app.db.repositories import SessionRepository
 from app.schemas.common import TaskType
 from app.schemas.research_feeder import Paper, PaperReader
-from app.schemas.tech_radar import RadarItem
+from app.schemas.tech_radar import RadarItem, RadarItemMarkRequest, RadarUserMark
 
 
 class MaterialService:
@@ -17,6 +18,53 @@ class MaterialService:
         if session.task_type != TaskType.tech_radar:
             return []
         return session.payload.digest.items
+
+    def update_radar_item_mark(
+        self,
+        session_id: str,
+        item_id: str,
+        request: RadarItemMarkRequest,
+    ) -> Optional[RadarItem]:
+        session = self.sessions.get_by_id(session_id)
+        if session is None or session.task_type != TaskType.tech_radar:
+            return None
+
+        updated_item: Optional[RadarItem] = None
+        updated_items: List[RadarItem] = []
+        for item in session.payload.digest.items:
+            if item.id == item_id:
+                mark = request.user_mark
+                update = {
+                    "user_mark": mark,
+                    "archive_note": request.archive_note,
+                }
+                if mark in {RadarUserMark.archived, RadarUserMark.done}:
+                    update["archived_at"] = datetime.now(timezone.utc)
+                updated_item = item.model_copy(update=update)
+                updated_items.append(updated_item)
+            else:
+                updated_items.append(item)
+
+        if updated_item is None:
+            return None
+
+        updated_digest = session.payload.digest.model_copy(update={"items": updated_items})
+        updated_payload = session.payload.model_copy(update={"digest": updated_digest})
+        updated_session = session.model_copy(
+            update={
+                "payload": updated_payload,
+                "updated_at": datetime.now(timezone.utc),
+            }
+        )
+        self.sessions.save(updated_session)
+        return updated_item
+
+    def archive_radar_item(self, session_id: str, item_id: str, note: str = "") -> Optional[RadarItem]:
+        return self.update_radar_item_mark(
+            session_id,
+            item_id,
+            RadarItemMarkRequest(user_mark=RadarUserMark.archived, archive_note=note),
+        )
 
     def list_papers(self, session_id: str) -> Optional[List[Paper]]:
         session = self.sessions.get_by_id(session_id)

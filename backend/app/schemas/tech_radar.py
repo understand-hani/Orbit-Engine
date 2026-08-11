@@ -28,6 +28,8 @@ class RadarUserMark(str, Enum):
     valuable = "valuable"
     noise = "noise"
     track_later = "track_later"
+    deep_dive = "deep_dive"
+    archived = "archived"
     done = "done"
 
 
@@ -37,6 +39,15 @@ class RadarScope(BaseModel):
     research_groups: List[str] = []
     signal_types: List[str] = []
     exclude: List[str] = []
+
+
+class RadarSourcePassage(BaseModel):
+    id: str
+    title: str = ""
+    excerpt: str
+    analysis: str = ""
+    source_url: Optional[HttpUrl] = None
+    location: str = ""
 
 
 class RadarItem(BaseModel):
@@ -50,10 +61,18 @@ class RadarItem(BaseModel):
     technical_substance: str = ""
     marketing_noise: str = ""
     why_it_matters: str
+    source_passages: List[RadarSourcePassage] = []
     visuals: List[VisualAsset] = []
     recommended_depth: RecommendedDepth = RecommendedDepth.skim
     user_mark: RadarUserMark = RadarUserMark.unread
+    archived_at: Optional[datetime] = None
+    archive_note: str = ""
     tags: List[str] = []
+
+
+class RadarItemMarkRequest(BaseModel):
+    user_mark: RadarUserMark
+    archive_note: str = ""
 
 
 class RadarDigest(BaseModel):
@@ -73,4 +92,3 @@ class TechRadarPayload(BaseModel):
     source_refresh_time: Optional[datetime] = None
     is_stale: bool = False
     digest: RadarDigest
-

@@ -70,9 +70,12 @@ struct RadarItem: Codable, Identifiable {
     let technicalSubstance: String
     let marketingNoise: String
     let whyItMatters: String
+    let sourcePassages: [RadarSourcePassage]
     let visuals: [VisualAsset]
     let recommendedDepth: String
     let userMark: String
+    let archivedAt: Date?
+    let archiveNote: String
     let tags: [String]
 
     enum CodingKeys: String, CodingKey {
@@ -86,9 +89,99 @@ struct RadarItem: Codable, Identifiable {
         case technicalSubstance = "technical_substance"
         case marketingNoise = "marketing_noise"
         case whyItMatters = "why_it_matters"
+        case sourcePassages = "source_passages"
         case visuals
         case recommendedDepth = "recommended_depth"
         case userMark = "user_mark"
+        case archivedAt = "archived_at"
+        case archiveNote = "archive_note"
         case tags
+    }
+
+    init(
+        id: String,
+        radarType: RadarType,
+        title: String,
+        source: String,
+        url: URL?,
+        signalType: String,
+        summary: String,
+        technicalSubstance: String,
+        marketingNoise: String,
+        whyItMatters: String,
+        sourcePassages: [RadarSourcePassage] = [],
+        visuals: [VisualAsset],
+        recommendedDepth: String,
+        userMark: String,
+        archivedAt: Date? = nil,
+        archiveNote: String = "",
+        tags: [String]
+    ) {
+        self.id = id
+        self.radarType = radarType
+        self.title = title
+        self.source = source
+        self.url = url
+        self.signalType = signalType
+        self.summary = summary
+        self.technicalSubstance = technicalSubstance
+        self.marketingNoise = marketingNoise
+        self.whyItMatters = whyItMatters
+        self.sourcePassages = sourcePassages
+        self.visuals = visuals
+        self.recommendedDepth = recommendedDepth
+        self.userMark = userMark
+        self.archivedAt = archivedAt
+        self.archiveNote = archiveNote
+        self.tags = tags
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        radarType = try container.decode(RadarType.self, forKey: .radarType)
+        title = try container.decode(String.self, forKey: .title)
+        source = try container.decode(String.self, forKey: .source)
+        url = try container.decodeIfPresent(URL.self, forKey: .url)
+        signalType = try container.decode(String.self, forKey: .signalType)
+        summary = try container.decode(String.self, forKey: .summary)
+        technicalSubstance = try container.decodeIfPresent(String.self, forKey: .technicalSubstance) ?? ""
+        marketingNoise = try container.decodeIfPresent(String.self, forKey: .marketingNoise) ?? ""
+        whyItMatters = try container.decodeIfPresent(String.self, forKey: .whyItMatters) ?? ""
+        sourcePassages = try container.decodeIfPresent([RadarSourcePassage].self, forKey: .sourcePassages) ?? []
+        visuals = try container.decodeIfPresent([VisualAsset].self, forKey: .visuals) ?? []
+        recommendedDepth = try container.decodeIfPresent(String.self, forKey: .recommendedDepth) ?? "skim"
+        userMark = try container.decodeIfPresent(String.self, forKey: .userMark) ?? "unread"
+        archivedAt = try container.decodeIfPresent(Date.self, forKey: .archivedAt)
+        archiveNote = try container.decodeIfPresent(String.self, forKey: .archiveNote) ?? ""
+        tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+    }
+}
+
+struct RadarSourcePassage: Codable, Identifiable {
+    let id: String
+    let title: String
+    let excerpt: String
+    let analysis: String
+    let sourceURL: URL?
+    let location: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case excerpt
+        case analysis
+        case sourceURL = "source_url"
+        case location
+    }
+}
+
+struct RadarItemMarkRequest: Codable {
+    let userMark: String
+    let archiveNote: String
+
+    enum CodingKeys: String, CodingKey {
+        case userMark = "user_mark"
+        case archiveNote = "archive_note"
     }
 }

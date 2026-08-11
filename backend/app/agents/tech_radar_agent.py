@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import List
 
 from app.schemas.common import VisualAsset, VisualType, VisualUsage
-from app.schemas.tech_radar import RadarItem, RadarType, RecommendedDepth, TechRadarPayload
+from app.schemas.tech_radar import RadarItem, RadarSourcePassage, RadarType, RecommendedDepth, TechRadarPayload
 
 
 class MockTechRadarAgent:
@@ -45,6 +45,29 @@ class MockTechRadarAgent:
                 technical_substance="重点看感知、规控、地图依赖和端到端模块是否有实质变化。",
                 marketing_noise="只说覆盖城市数量但没有展示 corner case 和失败边界，信息价值有限。",
                 why_it_matters="它能帮助判断自动驾驶产品路线是否需要更强的仿真、世界模型或场景生成能力。",
+                source_passages=[
+                    RadarSourcePassage(
+                        id="mock_product_signal_001_p1",
+                        title="功能边界",
+                        excerpt="城区 NOA 的公开信号从覆盖城市数量转向复杂路口、绕行和泊车衔接等连续体验。",
+                        analysis="这段适合作为产品路线变化的摘录：它说明值得观察的不只是覆盖范围，而是端到端体验链条是否变长。",
+                        location="mock release / feature overview",
+                    ),
+                    RadarSourcePassage(
+                        id="mock_product_signal_001_p2",
+                        title="验证重点",
+                        excerpt="需要继续确认感知、规控、地图依赖和端到端模块是否有实质变化。",
+                        analysis="这段是后续 Deep Dive 的验证入口，能把营销描述转成可检查的技术问题。",
+                        location="agent extraction",
+                    ),
+                    RadarSourcePassage(
+                        id="mock_product_signal_001_p3",
+                        title="噪音边界",
+                        excerpt="如果材料只强调城市数量，却没有展示 corner case 和失败边界，信息价值有限。",
+                        analysis="这段提醒不要把覆盖规模直接等同于能力进展，需要看失败场景和约束条件。",
+                        location="agent noise filter",
+                    ),
+                ],
                 visuals=[
                     VisualAsset(
                         id="mock_visual_product_001",
@@ -67,6 +90,29 @@ class MockTechRadarAgent:
                 technical_substance="重点看空间理解、任务规划、泛化场景和失败案例是否被展示。",
                 marketing_noise="剪辑视频如果缺少连续成功率和真实环境约束，不能直接说明产品成熟。",
                 why_it_matters="具身智能产品信号能帮助判断空间智能、世界模型和动态场景理解的长期价值。",
+                source_passages=[
+                    RadarSourcePassage(
+                        id="mock_product_signal_002_p1",
+                        title="能力链条",
+                        excerpt="演示信号集中在抓取、导航和多步骤任务执行能力。",
+                        analysis="这段用于判断机器人能力是否已经从单点动作走向任务链条。",
+                        location="mock demo video",
+                    ),
+                    RadarSourcePassage(
+                        id="mock_product_signal_002_p2",
+                        title="验证重点",
+                        excerpt="应关注空间理解、任务规划、泛化场景和失败案例是否被展示。",
+                        analysis="这段把观看演示视频的重点转成可验证维度。",
+                        location="agent extraction",
+                    ),
+                    RadarSourcePassage(
+                        id="mock_product_signal_002_p3",
+                        title="成熟度边界",
+                        excerpt="缺少连续成功率和真实环境约束时，剪辑视频不能直接说明产品成熟。",
+                        analysis="这段用于过滤展示型视频中的营销噪音。",
+                        location="agent noise filter",
+                    ),
+                ],
                 visuals=[
                     VisualAsset(
                         id="mock_visual_product_002",
@@ -93,6 +139,29 @@ class MockTechRadarAgent:
                 technical_substance="重点看输入条件、时序建模、动作控制和评价指标是否完整。",
                 marketing_noise="只展示漂亮视频但没有闭环评价或消融，技术可信度不足。",
                 why_it_matters="可作为周四/周五 research feeder 的候选阅读方向。",
+                source_passages=[
+                    RadarSourcePassage(
+                        id="mock_technical_signal_001_p1",
+                        title="问题定义",
+                        excerpt="方法关注多视角驾驶视频生成中的时序一致性和可控性问题。",
+                        analysis="这段是判断是否进入 Deep Dive 的核心：它直接对应 driving WM 的生成质量和控制输入。",
+                        location="mock paper abstract",
+                    ),
+                    RadarSourcePassage(
+                        id="mock_technical_signal_001_p2",
+                        title="方法检查点",
+                        excerpt="需要检查输入条件、时序建模、动作控制和评价指标是否完整。",
+                        analysis="这段可直接转成阅读 checklist，避免只看 demo 视频。",
+                        location="agent extraction",
+                    ),
+                    RadarSourcePassage(
+                        id="mock_technical_signal_001_p3",
+                        title="证据缺口",
+                        excerpt="如果论文只展示漂亮视频但没有闭环评价或消融，技术可信度不足。",
+                        analysis="这段是噪音过滤依据，适合归档为风险判断。",
+                        location="agent noise filter",
+                    ),
+                ],
                 visuals=[
                     VisualAsset(
                         id="mock_visual_technical_001",
@@ -115,6 +184,29 @@ class MockTechRadarAgent:
                 technical_substance="重点看数据格式、指标定义、baseline 和复现实验是否完整。",
                 marketing_noise="如果只有 leaderboard 没有评估脚本和数据说明，工程价值有限。",
                 why_it_matters="它可能为 4DGS / WM 方向判断提供可量化比较入口。",
+                source_passages=[
+                    RadarSourcePassage(
+                        id="mock_technical_signal_002_p1",
+                        title="Benchmark 更新",
+                        excerpt="benchmark 增加动态物体、相机运动和时序一致性指标。",
+                        analysis="这段是该推送的关键事实，直接关系到 4DGS / WM 方向如何评价动态场景。",
+                        location="mock github release",
+                    ),
+                    RadarSourcePassage(
+                        id="mock_technical_signal_002_p2",
+                        title="复现检查点",
+                        excerpt="需要检查数据格式、指标定义、baseline 和复现实验是否完整。",
+                        analysis="这段适合用来判断该 benchmark 是否能真正服务当前研究计划。",
+                        location="agent extraction",
+                    ),
+                    RadarSourcePassage(
+                        id="mock_technical_signal_002_p3",
+                        title="工程价值边界",
+                        excerpt="如果只有 leaderboard，没有评估脚本和数据说明，工程价值有限。",
+                        analysis="这段用于判断是否暂存或忽略，避免被榜单表象吸引。",
+                        location="agent noise filter",
+                    ),
+                ],
                 visuals=[
                     VisualAsset(
                         id="mock_visual_technical_002",
