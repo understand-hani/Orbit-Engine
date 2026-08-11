@@ -263,6 +263,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] Radar 详情展示原文 / 材料入口：URL 可打开原文，PDF / 手动材料 / Agent 扫描显示当前可追溯来源说明。
 - [x] Radar 详情展示关键信息段落提取与 Agent 解析，先基于当前 payload metadata 生成；真实网页/PDF 正文抽取后续接后端。
 - [x] Radar 详情支持 `Radar Check-in`，可把当前信号判断、关键洞察和下一步行动保存到归档。
+- [x] Radar 的 `归档` 和 `保存到归档` 需要真实写入归档页：归档按钮写入 archived 暂存卡片，Check-in 写入 completed 归档记录。
 - [x] Radar 页面显示 `Agent 能做什么`：根据计划和归档发现值得追踪的新信号，帮助用户决定是否进入 Deep Dive。
 - [x] Radar 结果先只支持查看、转 Deep Dive / 暂存决策，不做完整信号 CRUD。
 - [ ] Today / Manual 中的 `Weekly Studio` 入口进入原生轻量工作区。

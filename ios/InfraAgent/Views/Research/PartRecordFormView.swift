@@ -9,6 +9,7 @@ struct PartRecordFormView: View {
     let sourceSummary: String?
     let userNotes: String?
     let sectionTitle: String
+    let status: String
 
     @State private var summary: String
     @State private var keyInsight: String
@@ -27,7 +28,8 @@ struct PartRecordFormView: View {
         sourceURL: String? = nil,
         sourceSummary: String? = nil,
         userNotes: String? = nil,
-        sectionTitle: String = "记录"
+        sectionTitle: String = "记录",
+        status: String = "partial"
     ) {
         self.session = session
         self.defaultSummary = defaultSummary
@@ -37,6 +39,7 @@ struct PartRecordFormView: View {
         self.sourceSummary = sourceSummary
         self.userNotes = userNotes
         self.sectionTitle = sectionTitle
+        self.status = status
         _summary = State(initialValue: defaultSummary)
         _keyInsight = State(initialValue: defaultKeyInsight)
     }
@@ -77,7 +80,7 @@ struct PartRecordFormView: View {
                     date: session.date,
                     taskType: session.taskType,
                     durationMin: durationMin,
-                    status: "partial",
+                    status: status,
                     summary: summary,
                     keyInsight: keyInsight,
                     nextAction: nextAction,
