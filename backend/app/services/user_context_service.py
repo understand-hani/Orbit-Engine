@@ -173,7 +173,7 @@ class UserContextService:
 
         cleaned = [self._phase_source_text(item) for item in items if item.strip()]
         if not cleaned:
-            return []
+            cleaned = self._default_plan_seeds(direction)
 
         grouped = self._group_plan_items(cleaned, max_groups=4)
         ranges = self._phase_time_ranges(target_cycle, len(grouped))
@@ -182,6 +182,14 @@ class UserContextService:
             merged = self._merge_group(group, direction, index)
             normalized.append(self._format_phase(index, ranges[index - 1], merged, direction))
         return normalized
+
+    def _default_plan_seeds(self, direction: str) -> list[str]:
+        focus = direction.strip() or "当前方向"
+        return [
+            f"围绕「{focus}」建立基础地图，整理核心概念、代表材料、关键词和必须回答的问题。",
+            f"围绕「{focus}」完成多次 Deep Dive，对比关键路线、方法差异、适用边界和反例。",
+            f"围绕「{focus}」做一个小型输出或验证任务，形成可复查的案例拆解、对比清单或实践草稿。",
+        ]
 
     def _group_plan_items(self, items: list[str], max_groups: int) -> list[list[str]]:
         if len(items) <= max_groups:

@@ -341,58 +341,70 @@ struct TechRadarView: View {
     }
 
     private func keyPassages(for item: RadarItem) -> [RadarKeyPassage] {
-        let summary = item.summary.trimmingCharacters(in: .whitespacesAndNewlines)
         let substance = item.technicalSubstance.trimmingCharacters(in: .whitespacesAndNewlines)
-        let relevance = item.whyItMatters.trimmingCharacters(in: .whitespacesAndNewlines)
-        let noise = item.marketingNoise.trimmingCharacters(in: .whitespacesAndNewlines)
+        let visualEvidence = item.visuals
+            .map { "\($0.caption)（来源：\($0.source)）" }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let sourceEvidence = [
+            item.source.isEmpty ? "" : "来源：\(item.source)",
+            item.signalType.isEmpty ? "" : "信号类型：\(item.signalType)",
+            item.url?.absoluteString ?? "",
+        ]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+        let tagEvidence = item.tags.isEmpty ? "" : "标签：\(item.tags.joined(separator: "、"))"
+        let depthEvidence = item.recommendedDepth.isEmpty ? "" : "建议处理深度：\(item.recommendedDepth)"
 
         var passages: [RadarKeyPassage] = []
-        if !summary.isEmpty {
+        appendPassage(
+            to: &passages,
+            excerpt: substance,
+            analysis: "这是 Agent 从当前 Radar 材料字段中抽出的核心信息。进入 Deep Dive 前，应优先回到原文确认这段是否有足够事实、方法或数据支撑。"
+        )
+        appendPassage(
+            to: &passages,
+            excerpt: sourceEvidence,
+            analysis: "这是用于定位原始材料的来源线索。它帮助判断这条推送是论文、开源项目、产品发布、新闻还是手动材料。"
+        )
+        appendPassage(
+            to: &passages,
+            excerpt: visualEvidence,
+            analysis: "这是 Agent 记录的图像、视频、图表或方法图线索。视觉材料适合用来快速判断这条信号是否值得进一步打开原文。"
+        )
+        appendPassage(
+            to: &passages,
+            excerpt: tagEvidence,
+            analysis: "这是 Agent 给这条推送打上的主题标签，用来判断它和当前 Radar 方向、后续 Deep Dive 队列的关系。"
+        )
+        appendPassage(
+            to: &passages,
+            excerpt: depthEvidence,
+            analysis: "这是 Agent 对处理深度的判断，用来决定这条推送应该略读、暂存，还是转入 Deep Dive。"
+        )
+
+        while passages.count < 3 {
             passages.append(
                 RadarKeyPassage(
-                    title: "摘要",
-                    excerpt: summary,
-                    analysis: "这是 Agent 对当前 Radar 信号的简要概括，用来先判断这条内容是否值得继续看。"
+                    title: "关键段落 \(passages.count + 1)",
+                    excerpt: "当前后端还没有返回更多原文正文摘录。需要接入网页/PDF 正文抽取后，才能在这里补齐更多一手段落。",
+                    analysis: "这是一条占位摘录，用来明确当前数据缺口：Radar 已有结构化判断，但还没有足够的一手正文片段。"
                 )
             )
         }
-        if !substance.isEmpty, substance != summary {
-            passages.append(
-                RadarKeyPassage(
-                    title: "关键信息摘录",
-                    excerpt: substance,
-                    analysis: "这是 Agent 从当前材料字段中提取出的关键内容；如果要转 Deep Dive，应优先回到原文确认这部分。"
-                )
+        return Array(passages.prefix(5))
+    }
+
+    private func appendPassage(to passages: inout [RadarKeyPassage], excerpt: String, analysis: String) {
+        let trimmed = excerpt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        passages.append(
+            RadarKeyPassage(
+                title: "关键段落 \(passages.count + 1)",
+                excerpt: trimmed,
+                analysis: analysis
             )
-        }
-        if !relevance.isEmpty {
-            passages.append(
-                RadarKeyPassage(
-                    title: "与当前计划的关系",
-                    excerpt: relevance,
-                    analysis: "这段回答为什么它和用户有关；如果关系薄弱，应暂存或忽略，而不是进入深读。"
-                )
-            )
-        }
-        if !noise.isEmpty {
-            passages.append(
-                RadarKeyPassage(
-                    title: "噪音判断",
-                    excerpt: noise,
-                    analysis: "这段用于提醒可能的营销、热度或证据不足问题，避免把表面热闹误判成行动信号。"
-                )
-            )
-        }
-        if passages.isEmpty {
-            passages.append(
-                RadarKeyPassage(
-                    title: "待补材料",
-                    excerpt: "当前信号缺少可提取段落。",
-                    analysis: "需要补充原文链接、PDF 或手动材料后，Agent 才能进一步提取关键段落。"
-                )
-            )
-        }
-        return passages
+        )
     }
 
     private func manualRadarItem(

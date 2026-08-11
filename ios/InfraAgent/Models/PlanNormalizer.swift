@@ -24,12 +24,14 @@ struct PlanNormalizer {
             return formatted
         }
 
-        let cleaned = items
+        var cleaned = items
             .map(phaseSourceText)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
-        guard !cleaned.isEmpty else { return [] }
+        if cleaned.isEmpty {
+            cleaned = defaultPlanSeeds(direction: direction)
+        }
 
         let groups = grouped(cleaned, maxGroups: 4)
         let timeRanges = phaseTimeRanges(targetCycle: targetCycle, count: groups.count)
@@ -52,6 +54,15 @@ struct PlanNormalizer {
             return "有阶段写得太空泛：\(vagueItem)。请把该阶段要做什么、产出什么写清楚。"
         }
         return nil
+    }
+
+    private static func defaultPlanSeeds(direction: String) -> [String] {
+        let focus = direction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "当前方向" : direction
+        return [
+            "围绕「\(focus)」建立基础地图，整理核心概念、代表材料、关键词和必须回答的问题。",
+            "围绕「\(focus)」完成多次 Deep Dive，对比关键路线、方法差异、适用边界和反例。",
+            "围绕「\(focus)」做一个小型输出或验证任务，形成可复查的案例拆解、对比清单或实践草稿。",
+        ]
     }
 
     static func isVaguePlanItem(_ item: String) -> Bool {
