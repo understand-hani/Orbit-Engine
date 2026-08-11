@@ -96,17 +96,13 @@ class UserContextService:
                 f"围绕「{direction}」做一个小型输出，如对比清单、案例拆解或实践草稿，用来验证前两阶段结论。",
             ]
 
-        current_milestone = full_cycle_plan[0]
+        current_milestone = self._first_week_plan(full_cycle_plan) or self._phase_summary(full_cycle_plan[0])
         weekly_focus = request.weekly_focus.strip() or (
-            f"本周先推进「{current_milestone}」，至少完成一次材料筛选、一次 Deep Dive，以及一份可回看的阶段笔记。"
+            f"本周推进：{current_milestone}"
         )
         active_tasks = [item.strip() for item in request.active_tasks if item.strip()]
         if not active_tasks:
-            active_tasks = [
-                f"从「{current_milestone}」里拆出 2-3 个本周必须回答的具体问题，并写成检索目标。",
-                "生成 3-5 个候选材料，标记每份材料能回答什么问题、需要多少时间、为什么值得读。",
-                "完成一次 Deep Dive，并产出一份包含关键判断、证据、未解决问题和下一步动作的笔记。",
-            ]
+            active_tasks = self._active_tasks_from_week_plan(current_milestone)
         next_action = request.next_action.strip() or "让 Agent 根据本周重点生成候选材料，并先确认一份今天最值得读的主材料。"
 
         return DirectionProfileSuggestion(
@@ -137,6 +133,53 @@ class UserContextService:
                 "避免只收藏材料但不完成阅读输出",
             ],
         )
+
+    def _first_week_plan(self, full_cycle_plan: list[str]) -> str:
+        if not full_cycle_plan:
+            return ""
+        first_phase = full_cycle_plan[0]
+        execution = self._section_lines(first_phase, "具体执行计划：", "产出：")
+        if not execution:
+            return ""
+        for line in execution:
+            if "Week 1" in line or "第 1 周" in line or "第1周" in line:
+                return self._clean_list_marker(line)
+        return self._clean_list_marker(execution[0])
+
+    def _phase_summary(self, phase: str) -> str:
+        lines = [line.strip() for line in phase.splitlines() if line.strip()]
+        if not lines:
+            return "当前阶段计划"
+        if len(lines) == 1:
+            return self._clean_list_marker(lines[0])
+        return self._clean_list_marker(lines[1] if lines[0].startswith("第") else lines[0])
+
+    def _section_lines(self, text: str, start_marker: str, end_marker: str) -> list[str]:
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        try:
+            start = lines.index(start_marker) + 1
+        except ValueError:
+            return []
+        try:
+            end = lines.index(end_marker)
+        except ValueError:
+            end = len(lines)
+        return lines[start:end]
+
+    def _clean_list_marker(self, value: str) -> str:
+        text = value.strip()
+        while text and (text[0].isdigit() or text[0] in ".、-• "):
+            text = text[1:].strip()
+        return text
+
+    def _active_tasks_from_week_plan(self, week_plan: str) -> list[str]:
+        body = week_plan.split("：", 1)[1].strip() if "：" in week_plan else week_plan
+        tasks = [
+            item.strip()
+            for item in body.replace("；", "。").replace(";", "。").split("。")
+            if item.strip()
+        ]
+        return tasks[:3] or [week_plan]
 
     def _normalize_context(self, context: UserContext) -> UserContext:
         normalized_plan = self._normalize_work_learning_plan(context)

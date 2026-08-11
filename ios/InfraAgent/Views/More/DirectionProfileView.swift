@@ -379,6 +379,7 @@ struct DirectionProfileView: View {
         weeklyFocus = suggestion.weeklyFocus
         nextAction = suggestion.nextAction
         activeTasksText = suggestion.activeTasks.joined(separator: "\n")
+        applyFirstWeekPlanIfAvailable()
         keywordsText = suggestion.trackingKeywords.joined(separator: "\n")
         fieldsText = suggestion.fields.joined(separator: "\n")
         constraintsText = suggestion.constraints.joined(separator: "\n")
@@ -401,6 +402,7 @@ struct DirectionProfileView: View {
             weeklyFocus = suggestion.weeklyFocus
             nextAction = suggestion.nextAction
             activeTasksText = suggestion.activeTasks.joined(separator: "\n")
+            applyFirstWeekPlanIfAvailable()
             keywordsText = suggestion.trackingKeywords.joined(separator: "\n")
             fieldsText = suggestion.fields.joined(separator: "\n")
             constraintsText = suggestion.constraints.joined(separator: "\n")
@@ -474,6 +476,59 @@ struct DirectionProfileView: View {
             .components(separatedBy: "\n\n")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+
+    private func applyFirstWeekPlanIfAvailable() {
+        guard let weekPlan = firstWeekPlan(from: splitPlanBlocks(fullCyclePlanText)) else { return }
+        weeklyFocus = "本周推进：\(weekPlan)"
+        let action = weekPlanBody(weekPlan)
+        nextAction = action.isEmpty ? "让 Agent 根据本周重点生成候选材料，并先确认一份今天最值得读的主材料。" : action
+        activeTasksText = weekPlanTasks(from: action.isEmpty ? weekPlan : action).joined(separator: "\n")
+    }
+
+    private func firstWeekPlan(from planBlocks: [String]) -> String? {
+        guard let firstPhase = planBlocks.first else { return nil }
+        let executionLines = sectionLines(in: firstPhase, after: "具体执行计划：", before: "产出：")
+        if let weekOne = executionLines.first(where: { line in
+            line.contains("Week 1") || line.contains("第 1 周") || line.contains("第1周")
+        }) {
+            return cleanListMarker(weekOne)
+        }
+        return executionLines.first.map(cleanListMarker)
+    }
+
+    private func sectionLines(in text: String, after startMarker: String, before endMarker: String) -> [String] {
+        let lines = text
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard let start = lines.firstIndex(of: startMarker) else { return [] }
+        let end = lines.firstIndex(of: endMarker) ?? lines.endIndex
+        guard start + 1 < end else { return [] }
+        return Array(lines[(start + 1)..<end])
+    }
+
+    private func cleanListMarker(_ value: String) -> String {
+        var text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        while let first = text.first,
+              first.isNumber || ".、-• ".contains(first) {
+            text.removeFirst()
+            text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return text
+    }
+
+    private func weekPlanBody(_ weekPlan: String) -> String {
+        guard let range = weekPlan.range(of: "：") else { return weekPlan }
+        return String(weekPlan[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func weekPlanTasks(from text: String) -> [String] {
+        let tasks = text
+            .components(separatedBy: CharacterSet(charactersIn: "。；;"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return Array((tasks.isEmpty ? [text] : tasks).prefix(3))
     }
 
     private func nonEmpty(_ value: String, fallback: String) -> String {

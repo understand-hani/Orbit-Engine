@@ -278,6 +278,9 @@ Rules:
 - Adapt to the domain described by the user.
 - If full_cycle_plan is provided, treat it as the user-confirmed plan and generate
   downstream content based on that edited version instead of replacing it.
+- When generating weekly_focus and active_tasks from full_cycle_plan, use only
+  the execution step matching the current week, starting with Week 1 during
+  onboarding. Do not copy an entire phase into weekly_focus.
 - If weekly_focus or active_tasks are provided, preserve that confirmed week-level
   intent and mainly improve downstream retrieval strategy fields.
 - Keep weekly_focus concrete enough to generate search queries this week.
