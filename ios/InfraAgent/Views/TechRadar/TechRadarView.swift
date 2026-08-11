@@ -762,9 +762,47 @@ private struct RadarDecisionCardView: View {
             }
             RadarSummaryLine(title: "发生了什么", value: decision.whatChanged)
             RadarSummaryLine(title: "路由动作", value: decision.route)
+            if !decision.keyPassages.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("原文提取")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    ForEach(decision.keyPassages.prefix(3)) { passage in
+                        RadarInlinePassageCard(passage: passage)
+                    }
+                }
+                .padding(.top, 2)
+            }
             TagRow(tags: [decision.sourceType, "可点开详情"])
         }
         .padding(.vertical, 4)
+    }
+}
+
+private struct RadarInlinePassageCard: View {
+    let passage: RadarKeyPassage
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(passage.title)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.primary)
+            Text(passage.excerpt)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(4)
+            if !passage.analysis.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(passage.analysis)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(3)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(8)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }
 
