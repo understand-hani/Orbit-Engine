@@ -83,7 +83,7 @@ struct TechRadarView: View {
                 }
                 .disabled(isGeneratingRadar)
 
-                Text("Radar 不做候选池；点击后直接生成本轮扫描结果：发生了什么、为什么和我有关、噪音判断和路由动作。")
+                Text("Radar 不做候选池；点击后直接生成本轮扫描结果：摘要、为什么和我有关、噪音判断和路由动作。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -350,18 +350,18 @@ struct TechRadarView: View {
         if !summary.isEmpty {
             passages.append(
                 RadarKeyPassage(
-                    title: "变化摘要",
+                    title: "摘要",
                     excerpt: summary,
-                    analysis: "这是判断是否值得继续追踪的第一层信息：先明确发生了什么，再判断它是否足够具体。"
+                    analysis: "这是 Agent 对当前 Radar 信号的简要概括，用来先判断这条内容是否值得继续看。"
                 )
             )
         }
         if !substance.isEmpty, substance != summary {
             passages.append(
                 RadarKeyPassage(
-                    title: "技术 / 事实内容",
+                    title: "关键信息摘录",
                     excerpt: substance,
-                    analysis: "这段用于区分真实进展和泛泛表述；如果要转 Deep Dive，应优先验证这里的事实、机制或实现细节。"
+                    analysis: "这是 Agent 从当前材料字段中提取出的关键内容；如果要转 Deep Dive，应优先回到原文确认这部分。"
                 )
             )
         }
@@ -679,7 +679,7 @@ private struct RadarInputSheet: View {
             }
 
             Section("Radar 输出") {
-                Text("生成后不会进入候选池，而是直接得到本轮 Radar：每条信号包含发生了什么、为什么相关、噪音判断和路由动作。")
+                Text("生成后不会进入候选池，而是直接得到本轮 Radar：每条信号包含摘要、为什么相关、噪音判断和路由动作。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -760,7 +760,7 @@ private struct RadarDecisionCardView: View {
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
-            RadarSummaryLine(title: "发生了什么", value: decision.whatChanged)
+            RadarSummaryLine(title: "摘要", value: decision.whatChanged)
             RadarSummaryLine(title: "路由动作", value: decision.route)
             TagRow(tags: [decision.sourceType, "可点开详情"])
         }
@@ -787,7 +787,7 @@ private struct RadarDecisionDetailView: View {
             Section("信号判断") {
                 RadarSummaryLine(title: "来源方式", value: decision.sourceType)
                 RadarSummaryLine(title: "来源详情", value: decision.sourceDetail)
-                RadarSummaryLine(title: "发生了什么", value: decision.whatChanged)
+                RadarSummaryLine(title: "摘要", value: decision.whatChanged)
                 RadarSummaryLine(title: "为什么和我有关", value: decision.whyRelevant)
                 RadarSummaryLine(title: "噪音 / 可信度判断", value: decision.noiseJudgement)
             }
@@ -806,7 +806,7 @@ private struct RadarDecisionDetailView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("关键信息段落") {
+            Section("关键信息摘录") {
                 ForEach(decision.keyPassages) { passage in
                     RadarPassageView(passage: passage)
                 }
