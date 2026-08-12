@@ -597,3 +597,5 @@ submission/orbit_engine_value_proposal.pptx
 - [x] Radar smoke 通过：临时数据库中非 Radar 日期显式新建 `tech_radar` session 初始 0 条，点击生成后返回 3 条公开网页行业动态。
 - [x] Radar 关键信息摘录修正：`source_passages` 改为标题信号、摘要摘录、来源与时间、当前目标匹配依据、来源标签 / 类型线索；`excerpt` 只放来源可追溯信息，`analysis` 才放 Agent 解析，避免把 Agent 判断伪装成原文摘录。
 - [x] Radar 关键信息摘录二次修正：`source_passages` 改为优先读取推送链接网页正文，抽取 3-5 条有信息量的原文段落；每条卡片只承载 `excerpt` 原文摘录和 `analysis` Agent 对该段的解析。网页正文无法抓取时才退回 RSS 摘要 / 标题 / 来源线索，并在解析中明确标记为兜底。
+- [x] 修复 Radar「生成本轮 Radar」无反应问题：根因是 8000 端口后端进程为 8/10 启动的旧代码，缺少 8/12 commit `74ceb90` 加入的 `POST /api/sessions/{session_id}/radar/refresh` 路由，返回 404。已重启 8000 后端加载最新代码，并在 8000 / cloudflared tunnel 上验证该端点返回 200 且生成 3 条行业信号。
+- [x] 更新 iOS 默认后端 URL 为当前可用 tunnel：`https://refused-atom-org-soil.trycloudflare.com`（旧默认 `builder-estimates-leads-beneath` 已死，`continuous-ranges-contacted-licence` 返回 530 origin 不可达）。旧 URL 全部加入 legacy 迁移列表，`UserDefaults` 覆盖逻辑仍保留。

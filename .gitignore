@@ -31,6 +31,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# LibreOffice / WPS backup files
+.~*
+
 # Build outputs
 dist/
 build/
