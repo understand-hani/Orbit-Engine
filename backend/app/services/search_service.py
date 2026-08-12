@@ -1,6 +1,9 @@
+import hashlib
+import re
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import List
-from urllib.parse import urlencode
+from urllib.parse import quote_plus, urlencode
 from xml.etree import ElementTree as ET
 
 import httpx
@@ -17,6 +20,7 @@ from app.schemas.source import (
 
 ATOM_NS = "{http://www.w3.org/2005/Atom}"
 ARXIV_NS = "{http://arxiv.org/schemas/atom}"
+RSS_NS = "{http://www.w3.org/2005/Atom}"
 
 
 class SearchService:
@@ -78,6 +82,10 @@ class SearchService:
         items: List[SourceItem] = []
         per_source = max(1, min(max_results, 10))
         try:
+            items.extend(self.search_public_web(query, per_source).items)
+        except Exception as exc:
+            items.append(self._error_item(SourceType.web, query, exc))
+        try:
             items.extend(self.search_arxiv(query, per_source).items)
         except Exception as exc:
             items.append(self._error_item(SourceType.arxiv, query, exc))
@@ -91,24 +99,41 @@ class SearchService:
             fetched_at=datetime.now(timezone.utc),
         )
 
-    def search_product_strategy_sources(self, query: str, max_results: int = 5) -> CombinedSearchResponse:
-        return CombinedSearchResponse(
+    def search_public_web(self, query: str, max_results: int = 5) -> SourceSearchResponse:
+        url = (
+            "https://news.google.com/rss/search?q="
+            + quote_plus(query)
+            + "&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+        )
+        response = httpx.get(
+            url,
+            timeout=self.settings.source_timeout_sec,
+            trust_env=False,
+            headers={"User-Agent": "OrbitEngineRadar/0.1"},
+        )
+        response.raise_for_status()
+        return SourceSearchResponse(
             query=query,
-            items=[
-                SourceItem(
-                    id="web_search_not_configured",
-                    source=SourceType.web,
-                    item_type=SourceItemType.article,
-                    title="Web search provider is not configured",
-                    summary=(
-                        "产品、车企、法规类搜索需要接入搜索 API、RSS 或指定站点源。"
-                        "当前版本不做不稳定网页爬虫。"
-                    ),
-                    tags=["todo", "web_search"],
-                )
-            ][:max_results],
+            source=SourceType.web,
+            items=self._parse_rss(response.text, max_results),
             fetched_at=datetime.now(timezone.utc),
         )
+
+    def search_industry_sources(self, query: str, max_results: int = 5) -> CombinedSearchResponse:
+        items: List[SourceItem] = []
+        per_source = max(1, min(max_results, 10))
+        try:
+            items.extend(self.search_public_web(query, per_source).items)
+        except Exception as exc:
+            items.append(self._error_item(SourceType.web, query, exc))
+        return CombinedSearchResponse(
+            query=query,
+            items=items[: max(1, max_results)],
+            fetched_at=datetime.now(timezone.utc),
+        )
+
+    def search_product_strategy_sources(self, query: str, max_results: int = 5) -> CombinedSearchResponse:
+        return self.search_industry_sources(query, max_results=max_results)
 
     def _parse_arxiv(self, xml_text: str) -> List[SourceItem]:
         root = ET.fromstring(xml_text)
@@ -170,6 +195,38 @@ class SearchService:
             )
         return items
 
+    def _parse_rss(self, xml_text: str, max_results: int) -> List[SourceItem]:
+        root = ET.fromstring(xml_text)
+        items: List[SourceItem] = []
+        channel = root.find("channel")
+        nodes = channel.findall("item") if channel is not None else root.findall(f"{RSS_NS}entry")
+        for node in nodes[:max_results]:
+            title = " ".join(self._text(node, "title").split())
+            link = self._text(node, "link")
+            if not link:
+                link_node = node.find(f"{RSS_NS}link")
+                link = link_node.attrib.get("href", "") if link_node is not None else ""
+            description = self._clean_html(self._text(node, "description") or self._text(node, "summary"))
+            published = self._parse_rss_datetime(self._text(node, "pubDate") or self._text(node, "published"))
+            source_node = node.find("source")
+            source_name = source_node.text.strip() if source_node is not None and source_node.text else ""
+            item_id = hashlib.sha1((link or title).encode("utf-8")).hexdigest()[:16]
+            items.append(
+                SourceItem(
+                    id=item_id,
+                    source=SourceType.web,
+                    item_type=SourceItemType.article,
+                    title=title,
+                    url=link or None,
+                    summary=description,
+                    published_at=published,
+                    updated_at=published,
+                    tags=[tag for tag in ["public_web", source_name] if tag],
+                    extra={"publisher": source_name} if source_name else {},
+                )
+            )
+        return items
+
     def _error_item(self, source: SourceType, query: str, exc: Exception) -> SourceItem:
         return SourceItem(
             id=f"{source.value}_search_error",
@@ -193,3 +250,19 @@ class SearchService:
             return datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
             return None
+
+    def _parse_rss_datetime(self, value: str):
+        if not value:
+            return None
+        try:
+            parsed = parsedate_to_datetime(value)
+            if parsed.tzinfo is None:
+                return parsed.replace(tzinfo=timezone.utc)
+            return parsed
+        except (TypeError, ValueError):
+            return self._parse_datetime(value)
+
+    def _clean_html(self, value: str) -> str:
+        text = re.sub(r"<[^>]+>", " ", value)
+        text = re.sub(r"\s+", " ", text)
+        return text.strip()

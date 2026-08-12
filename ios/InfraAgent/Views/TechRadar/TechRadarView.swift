@@ -219,10 +219,11 @@ struct TechRadarView: View {
     }
 
     private func restoreRadarRunIfNeeded() {
-        guard radarRun == nil, !currentPayload.digest.items.isEmpty else { return }
+        let restorableItems = realRadarItems(currentPayload.digest.items)
+        guard radarRun == nil, !restorableItems.isEmpty else { return }
         radarRun = makeRadarRun(
             input: RadarInput(source: .agent, title: "", url: "", summary: ""),
-            items: currentPayload.digest.items
+            items: restorableItems
         )
     }
 
@@ -265,8 +266,9 @@ struct TechRadarView: View {
     private func radarItems(for input: RadarInput) -> [RadarItem] {
         switch input.source {
         case .agent:
-            if !currentPayload.digest.items.isEmpty {
-                return currentPayload.digest.items
+            let items = realRadarItems(currentPayload.digest.items)
+            if !items.isEmpty {
+                return items
             }
             return [manualRadarItem(input: input, suffix: "agent")]
         case .topic:
@@ -287,6 +289,10 @@ struct TechRadarView: View {
         case .manual:
             return [manualRadarItem(input: input, suffix: "manual")]
         }
+    }
+
+    private func realRadarItems(_ items: [RadarItem]) -> [RadarItem] {
+        items.filter { !$0.id.hasPrefix("mock_") }
     }
 
     private func route(for item: RadarItem, index: Int) -> String {

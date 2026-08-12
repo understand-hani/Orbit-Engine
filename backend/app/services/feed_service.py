@@ -65,12 +65,16 @@ class FeedService:
         target_date: Optional[date] = None,
         task_type: Optional[TaskType] = None,
     ) -> BaseSession:
-        excluded_radar_keys = self._radar_source_keys()
-        session = self.generate_mock_session(
-            target_date,
-            task_type=task_type,
-            excluded_radar_keys=excluded_radar_keys,
-        )
+        seed_session = self.coordinator.create_session(target_date, task_type_override=task_type)
+        if seed_session.task_type == TaskType.tech_radar:
+            session = seed_session
+        else:
+            excluded_radar_keys = self._radar_source_keys()
+            session = self.generate_mock_session(
+                target_date,
+                task_type=task_type,
+                excluded_radar_keys=excluded_radar_keys,
+            )
         if self.sessions.get_by_id(session.id) is not None:
             suffix = uuid4().hex[:8]
             session = session.model_copy(
@@ -98,7 +102,7 @@ class FeedService:
             session.payload,
             excluded_source_keys=excluded_radar_keys,
         )
-        if self._is_mock_technical_payload(payload) and session.payload.digest.items:
+        if not payload.digest.items and self._has_real_radar_items(session):
             payload = session.payload
 
         updated_session = session.model_copy(
@@ -250,10 +254,10 @@ class FeedService:
                     keys.add(f"{item.source}:{item.id}")
         return keys
 
-    def _is_mock_technical_payload(self, payload: TechRadarPayload) -> bool:
-        if not payload.digest.items:
-            return True
-        return all(not item.id.startswith("radar_real_") for item in payload.digest.items)
+    def _has_real_radar_items(self, session: BaseSession) -> bool:
+        if not isinstance(session.payload, TechRadarPayload):
+            return False
+        return any(item.id.startswith("radar_real_") for item in session.payload.digest.items)
 
     def _apply_default_title(self, session: BaseSession, exclude_self: bool = True) -> BaseSession:
         if session.task_type != TaskType.research_feeder:
