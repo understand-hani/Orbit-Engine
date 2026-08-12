@@ -103,10 +103,7 @@ struct TechRadarView: View {
                         NavigationLink {
                             RadarDecisionDetailView(
                                 session: session,
-                                decision: decision,
-                                onArchived: { archivedID in
-                                    removeRadarDecision(id: archivedID)
-                                }
+                                decision: decision
                             )
                         } label: {
                             RadarDecisionCardView(decision: decision)
@@ -206,17 +203,6 @@ struct TechRadarView: View {
             title: "本轮 Radar 扫描",
             summary: radarSummary(input: input, count: decisions.count),
             decisions: decisions
-        )
-    }
-
-    private func removeRadarDecision(id: String) {
-        guard let radarRun else {
-            return
-        }
-        self.radarRun = RadarRun(
-            title: radarRun.title,
-            summary: radarRun.summary,
-            decisions: radarRun.decisions.filter { $0.id != id }
         )
     }
 
@@ -823,18 +809,15 @@ private struct RadarDecisionCardView: View {
 private struct RadarDecisionDetailView: View {
     let session: BaseSession
     let decision: RadarDecision
-    let onArchived: (String) -> Void
 
     @State private var currentMark: String
     @State private var statusMessage: String?
     @State private var isUpdatingMark = false
     private let materialAPI = MaterialAPI()
-    private let checkinAPI = CheckinAPI()
 
-    init(session: BaseSession, decision: RadarDecision, onArchived: @escaping (String) -> Void) {
+    init(session: BaseSession, decision: RadarDecision) {
         self.session = session
         self.decision = decision
-        self.onArchived = onArchived
         _currentMark = State(initialValue: decision.userMark)
     }
 
@@ -910,10 +893,6 @@ private struct RadarDecisionDetailView: View {
                     updateMark("noise", message: "已标记为忽略")
                 }
                 .disabled(isUpdatingMark)
-                Button("归档") {
-                    archiveItem()
-                }
-                .disabled(isUpdatingMark || currentMark == "archived")
                 if let statusMessage {
                     Text(statusMessage)
                         .font(.caption)
@@ -949,41 +928,6 @@ private struct RadarDecisionDetailView: View {
                 statusMessage = message
             } catch {
                 statusMessage = "状态更新失败：\(error.localizedDescription)"
-            }
-            isUpdatingMark = false
-        }
-    }
-
-    private func archiveItem() {
-        isUpdatingMark = true
-        Task {
-            do {
-                let updated = try await materialAPI.archiveRadarItem(
-                    sessionID: session.id,
-                    itemID: decision.id,
-                    archiveNote: "从 Radar 详情页归档。"
-                )
-                _ = try await checkinAPI.create(
-                    CheckinCreate(
-                        sessionID: session.id,
-                        date: session.date,
-                        taskType: session.taskType,
-                        durationMin: 5,
-                        status: "archived",
-                        summary: "已归档 Radar 信号：\(decision.title)",
-                        keyInsight: decision.whyRelevant,
-                        nextAction: "以后可以从归档区找回这条 Radar 信号，再决定是否转入 Deep Dive。",
-                        sourceTitle: decision.title,
-                        sourceURL: decision.sourceURL,
-                        sourceSummary: decision.introduction,
-                        userNotes: "来源方式：\(decision.sourceType)\n来源详情：\(decision.sourceDetail)\n噪音判断：\(decision.noiseJudgement)\n路由动作：\(decision.route)"
-                    )
-                )
-                currentMark = updated.userMark
-                statusMessage = "已归档这条 Radar 推送，可在归档页查看。"
-                onArchived(decision.id)
-            } catch {
-                statusMessage = "归档失败：\(error.localizedDescription)"
             }
             isUpdatingMark = false
         }
