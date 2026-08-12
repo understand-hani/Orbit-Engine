@@ -263,9 +263,16 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] Radar 详情展示原文 / 材料入口：URL 可打开原文，PDF / 手动材料 / Agent 扫描显示当前可追溯来源说明。
 - [x] Radar 详情展示关键信息段落提取与 Agent 解析，先基于当前 payload metadata 生成；真实网页/PDF 正文抽取后续接后端。
 - [x] Radar 详情支持 `Radar Check-in`，可把当前信号判断、关键洞察和下一步行动保存到归档。
-- [x] Radar 的 `归档` 和 `保存到归档` 需要真实写入归档页：归档按钮写入 archived 暂存卡片，Check-in 写入 completed 归档记录。
+- [x] Radar 归档入口统一收敛到 `保存到归档`，避免上方 `归档` 按钮和 Check-in 归档语义重复。
 - [x] Radar 页面显示 `Agent 能做什么`：根据计划和归档发现值得追踪的新信号，帮助用户决定是否进入 Deep Dive。
 - [x] Radar 结果先只支持查看、转 Deep Dive / 暂存决策，不做完整信号 CRUD。
+- [ ] Radar 真实外部检索闭环：基于 UserContext、全周期计划、本周计划、tracking keywords 和材料源偏好，自动生成 3-5 个检索 query。
+- [ ] Radar 接入真实公开源：优先支持 arXiv、GitHub、官方博客 / release notes、指定 URL；先做技术源，产品 / 法规 / 新闻源后续扩展。
+- [ ] Radar 原文抓取与摘录：从网页、论文摘要、GitHub release 或官方文档中抽取 3-5 条 `source_passages`，每条包含 excerpt、source_url、location 和 Agent analysis。
+- [ ] Radar 去重和噪音过滤：过滤重复新闻、纯营销稿、股票 / 销量消息和无技术细节内容，只保留与当前计划有关的信号。
+- [ ] Radar 排序和路由：按与本周计划关系、证据强度、可行动性和噪音程度排序，并输出 `转 Deep Dive / 暂存 / 忽略` 的理由。
+- [ ] Radar 状态列表展示：在 Radar 工作区或归档页能查看 `track_later`、`noise`、`deep_dive`、`archived` 的单条 Radar item，而不是只能在详情页看到状态。
+- [ ] Radar 定时 / 手动刷新策略：明确当前竞赛版是点击生成，后续版本再接固定节奏自动拉取和推送。
 - [ ] Today / Manual 中的 `Weekly Studio` 入口进入原生轻量工作区。
 - [ ] Weekly Studio 工作区显示本周重点、当前任务、已完成/未完成归档摘要和下周候选动作。
 - [ ] Weekly Studio 支持 `新建 Weekly Studio`，生成一份轻量周复盘草稿：本周完成、卡点、下周 3 个优先任务。
