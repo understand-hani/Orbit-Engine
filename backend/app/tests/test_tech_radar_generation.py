@@ -8,6 +8,7 @@ from app.db.migrations import init_db
 from app.schemas.common import TaskType
 from app.schemas.source import CombinedSearchResponse, SourceItem, SourceItemType, SourceType
 from app.schemas.user_context import PersonalProfile, UserContext, UserPreference, WorkLearningPlan
+from app.agents.tech_radar_agent import MockTechRadarAgent
 from app.services.feed_service import FeedService
 from app.services.user_context_service import UserContextService
 
@@ -82,6 +83,28 @@ def test_saved_tech_radar_sessions_exclude_previous_source_urls():
         get_settings.cache_clear()
 
 
+def test_tech_radar_override_creates_empty_radar_session_on_non_radar_date():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_radar_override_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        session = FeedService().generate_and_save_mock_session(
+            date(2026, 8, 12),
+            task_type=TaskType.tech_radar,
+        )
+
+        assert session.task_type == TaskType.tech_radar
+        assert session.payload.digest.items == []
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
 def test_tech_radar_uses_user_goal_for_queries_and_relevance():
     original_path = os.environ.get("DATABASE_PATH")
     db_path = Path(tempfile.mkdtemp()) / "infra_radar_user_goal_test.db"
@@ -132,6 +155,21 @@ def test_tech_radar_uses_user_goal_for_queries_and_relevance():
         else:
             os.environ["DATABASE_PATH"] = original_path
         get_settings.cache_clear()
+
+
+def test_radar_relevance_allows_industry_signal_without_exact_goal_sentence():
+    agent = MockTechRadarAgent()
+    source_item = SourceItem(
+        id="web_001",
+        source=SourceType.web,
+        item_type=SourceItemType.article,
+        title="某金融科技公司发布新一代风控产品",
+        url="https://example.com/fintech-risk-product",
+        summary="该产品面向证券机构，提供平台化风险管理能力。",
+        tags=["public_web"],
+    )
+
+    assert agent._is_relevant_source(source_item, ["量化交易风控平台"])
 
 
 def test_tech_radar_refresh_does_not_fallback_to_mock_items():

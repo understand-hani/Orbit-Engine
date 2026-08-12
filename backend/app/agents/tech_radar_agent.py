@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import re
 from typing import List, Optional, Set
 
 from app.schemas.source import SourceItem, SourceItemType, SourceType
@@ -122,29 +123,80 @@ class MockTechRadarAgent:
                 str(source_item.extra.get("publisher", "")),
             ]
         ).lower()
-        meaningful_context = [term.lower() for term in radar_context if len(term.strip()) >= 2]
+        meaningful_context = self._context_match_terms(radar_context)
         if not meaningful_context:
             return any(term in haystack for term in GENERIC_INDUSTRY_TERMS)
-        return any(term in haystack for term in meaningful_context)
+        return any(term in haystack for term in meaningful_context) or any(
+            term in haystack for term in GENERIC_INDUSTRY_TERMS
+        )
+
+    def _context_match_terms(self, radar_context: List[str]) -> List[str]:
+        terms: List[str] = []
+        for value in radar_context:
+            lowered = value.lower().strip()
+            if not lowered:
+                continue
+            terms.append(lowered)
+            terms.extend(re.findall(r"[a-z0-9][a-z0-9\-/+.]{2,}", lowered))
+            for chunk in re.findall(r"[\u4e00-\u9fff]{2,}", lowered):
+                if len(chunk) <= 8:
+                    terms.append(chunk)
+                    continue
+                for size in (4, 3):
+                    terms.extend(chunk[index : index + size] for index in range(0, len(chunk) - size + 1))
+        stop_terms = {"当前", "目标", "计划", "本周", "材料", "生成", "记录", "观察", "行业", "动态", "平台"}
+        return self._dedupe_terms(
+            [term for term in terms if len(term) >= 2 and term not in stop_terms]
+        )
 
     def _industry_queries(self, payload: TechRadarPayload, radar_context: List[str]) -> List[str]:
         topics = [topic.strip() for topic in payload.scope.topics if topic.strip()]
         companies = [company.strip() for company in payload.scope.companies if company.strip()]
         research_groups = [group.strip() for group in payload.scope.research_groups if group.strip()]
-        seeds = radar_context[:5] + topics[:3] + companies[:3] + research_groups[:2]
+        seeds = self._query_seed_terms(radar_context)[:8] + topics[:3] + companies[:3] + research_groups[:2]
         seeds = self._dedupe_terms(seeds)
         if not seeds:
             seeds = ["AI industry research product release", "technology platform university lab"]
         queries: List[str] = []
         for seed in seeds:
-            queries.extend(
-                [
-                    f"{seed} product release research lab company",
-                    f"{seed} university research institute platform breakthrough",
-                    f"{seed} industry news public report",
-                ]
-            )
+            if self._has_cjk(seed):
+                queries.extend(
+                    [
+                        seed,
+                        f"{seed} 发布 产品 研究院 公司",
+                        f"{seed} 大学 研究机构 平台 成果",
+                        f"{seed} 新闻 行业动态",
+                    ]
+                )
+            else:
+                queries.extend(
+                    [
+                        seed,
+                        f"{seed} product release research lab company",
+                        f"{seed} university research institute platform breakthrough",
+                        f"{seed} industry news public report",
+                    ]
+                )
         return queries[:6]
+
+    def _query_seed_terms(self, radar_context: List[str]) -> List[str]:
+        seeds: List[str] = []
+        for value in radar_context:
+            cleaned = value.strip()
+            if not cleaned:
+                continue
+            lowered = cleaned.lower()
+            if "week " not in lowered and len(cleaned) <= 18:
+                seeds.append(cleaned)
+        seeds.extend(self._context_match_terms(radar_context))
+        return [
+            seed
+            for seed in self._dedupe_terms(seeds)
+            if seed not in GENERIC_INDUSTRY_TERMS and len(seed) >= 2
+        ]
+
+    def _has_cjk(self, value: str) -> bool:
+        return bool(re.search(r"[\u4e00-\u9fff]", value))
 
     def _radar_context_terms(
         self,

@@ -338,6 +338,9 @@ struct SessionQueueView: View {
     }
 
     private func taskTypeOverrideForNewSession() -> TaskType? {
+        if seedSession.taskType == .techRadar {
+            return .techRadar
+        }
         if seedSession.taskType == .researchFeeder && !isWeeklyStudio(seedSession) {
             return .researchFeeder
         }

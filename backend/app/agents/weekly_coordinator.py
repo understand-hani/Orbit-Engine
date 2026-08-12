@@ -72,6 +72,16 @@ class WeeklyCoordinator:
         target_date: date,
         task_type_override: Optional[TaskType] = None,
     ) -> Dict:
+        if task_type_override == TaskType.tech_radar:
+            return {
+                "task_type": TaskType.tech_radar,
+                "session_mode": SessionMode.manual,
+                "title": "技术雷达",
+                "subtitle": "根据用户目标扫描公开行业动态、机构成果、平台与产品信号",
+                "suggested_action": SuggestedAction.generate_weekly_radar,
+                "radar_type": RadarType.technical_method_radar,
+            }
+
         if task_type_override == TaskType.research_feeder:
             return {
                 "task_type": TaskType.research_feeder,
