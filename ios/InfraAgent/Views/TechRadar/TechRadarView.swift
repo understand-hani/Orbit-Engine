@@ -405,80 +405,24 @@ struct TechRadarView: View {
                     title: passage.title.isEmpty ? "关键段落" : passage.title,
                     excerpt: passage.excerpt,
                     analysis: passage.analysis,
+                    suggestion: passage.suggestion,
                     sourceURL: passage.sourceURL,
                     location: passage.location
                 )
             }
         }
 
-        let substance = item.technicalSubstance.trimmingCharacters(in: .whitespacesAndNewlines)
-        let visualEvidence = item.visuals
-            .map { "\($0.caption)（来源：\($0.source)）" }
-            .joined(separator: "\n")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let sourceEvidence = [
-            item.source.isEmpty ? "" : "来源：\(item.source)",
-            item.signalType.isEmpty ? "" : "信号类型：\(item.signalType)",
-            item.url?.absoluteString ?? "",
-        ]
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
-        let tagEvidence = item.tags.isEmpty ? "" : "标签：\(item.tags.joined(separator: "、"))"
-        let depthEvidence = item.recommendedDepth.isEmpty ? "" : "建议处理深度：\(item.recommendedDepth)"
-
-        var passages: [RadarKeyPassage] = []
-        appendPassage(
-            to: &passages,
-            excerpt: substance,
-            analysis: "这是 Agent 从当前 Radar 材料字段中抽出的核心信息。进入 Deep Dive 前，应优先回到原文确认这段是否有足够事实、方法或数据支撑。"
-        )
-        appendPassage(
-            to: &passages,
-            excerpt: sourceEvidence,
-            analysis: "这是用于定位原始材料的来源线索。它帮助判断这条推送是论文、开源项目、产品发布、新闻还是手动材料。"
-        )
-        appendPassage(
-            to: &passages,
-            excerpt: visualEvidence,
-            analysis: "这是 Agent 记录的图像、视频、图表或方法图线索。视觉材料适合用来快速判断这条信号是否值得进一步打开原文。"
-        )
-        appendPassage(
-            to: &passages,
-            excerpt: tagEvidence,
-            analysis: "这是 Agent 给这条推送打上的主题标签，用来判断它和当前 Radar 方向、后续 Deep Dive 队列的关系。"
-        )
-        appendPassage(
-            to: &passages,
-            excerpt: depthEvidence,
-            analysis: "这是 Agent 对处理深度的判断，用来决定这条推送应该略读、暂存，还是转入 Deep Dive。"
-        )
-
-        while passages.count < 3 {
-            passages.append(
-                RadarKeyPassage(
-                    title: "关键段落 \(passages.count + 1)",
-                    excerpt: "当前后端还没有返回更多原文正文摘录。需要接入网页/PDF 正文抽取后，才能在这里补齐更多一手段落。",
-                    analysis: "这是一条占位摘录，用来明确当前数据缺口：Radar 已有结构化判断，但还没有足够的一手正文片段。",
-                    sourceURL: nil,
-                    location: ""
-                )
-            )
-        }
-        return Array(passages.prefix(5))
-    }
-
-    private func appendPassage(to passages: inout [RadarKeyPassage], excerpt: String, analysis: String) {
-        let trimmed = excerpt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        passages.append(
+        // 旧 session 无 source_passages 时的兜底：给出一条失败说明，而不是拼装占位卡片。
+        return [
             RadarKeyPassage(
-                title: "关键段落 \(passages.count + 1)",
-                excerpt: trimmed,
-                analysis: analysis,
-                sourceURL: nil,
-                location: ""
+                title: "原文正文抓取失败",
+                excerpt: "Agent 未能读取该推送的完整正文，无法从原文提取关键段落。",
+                analysis: "当前只能依据 RSS 摘要 / 标题 / 来源信息判断主题方向，这些信息不能替代原文事实。",
+                suggestion: "建议打开原文链接确认核心内容；如果链接失效，可把这条信号登记为手动材料，或粘贴原文 URL 重新扫描。",
+                sourceURL: item.url,
+                location: "web page fetch failed"
             )
-        )
+        ]
     }
 
     private func manualRadarItem(
@@ -678,6 +622,7 @@ private struct RadarKeyPassage: Identifiable {
     let title: String
     let excerpt: String
     let analysis: String
+    let suggestion: String
     let sourceURL: URL?
     let location: String
 }
@@ -1022,7 +967,7 @@ private struct RadarPassageCardView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(3)
-            Text("点击查看完整摘录和 Agent 解析")
+            Text("点击查看原文摘录、Agent 解析和建议")
                 .font(.caption)
                 .foregroundStyle(.blue)
         }
@@ -1039,7 +984,7 @@ private struct RadarPassageDetailView: View {
 
     var body: some View {
         List {
-            Section("Agent 摘录") {
+            Section("Agent 提取的原文") {
                 if let url = passage.sourceURL {
                     Link(destination: url) {
                         Label("打开来源", systemImage: "safari")
@@ -1055,6 +1000,12 @@ private struct RadarPassageDetailView: View {
 
             Section("Agent 解析") {
                 Text(passage.analysis)
+                    .font(.subheadline)
+                    .textSelection(.enabled)
+            }
+
+            Section("对用户的建议") {
+                Text(passage.suggestion.isEmpty ? "当前没有针对该段的额外建议。" : passage.suggestion)
                     .font(.subheadline)
                     .textSelection(.enabled)
             }

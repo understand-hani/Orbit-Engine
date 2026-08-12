@@ -163,6 +163,7 @@ struct RadarSourcePassage: Codable, Identifiable {
     let title: String
     let excerpt: String
     let analysis: String
+    let suggestion: String
     let sourceURL: URL?
     let location: String
 
@@ -171,8 +172,38 @@ struct RadarSourcePassage: Codable, Identifiable {
         case title
         case excerpt
         case analysis
+        case suggestion
         case sourceURL = "source_url"
         case location
+    }
+
+    init(
+        id: String,
+        title: String,
+        excerpt: String,
+        analysis: String,
+        suggestion: String = "",
+        sourceURL: URL? = nil,
+        location: String = ""
+    ) {
+        self.id = id
+        self.title = title
+        self.excerpt = excerpt
+        self.analysis = analysis
+        self.suggestion = suggestion
+        self.sourceURL = sourceURL
+        self.location = location
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        title = try container.decodeIfPresent(String.self, forKey: .title) ?? ""
+        excerpt = try container.decode(String.self, forKey: .excerpt)
+        analysis = try container.decodeIfPresent(String.self, forKey: .analysis) ?? ""
+        suggestion = try container.decodeIfPresent(String.self, forKey: .suggestion) ?? ""
+        sourceURL = try container.decodeIfPresent(URL.self, forKey: .sourceURL)
+        location = try container.decodeIfPresent(String.self, forKey: .location) ?? ""
     }
 }
 

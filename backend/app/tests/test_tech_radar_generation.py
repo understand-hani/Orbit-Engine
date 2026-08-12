@@ -201,15 +201,19 @@ def test_radar_source_passages_separate_excerpt_and_agent_analysis():
     passages = agent._source_passages(source_item, source_item.summary, ["量化交易风控平台"])
 
     assert len(passages) >= 3
-    assert passages[0].title == "原文摘录 1"
     assert "原文第一段" in passages[0].excerpt
     assert "Agent" not in passages[0].excerpt
     assert passages[0].analysis
     assert "产品" in passages[0].analysis or "平台" in passages[0].analysis
-    assert all(passage.title.startswith("原文摘录") for passage in passages)
+    # title 改为段落主旨短句，不再是固定编号
+    assert passages[0].title != "原文摘录 1"
+    assert len(passages[0].title) <= 32
+    # 每条 passage 带针对性建议
+    assert all(passage.suggestion for passage in passages)
+    assert "建议" in passages[0].suggestion
 
 
-def test_radar_source_passages_fallback_to_rss_when_page_unreadable():
+def test_radar_source_passages_fallback_to_fetch_failed_note_when_page_unreadable():
     agent = MockTechRadarAgent(search_service=EmptyPassageSearchService())
     source_item = SourceItem(
         id="web_003",
@@ -225,11 +229,11 @@ def test_radar_source_passages_fallback_to_rss_when_page_unreadable():
 
     passages = agent._source_passages(source_item, source_item.summary, ["量化交易风控平台"])
 
-    assert len(passages) >= 3
-    assert passages[0].title == "RSS 摘要摘录"
-    assert passages[0].excerpt == source_item.summary
-    assert "兜底摘录" in passages[0].analysis
-    assert any(passage.title == "来源线索摘录" for passage in passages)
+    assert len(passages) == 1
+    assert passages[0].title == "原文正文抓取失败"
+    assert "无法从原文提取关键段落" in passages[0].excerpt
+    assert "建议打开原文链接" in passages[0].suggestion
+    assert passages[0].source_url is not None
 
 
 def test_tech_radar_refresh_does_not_fallback_to_mock_items():

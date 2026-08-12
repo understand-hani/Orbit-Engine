@@ -328,31 +328,30 @@ class MockTechRadarAgent:
     ) -> List[RadarSourcePassage]:
         passages: List[RadarSourcePassage] = []
         page_passages = self._fetch_source_page_passages(source_item)
-        for index, excerpt in enumerate(page_passages[:5], start=1):
-            self._append_source_passage(
-                passages,
-                source_item,
-                title=f"原文摘录 {index}",
-                excerpt=excerpt,
-                analysis=self._passage_analysis(source_item, excerpt, radar_context),
-                location=f"web page paragraph {index}",
-            )
-
-        if len(passages) >= 3:
+        if page_passages:
+            for index, excerpt in enumerate(page_passages[:5], start=1):
+                self._append_source_passage(
+                    passages,
+                    source_item,
+                    title=self._passage_title(excerpt, index),
+                    excerpt=excerpt,
+                    analysis=self._passage_analysis(source_item, excerpt, radar_context),
+                    suggestion=self._passage_suggestion(source_item, excerpt, radar_context),
+                    location=f"web page paragraph {index}",
+                )
             return passages[:5]
 
-        for title, excerpt, location in self._fallback_passage_inputs(source_item, summary):
-            self._append_source_passage(
-                passages,
-                source_item,
-                title=title,
-                excerpt=excerpt,
-                analysis=self._fallback_passage_analysis(title, source_item, excerpt),
-                location=location,
+        return [
+            RadarSourcePassage(
+                id=f"{source_item.id}_fetch_failed".replace("/", "_"),
+                title="原文正文抓取失败",
+                excerpt="Agent 未能读取该推送的完整正文，无法从原文提取关键段落。",
+                analysis="当前只能依据 RSS 摘要 / 标题 / 来源信息判断主题方向，这些信息不能替代原文事实。",
+                suggestion="建议打开原文链接确认核心内容；如果链接失效，可把这条信号登记为手动材料，或粘贴原文 URL 重新扫描。",
+                source_url=source_item.url,
+                location="web page fetch failed",
             )
-            if len(passages) >= 3:
-                break
-        return passages[:5]
+        ]
 
     def _fetch_source_page_passages(self, source_item: SourceItem) -> List[str]:
         if not source_item.url:
@@ -362,6 +361,46 @@ class MockTechRadarAgent:
         except Exception:
             return []
 
+    def _passage_title(self, excerpt: str, index: int) -> str:
+        cleaned = " ".join(excerpt.split())
+        if not cleaned:
+            return f"关键段落 {index}"
+        sentence = re.split(r"[。！？!?]", cleaned)[0].strip()
+        if not sentence:
+            sentence = cleaned
+        if len(sentence) > 30:
+            return sentence[:29].rstrip() + "…"
+        return sentence
+
+    def _passage_suggestion(
+        self,
+        source_item: SourceItem,
+        excerpt: str,
+        radar_context: List[str],
+    ) -> str:
+        text = " ".join([source_item.title, excerpt]).lower()
+        matched_terms = [
+            term
+            for term in self._display_context_terms(radar_context)
+            if term.lower() in text
+        ]
+        compacted_terms = self._compact_overlapping_terms(matched_terms)
+        related = ""
+        if compacted_terms:
+            related = " 这段与当前方向中的「" + "、".join(compacted_terms[:4]) + "」直接相关，建议优先核对它是否改变当前计划。"
+
+        if self._contains_any(text, ["融资", "股价", "营收", "market share", "funding", "stock", "revenue"]):
+            base = "建议：先忽略估值和热度，确认是否有真实产品、成果或技术证据，再决定是否转入 Deep Dive。"
+        elif self._contains_any(text, ["发布", "推出", "上线", "product", "launch", "release", "platform"]):
+            base = "建议：确认该产品 / 平台动作的边界和可验证来源（官网、文档、示例），值得时转入 Deep Dive 读原文。"
+        elif self._contains_any(text, ["大学", "研究院", "实验室", "团队", "university", "institute", "lab", "researchers"]):
+            base = "建议：优先确认机构 / 团队来源和发布时间，判断它是否代表研发主体的正式动作。"
+        elif self._contains_any(text, ["实验", "测试", "benchmark", "sota", "performance", "dataset", "评估", "指标"]):
+            base = "建议：这段包含实验 / 评估证据，转入 Deep Dive 时应优先核对指标、数据集和对比对象。"
+        else:
+            base = "建议：先打开原文确认它具体解决什么问题、由谁发布、证据是否充分，再决定是否进入本周任务。"
+        return base + related
+
     def _append_source_passage(
         self,
         passages: List[RadarSourcePassage],
@@ -369,6 +408,7 @@ class MockTechRadarAgent:
         title: str,
         excerpt: str,
         analysis: str,
+        suggestion: str,
         location: str,
     ) -> None:
         cleaned = excerpt.strip()
@@ -381,22 +421,11 @@ class MockTechRadarAgent:
                 title=title,
                 excerpt=cleaned,
                 analysis=analysis,
+                suggestion=suggestion,
                 source_url=source_item.url,
                 location=location,
             )
         )
-
-    def _summary_analysis(self, source_item: SourceItem, summary: str) -> str:
-        if source_item.source == SourceType.web:
-            return (
-                "这是公开网页/RSS 摘要，不等同于完整正文。它适合初筛这条动态是否涉及产品发布、机构动作、"
-                "研发成果或平台变化；下一步需要打开原文确认细节和证据。"
-            )
-        if source_item.source == SourceType.arxiv:
-            return "这是论文摘要，可用于初步判断问题定义、方法假设和实验对象，但仍需要阅读全文确认贡献与局限。"
-        if source_item.source == SourceType.github:
-            return "这是仓库描述，可用于判断项目主题和工程入口，但需要进一步检查 README、release、commit 和 issue 活跃度。"
-        return "这是来源摘要，可用于初筛材料价值，但不能替代原文阅读。"
 
     def _passage_analysis(
         self,
@@ -430,42 +459,6 @@ class MockTechRadarAgent:
     def _contains_any(self, text: str, needles: List[str]) -> bool:
         return any(needle.lower() in text for needle in needles)
 
-    def _fallback_passage_inputs(self, source_item: SourceItem, summary: str):
-        return [
-            ("RSS 摘要摘录", summary, f"{source_item.source.value} description"),
-            ("标题摘录", source_item.title, f"{source_item.source.value} title"),
-            ("来源线索摘录", self._source_metadata_text(source_item), "source metadata"),
-        ]
-
-    def _fallback_passage_analysis(self, title: str, source_item: SourceItem, excerpt: str) -> str:
-        if title == "RSS 摘要摘录":
-            return (
-                "未能稳定抓取原网页正文时，Agent 暂用 RSS/搜索摘要作为兜底摘录。"
-                "它只能用于初筛，不能替代打开原文确认关键段落。"
-            )
-        if title == "标题摘录":
-            return "这是标题级事实线索，只能判断主题方向，不能证明材料中有实质技术、产品或成果细节。"
-        return "这是来源和时间线索，用于辅助判断可信度与时效性；正文抓取恢复后应以原文段落为准。"
-
-    def _matched_context_text(self, source_item: SourceItem, radar_context: List[str]) -> str:
-        haystack = " ".join(
-            [
-                source_item.title,
-                source_item.summary,
-                " ".join(source_item.tags),
-                str(source_item.extra.get("publisher", "")),
-            ]
-        ).lower()
-        matched = [
-            term
-            for term in self._display_context_terms(radar_context)
-            if term.lower() in haystack
-        ]
-        matched = self._compact_overlapping_terms(matched)
-        if matched:
-            return "命中用户目标关键词：" + "、".join(matched[:8])
-        return "未命中明确用户关键词，但命中了产品 / 平台 / 发布 / 公司 / 大学 / 研究院 / 成果等通用行业动态线索。"
-
     def _compact_overlapping_terms(self, terms: List[str]) -> List[str]:
         compacted: List[str] = []
         for term in sorted(self._dedupe_terms(terms), key=len, reverse=True):
@@ -489,35 +482,3 @@ class MockTechRadarAgent:
             [term for term in terms if len(term) >= 2 and term not in stop_terms]
         )
 
-    def _source_tag_text(self, source_item: SourceItem) -> str:
-        tags = [tag for tag in source_item.tags[:8] if tag]
-        if not tags:
-            return ""
-        return "、".join(tags)
-
-    def _verification_analysis(self, source_item: SourceItem) -> str:
-        if source_item.source == SourceType.web:
-            return "打开原文后确认：具体是哪家机构/平台/企业，发布了什么产品、成果或动作，是否有技术细节、时间、场景和证据。"
-        if source_item.source == SourceType.arxiv:
-            return "打开论文后确认：核心问题、方法差异、实验支撑和局限是否足够清楚，再判断是否进入精读。"
-        if source_item.source == SourceType.github:
-            return "打开仓库后确认：README、release、demo、benchmark 和维护状态是否足够支撑当前计划。"
-        return "打开来源后确认：这条材料是否有明确事实、来源、时间、证据和与当前目标的关系。"
-
-    def _source_metadata_text(self, source_item: SourceItem) -> str:
-        lines = [f"来源：{source_item.source.value}", f"类型：{self._signal_type(source_item)}"]
-        if source_item.authors:
-            lines.append(f"作者：{'、'.join(source_item.authors[:5])}")
-        if source_item.published_at:
-            lines.append(f"发布时间：{source_item.published_at.date().isoformat()}")
-        if source_item.updated_at:
-            lines.append(f"更新时间：{source_item.updated_at.date().isoformat()}")
-        if source_item.extra:
-            details = []
-            for key in ["publisher", "publisher_url", "stars", "forks", "language", "pdf_url"]:
-                value = source_item.extra.get(key)
-                if value:
-                    details.append(f"{key}={value}")
-            if details:
-                lines.append("补充信息：" + "，".join(details))
-        return "\n".join(lines)

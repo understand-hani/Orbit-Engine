@@ -599,3 +599,7 @@ submission/orbit_engine_value_proposal.pptx
 - [x] Radar 关键信息摘录二次修正：`source_passages` 改为优先读取推送链接网页正文，抽取 3-5 条有信息量的原文段落；每条卡片只承载 `excerpt` 原文摘录和 `analysis` Agent 对该段的解析。网页正文无法抓取时才退回 RSS 摘要 / 标题 / 来源线索，并在解析中明确标记为兜底。
 - [x] 修复 Radar「生成本轮 Radar」无反应问题：根因是 8000 端口后端进程为 8/10 启动的旧代码，缺少 8/12 commit `74ceb90` 加入的 `POST /api/sessions/{session_id}/radar/refresh` 路由，返回 404。已重启 8000 后端加载最新代码，并在 8000 / cloudflared tunnel 上验证该端点返回 200 且生成 3 条行业信号。
 - [x] 更新 iOS 默认后端 URL 为当前可用 tunnel：`https://refused-atom-org-soil.trycloudflare.com`（旧默认 `builder-estimates-leads-beneath` 已死，`continuous-ranges-contacted-licence` 返回 530 origin 不可达）。旧 URL 全部加入 legacy 迁移列表，`UserDefaults` 覆盖逻辑仍保留。
+- [x] Radar 详情页「关键信息摘录」改造：卡片改为展示 Agent 从推送原文提取的关键段落（3-5 个），卡片标题用段落主旨短句；点开卡片显示三部分：`Agent 提取的原文`（excerpt + 打开来源链接）、`Agent 解析`（analysis）、`对用户的建议`（suggestion）。
+- [x] 后端 `RadarSourcePassage` 新增 `suggestion` 字段；`_source_passages` 重写：原文正文抓取成功时生成主旨标题 + excerpt + analysis + suggestion（suggestion 结合当前方向关键词和段落类型生成针对性建议）；抓取失败时不再 fallback 到 RSS 摘要 / 标题 / 来源线索，改为单条「原文正文抓取失败」说明并提示打开原文链接。
+- [x] iOS `TechRadar.swift` 的 `RadarSourcePassage` 增加 `suggestion`；`TechRadarView.swift` 的 `keyPassages` / `RadarPassageCardView` / `RadarPassageDetailView` 同步更新；旧 session 无 source_passages 时给出失败说明而非拼装占位卡片。
+- [!] Google News RSS 跳转链接（news.google.com/rss/articles/...）正文抓取不稳定，当前实际生成结果多为「原文正文抓取失败」；真实段落展示需要更稳定的公开源或网页正文抓取增强，已列入 roadmap。

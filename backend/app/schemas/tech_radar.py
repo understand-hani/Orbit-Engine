@@ -46,6 +46,7 @@ class RadarSourcePassage(BaseModel):
     title: str = ""
     excerpt: str
     analysis: str = ""
+    suggestion: str = ""
     source_url: Optional[HttpUrl] = None
     location: str = ""
 
