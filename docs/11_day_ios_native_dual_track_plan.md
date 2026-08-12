@@ -272,7 +272,8 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] Radar 无 mock fallback：公开源检索失败或过滤后为空时返回空结果和失败说明，不再把样例 mock 材料伪装成真实推送。
 - [x] Radar 跨 session 去重 v0：生成 Radar 时排除历史已推送 URL，避免连续新建多个 Radar 时优先生成同一批材料。
 - [ ] Radar 接入更多真实公开源：继续补官方博客 / release notes、指定 URL、公众号公开网页、机构官网；arXiv / GitHub 后续作为技术证据补充源，而不是默认主推送源。
-- [ ] Radar 原文抓取与摘录：从网页、论文摘要、GitHub release 或官方文档中抽取 3-5 条 `source_passages`，每条包含 excerpt、source_url、location 和 Agent analysis。
+- [x] Radar 原文抓取与摘录 v0：从公开网页 / 新闻 RSS 的 title、description、publisher、发布时间和用户目标命中词生成 3-5 条 `source_passages`，严格区分来源摘录 `excerpt` 和 Agent 解析 `analysis`。
+- [ ] Radar 原文正文抓取增强：继续支持打开真实网页正文、官方文档、GitHub release 和论文摘要，补充更细的段落位置、正文摘录和引用定位。
 - [ ] Radar 去重和噪音过滤增强：过滤重复新闻、纯营销稿、股票 / 销量消息、偏题泛科技内容和无实质产品 / 成果 / 机构动作的内容，只保留与用户当前目标有关的行业信号。
 - [ ] Radar 跨 session 去重增强：生成新 Radar 时继续补齐 source id、标题相似度、已归档、已忽略、已转 Deep Dive 的排除逻辑。
 - [ ] Radar 增量检索：按 published / updated 时间过滤新论文、新 repo release 和官方更新，支持每天固定节奏只推新增信号。
@@ -594,3 +595,4 @@ submission/orbit_engine_value_proposal.pptx
 - [x] Radar 空结果问题修正：中文长目标会拆成更短的可检索关键词，中文 query 使用中文行业动态后缀，避免中英混拼导致 Google News RSS 返回 0 条。
 - [x] Radar mock 问题修正：公开源失败时返回空结果和说明，不再 fallback 到 mock；旧 session 中的 `mock_` item 在 iOS 侧过滤不展示。
 - [x] Radar smoke 通过：临时数据库中非 Radar 日期显式新建 `tech_radar` session 初始 0 条，点击生成后返回 3 条公开网页行业动态。
+- [x] Radar 关键信息摘录修正：`source_passages` 改为标题信号、摘要摘录、来源与时间、当前目标匹配依据、来源标签 / 类型线索；`excerpt` 只放来源可追溯信息，`analysis` 才放 Agent 解析，避免把 Agent 判断伪装成原文摘录。

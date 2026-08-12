@@ -172,6 +172,33 @@ def test_radar_relevance_allows_industry_signal_without_exact_goal_sentence():
     assert agent._is_relevant_source(source_item, ["量化交易风控平台"])
 
 
+def test_radar_source_passages_separate_excerpt_and_agent_analysis():
+    agent = MockTechRadarAgent()
+    source_item = SourceItem(
+        id="web_002",
+        source=SourceType.web,
+        item_type=SourceItemType.article,
+        title="某金融科技公司发布新一代风控产品",
+        url="https://example.com/fintech-risk-product",
+        summary="该产品面向证券机构，提供平台化风险管理能力。",
+        published_at=datetime(2026, 8, 12, tzinfo=timezone.utc),
+        tags=["public_web", "金融科技日报"],
+        extra={"publisher": "金融科技日报", "publisher_url": "https://example.com"},
+    )
+
+    passages = agent._source_passages(source_item, source_item.summary, ["量化交易风控平台"])
+
+    assert len(passages) >= 3
+    assert passages[0].title == "标题信号"
+    assert passages[0].excerpt == source_item.title
+    assert passages[1].title == "摘要摘录"
+    assert passages[1].excerpt == source_item.summary
+    assert "Agent" not in passages[1].excerpt
+    assert passages[1].analysis
+    assert any(passage.title == "与当前目标的匹配依据" for passage in passages)
+    assert any("金融科技日报" in passage.excerpt for passage in passages)
+
+
 def test_tech_radar_refresh_does_not_fallback_to_mock_items():
     original_path = os.environ.get("DATABASE_PATH")
     db_path = Path(tempfile.mkdtemp()) / "infra_radar_no_mock_test.db"

@@ -107,7 +107,7 @@ class MockTechRadarAgent:
             if len(collected) >= RADAR_ITEM_LIMIT:
                 break
         return [
-            self._radar_item_from_source(payload, item, index)
+            self._radar_item_from_source(payload, item, index, radar_context)
             for index, item in enumerate(collected[:RADAR_ITEM_LIMIT], start=1)
         ]
 
@@ -239,7 +239,13 @@ class MockTechRadarAgent:
             deduped.append(term)
         return deduped
 
-    def _radar_item_from_source(self, payload: TechRadarPayload, source_item: SourceItem, index: int) -> RadarItem:
+    def _radar_item_from_source(
+        self,
+        payload: TechRadarPayload,
+        source_item: SourceItem,
+        index: int,
+        radar_context: List[str],
+    ) -> RadarItem:
         source_label = source_item.source.value
         summary = source_item.summary.strip() or "该来源缺少摘要，需要打开原文确认核心内容。"
         signal_type = self._signal_type(source_item)
@@ -256,7 +262,7 @@ class MockTechRadarAgent:
             technical_substance=summary,
             marketing_noise=self._noise_for_source(source_item),
             why_it_matters=self._why_source_matters(source_item),
-            source_passages=self._source_passages(source_item, summary),
+            source_passages=self._source_passages(source_item, summary, radar_context),
             visuals=[],
             recommended_depth=self._recommended_depth(source_item),
             tags=tags,
@@ -314,46 +320,158 @@ class MockTechRadarAgent:
                 return RecommendedDepth.read
         return RecommendedDepth.skim
 
-    def _source_passages(self, source_item: SourceItem, summary: str) -> List[RadarSourcePassage]:
-        passages = [
-            RadarSourcePassage(
-                id=f"{source_item.id}_p1".replace("/", "_"),
-                title="来源摘要",
-                excerpt=summary,
-                analysis="这是从公开源 metadata 中抽出的核心摘要，用来初筛是否值得打开原文。",
-                source_url=source_item.url,
-                location=f"{source_item.source.value} metadata",
+    def _source_passages(
+        self,
+        source_item: SourceItem,
+        summary: str,
+        radar_context: List[str],
+    ) -> List[RadarSourcePassage]:
+        passages: List[RadarSourcePassage] = []
+        self._append_source_passage(
+            passages,
+            source_item,
+            title="标题信号",
+            excerpt=source_item.title,
+            analysis=(
+                "标题是本条 Radar 的第一层事实入口。Agent 只据此判断它可能涉及产品、机构成果、"
+                "平台动作或研究方向变化；是否有实质内容仍需要打开原文确认。"
             ),
-            RadarSourcePassage(
-                id=f"{source_item.id}_p2".replace("/", "_"),
-                title="来源线索",
-                excerpt=self._source_metadata_text(source_item),
-                analysis="这段用于定位材料类型、发布时间、作者或仓库活跃度，帮助判断是否适合进入本周 Deep Dive。",
-                source_url=source_item.url,
-                location="source metadata",
+            location=f"{source_item.source.value} title",
+        )
+        self._append_source_passage(
+            passages,
+            source_item,
+            title="摘要摘录",
+            excerpt=summary,
+            analysis=self._summary_analysis(source_item, summary),
+            location=f"{source_item.source.value} description",
+        )
+        self._append_source_passage(
+            passages,
+            source_item,
+            title="来源与时间",
+            excerpt=self._source_metadata_text(source_item),
+            analysis=(
+                "这段用于判断来源可信度和时效性。优先看发布方是否是官方、机构媒体、行业媒体或代码/论文平台，"
+                "以及发布时间是否足够新。"
             ),
-            RadarSourcePassage(
-                id=f"{source_item.id}_p3".replace("/", "_"),
-                title="Agent 初筛",
-                excerpt=self._why_source_matters(source_item),
-                analysis="这是 Agent 对该来源和当前 Radar 任务关系的初步判断，后续需要用原文细读验证。",
-                source_url=source_item.url,
-                location="agent routing",
+            location="source metadata",
+        )
+        matched_context = self._matched_context_text(source_item, radar_context)
+        self._append_source_passage(
+            passages,
+            source_item,
+            title="与当前目标的匹配依据",
+            excerpt=matched_context,
+            analysis=(
+                "这些关键词来自用户方向配置、当前计划或材料偏好，并在标题、摘要或来源标签中命中。"
+                "如果命中词很泛，后续应降低优先级；如果命中词对应当前阶段任务，可考虑转入 Deep Dive。"
             ),
-        ]
-        tag_text = "、".join(source_item.tags[:8])
-        if tag_text:
-            passages.append(
-                RadarSourcePassage(
-                    id=f"{source_item.id}_p4".replace("/", "_"),
-                    title="主题标签",
-                    excerpt=tag_text,
-                    analysis="标签用于快速判断它是否落在当前方向的关键词范围内。",
-                    source_url=source_item.url,
-                    location="source tags",
-                )
-            )
+            location="radar context match",
+        )
+        tag_text = self._source_tag_text(source_item)
+        self._append_source_passage(
+            passages,
+            source_item,
+            title="来源标签 / 类型线索",
+            excerpt=tag_text,
+            analysis=self._verification_analysis(source_item),
+            location="source tags",
+        )
         return passages[:5]
+
+    def _append_source_passage(
+        self,
+        passages: List[RadarSourcePassage],
+        source_item: SourceItem,
+        title: str,
+        excerpt: str,
+        analysis: str,
+        location: str,
+    ) -> None:
+        cleaned = excerpt.strip()
+        if not cleaned:
+            return
+        passage_id = f"{source_item.id}_p{len(passages) + 1}".replace("/", "_")
+        passages.append(
+            RadarSourcePassage(
+                id=passage_id,
+                title=title,
+                excerpt=cleaned,
+                analysis=analysis,
+                source_url=source_item.url,
+                location=location,
+            )
+        )
+
+    def _summary_analysis(self, source_item: SourceItem, summary: str) -> str:
+        if source_item.source == SourceType.web:
+            return (
+                "这是公开网页/RSS 摘要，不等同于完整正文。它适合初筛这条动态是否涉及产品发布、机构动作、"
+                "研发成果或平台变化；下一步需要打开原文确认细节和证据。"
+            )
+        if source_item.source == SourceType.arxiv:
+            return "这是论文摘要，可用于初步判断问题定义、方法假设和实验对象，但仍需要阅读全文确认贡献与局限。"
+        if source_item.source == SourceType.github:
+            return "这是仓库描述，可用于判断项目主题和工程入口，但需要进一步检查 README、release、commit 和 issue 活跃度。"
+        return "这是来源摘要，可用于初筛材料价值，但不能替代原文阅读。"
+
+    def _matched_context_text(self, source_item: SourceItem, radar_context: List[str]) -> str:
+        haystack = " ".join(
+            [
+                source_item.title,
+                source_item.summary,
+                " ".join(source_item.tags),
+                str(source_item.extra.get("publisher", "")),
+            ]
+        ).lower()
+        matched = [
+            term
+            for term in self._display_context_terms(radar_context)
+            if term.lower() in haystack
+        ]
+        matched = self._compact_overlapping_terms(matched)
+        if matched:
+            return "命中用户目标关键词：" + "、".join(matched[:8])
+        return "未命中明确用户关键词，但命中了产品 / 平台 / 发布 / 公司 / 大学 / 研究院 / 成果等通用行业动态线索。"
+
+    def _compact_overlapping_terms(self, terms: List[str]) -> List[str]:
+        compacted: List[str] = []
+        for term in sorted(self._dedupe_terms(terms), key=len, reverse=True):
+            if any(term in kept for kept in compacted):
+                continue
+            compacted.append(term)
+        return sorted(compacted, key=lambda value: terms.index(value))
+
+    def _display_context_terms(self, radar_context: List[str]) -> List[str]:
+        terms: List[str] = []
+        for value in radar_context:
+            cleaned = value.strip()
+            if not cleaned:
+                continue
+            if len(cleaned) <= 18 and "week " not in cleaned.lower():
+                terms.append(cleaned)
+            terms.extend(re.findall(r"[a-z0-9][a-z0-9\-/+.]{2,}", cleaned.lower()))
+            terms.extend(re.findall(r"[\u4e00-\u9fff]{2,8}", cleaned))
+        stop_terms = {"当前", "目标", "计划", "本周", "材料", "生成", "记录", "观察", "行业", "动态", "平台"}
+        return self._dedupe_terms(
+            [term for term in terms if len(term) >= 2 and term not in stop_terms]
+        )
+
+    def _source_tag_text(self, source_item: SourceItem) -> str:
+        tags = [tag for tag in source_item.tags[:8] if tag]
+        if not tags:
+            return ""
+        return "、".join(tags)
+
+    def _verification_analysis(self, source_item: SourceItem) -> str:
+        if source_item.source == SourceType.web:
+            return "打开原文后确认：具体是哪家机构/平台/企业，发布了什么产品、成果或动作，是否有技术细节、时间、场景和证据。"
+        if source_item.source == SourceType.arxiv:
+            return "打开论文后确认：核心问题、方法差异、实验支撑和局限是否足够清楚，再判断是否进入精读。"
+        if source_item.source == SourceType.github:
+            return "打开仓库后确认：README、release、demo、benchmark 和维护状态是否足够支撑当前计划。"
+        return "打开来源后确认：这条材料是否有明确事实、来源、时间、证据和与当前目标的关系。"
 
     def _source_metadata_text(self, source_item: SourceItem) -> str:
         lines = [f"来源：{source_item.source.value}", f"类型：{self._signal_type(source_item)}"]
@@ -365,7 +483,7 @@ class MockTechRadarAgent:
             lines.append(f"更新时间：{source_item.updated_at.date().isoformat()}")
         if source_item.extra:
             details = []
-            for key in ["stars", "forks", "language", "pdf_url"]:
+            for key in ["publisher", "publisher_url", "stars", "forks", "language", "pdf_url"]:
                 value = source_item.extra.get(key)
                 if value:
                     details.append(f"{key}={value}")

@@ -1,4 +1,5 @@
 import hashlib
+import html
 import re
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -210,6 +211,7 @@ class SearchService:
             published = self._parse_rss_datetime(self._text(node, "pubDate") or self._text(node, "published"))
             source_node = node.find("source")
             source_name = source_node.text.strip() if source_node is not None and source_node.text else ""
+            source_url = source_node.attrib.get("url", "") if source_node is not None else ""
             item_id = hashlib.sha1((link or title).encode("utf-8")).hexdigest()[:16]
             items.append(
                 SourceItem(
@@ -222,7 +224,14 @@ class SearchService:
                     published_at=published,
                     updated_at=published,
                     tags=[tag for tag in ["public_web", source_name] if tag],
-                    extra={"publisher": source_name} if source_name else {},
+                    extra={
+                        key: value
+                        for key, value in {
+                            "publisher": source_name,
+                            "publisher_url": source_url,
+                        }.items()
+                        if value
+                    },
                 )
             )
         return items
@@ -264,5 +273,7 @@ class SearchService:
 
     def _clean_html(self, value: str) -> str:
         text = re.sub(r"<[^>]+>", " ", value)
+        text = html.unescape(text)
+        text = text.replace("\xa0", " ")
         text = re.sub(r"\s+", " ", text)
         return text.strip()
