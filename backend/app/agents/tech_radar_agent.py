@@ -7,6 +7,9 @@ from app.schemas.tech_radar import RadarItem, RadarSourcePassage, RadarType, Rec
 from app.services.search_service import SearchService
 
 
+RADAR_ITEM_LIMIT = 3
+
+
 class MockTechRadarAgent:
     def __init__(self, search_service: Optional[SearchService] = None) -> None:
         self.search_service = search_service or SearchService()
@@ -50,7 +53,7 @@ class MockTechRadarAgent:
         seen_urls = set()
         for query in queries:
             try:
-                response = self.search_service.search_technical_sources(query, max_results=5)
+                response = self.search_service.search_technical_sources(query, max_results=RADAR_ITEM_LIMIT)
             except Exception:
                 continue
             for source_item in response.items:
@@ -61,11 +64,11 @@ class MockTechRadarAgent:
                     continue
                 seen_urls.add(dedupe_key)
                 collected.append(source_item)
-                if len(collected) >= 5:
+                if len(collected) >= RADAR_ITEM_LIMIT:
                     break
-            if len(collected) >= 5:
+            if len(collected) >= RADAR_ITEM_LIMIT:
                 break
-        return [self._radar_item_from_source(item, index) for index, item in enumerate(collected[:5], start=1)]
+        return [self._radar_item_from_source(item, index) for index, item in enumerate(collected[:RADAR_ITEM_LIMIT], start=1)]
 
     def _technical_queries(self, payload: TechRadarPayload) -> List[str]:
         topics = [topic.strip() for topic in payload.scope.topics if topic.strip()]

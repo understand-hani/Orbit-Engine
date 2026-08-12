@@ -179,7 +179,7 @@ struct TechRadarView: View {
         defer { isGeneratingRadar = false }
 
         let sourceItems = radarItems(for: input)
-        let decisions = Array(sourceItems.prefix(5)).enumerated().map { index, item in
+        let decisions = Array(sourceItems.prefix(3)).enumerated().map { index, item in
             RadarDecision(
                 id: item.id,
                 title: item.title,

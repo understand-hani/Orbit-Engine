@@ -258,7 +258,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] Radar 工作区显示当前计划关键词、近期材料/归档信号、Agent 可扫描的 3 类信号：外部变化、方向变化、下一步机会。
 - [x] Radar 支持多种内容注入方式：Agent 自动扫描、输入主题、粘贴 URL、个人上传/PDF 登记、手动材料；生成后直接进入本轮 Radar 结果。
 - [x] Radar 生成弹窗的来源选择改为纵向可读列表，避免 5 个选项横向挤压导致文字不可读。
-- [x] Radar 支持 `新建 Radar`，直接生成本轮扫描结果：3-5 条信号、发生了什么、为什么相关、噪音判断和路由动作。
+- [x] Radar 支持 `新建 Radar`，直接生成本轮扫描结果：3 条信号、发生了什么、为什么相关、噪音判断和路由动作。
 - [x] Radar 结果以卡片展示，每条卡片可点开查看完整信号判断、来源详情、具体观察、验证问题、噪音判断和路由动作。
 - [x] Radar 详情展示原文 / 材料入口：URL 可打开原文，PDF / 手动材料 / Agent 扫描显示当前可追溯来源说明。
 - [x] Radar 详情展示关键信息段落提取与 Agent 解析，先基于当前 payload metadata 生成；真实网页/PDF 正文抽取后续接后端。
@@ -266,10 +266,14 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] Radar 归档入口统一收敛到 `保存到归档`，避免上方 `归档` 按钮和 Check-in 归档语义重复。
 - [x] Radar 页面显示 `Agent 能做什么`：根据计划和归档发现值得追踪的新信号，帮助用户决定是否进入 Deep Dive。
 - [x] Radar 结果先只支持查看、转 Deep Dive / 暂存决策，不做完整信号 CRUD。
-- [x] Radar 真实外部检索闭环 v0：技术 Radar 已优先复用 arXiv / GitHub search service 生成 3-5 条外部信号，失败时 fallback 到 mock。
+- [x] Radar 真实外部检索闭环 v0：技术 Radar 已优先复用 arXiv / GitHub search service 生成 3 条外部信号，失败时 fallback 到 mock。
 - [ ] Radar 接入真实公开源：优先支持 arXiv、GitHub、官方博客 / release notes、指定 URL；先做技术源，产品 / 法规 / 新闻源后续扩展。
 - [ ] Radar 原文抓取与摘录：从网页、论文摘要、GitHub release 或官方文档中抽取 3-5 条 `source_passages`，每条包含 excerpt、source_url、location 和 Agent analysis。
 - [ ] Radar 去重和噪音过滤：过滤重复新闻、纯营销稿、股票 / 销量消息和无技术细节内容，只保留与当前计划有关的信号。
+- [ ] Radar 跨 session 去重：生成新 Radar 时排除历史已推送、已归档、已忽略、已转 Deep Dive 的 URL / source id，避免连续开多个任务时反复出现同一材料。
+- [ ] Radar 增量检索：按 published / updated 时间过滤新论文、新 repo release 和官方更新，支持每天固定节奏只推新增信号。
+- [ ] Radar query 轮换：根据用户方向配置、当前周计划、近期归档和噪音反馈自动调整检索词，而不是每次使用同一组 query。
+- [ ] Radar 重复主题聚合：当多条来源指向同一技术主题时合并为一条主题信号，保留多个依据链接和 Agent 综合判断。
 - [ ] Radar 排序和路由：按与本周计划关系、证据强度、可行动性和噪音程度排序，并输出 `转 Deep Dive / 暂存 / 忽略` 的理由。
 - [ ] Radar 状态列表展示：在 Radar 工作区或归档页能查看 `track_later`、`noise`、`deep_dive`、`archived` 的单条 Radar item，而不是只能在详情页看到状态。
 - [ ] Radar 定时 / 手动刷新策略：明确当前竞赛版是点击生成，后续版本再接固定节奏自动拉取和推送。
