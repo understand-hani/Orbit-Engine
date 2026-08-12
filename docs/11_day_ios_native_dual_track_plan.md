@@ -596,3 +596,4 @@ submission/orbit_engine_value_proposal.pptx
 - [x] Radar mock 问题修正：公开源失败时返回空结果和说明，不再 fallback 到 mock；旧 session 中的 `mock_` item 在 iOS 侧过滤不展示。
 - [x] Radar smoke 通过：临时数据库中非 Radar 日期显式新建 `tech_radar` session 初始 0 条，点击生成后返回 3 条公开网页行业动态。
 - [x] Radar 关键信息摘录修正：`source_passages` 改为标题信号、摘要摘录、来源与时间、当前目标匹配依据、来源标签 / 类型线索；`excerpt` 只放来源可追溯信息，`analysis` 才放 Agent 解析，避免把 Agent 判断伪装成原文摘录。
+- [x] Radar 关键信息摘录二次修正：`source_passages` 改为优先读取推送链接网页正文，抽取 3-5 条有信息量的原文段落；每条卡片只承载 `excerpt` 原文摘录和 `analysis` Agent 对该段的解析。网页正文无法抓取时才退回 RSS 摘要 / 标题 / 来源线索，并在解析中明确标记为兜底。

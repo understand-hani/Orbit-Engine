@@ -327,58 +327,40 @@ class MockTechRadarAgent:
         radar_context: List[str],
     ) -> List[RadarSourcePassage]:
         passages: List[RadarSourcePassage] = []
-        self._append_source_passage(
-            passages,
-            source_item,
-            title="标题信号",
-            excerpt=source_item.title,
-            analysis=(
-                "标题是本条 Radar 的第一层事实入口。Agent 只据此判断它可能涉及产品、机构成果、"
-                "平台动作或研究方向变化；是否有实质内容仍需要打开原文确认。"
-            ),
-            location=f"{source_item.source.value} title",
-        )
-        self._append_source_passage(
-            passages,
-            source_item,
-            title="摘要摘录",
-            excerpt=summary,
-            analysis=self._summary_analysis(source_item, summary),
-            location=f"{source_item.source.value} description",
-        )
-        self._append_source_passage(
-            passages,
-            source_item,
-            title="来源与时间",
-            excerpt=self._source_metadata_text(source_item),
-            analysis=(
-                "这段用于判断来源可信度和时效性。优先看发布方是否是官方、机构媒体、行业媒体或代码/论文平台，"
-                "以及发布时间是否足够新。"
-            ),
-            location="source metadata",
-        )
-        matched_context = self._matched_context_text(source_item, radar_context)
-        self._append_source_passage(
-            passages,
-            source_item,
-            title="与当前目标的匹配依据",
-            excerpt=matched_context,
-            analysis=(
-                "这些关键词来自用户方向配置、当前计划或材料偏好，并在标题、摘要或来源标签中命中。"
-                "如果命中词很泛，后续应降低优先级；如果命中词对应当前阶段任务，可考虑转入 Deep Dive。"
-            ),
-            location="radar context match",
-        )
-        tag_text = self._source_tag_text(source_item)
-        self._append_source_passage(
-            passages,
-            source_item,
-            title="来源标签 / 类型线索",
-            excerpt=tag_text,
-            analysis=self._verification_analysis(source_item),
-            location="source tags",
-        )
+        page_passages = self._fetch_source_page_passages(source_item)
+        for index, excerpt in enumerate(page_passages[:5], start=1):
+            self._append_source_passage(
+                passages,
+                source_item,
+                title=f"原文摘录 {index}",
+                excerpt=excerpt,
+                analysis=self._passage_analysis(source_item, excerpt, radar_context),
+                location=f"web page paragraph {index}",
+            )
+
+        if len(passages) >= 3:
+            return passages[:5]
+
+        for title, excerpt, location in self._fallback_passage_inputs(source_item, summary):
+            self._append_source_passage(
+                passages,
+                source_item,
+                title=title,
+                excerpt=excerpt,
+                analysis=self._fallback_passage_analysis(title, source_item, excerpt),
+                location=location,
+            )
+            if len(passages) >= 3:
+                break
         return passages[:5]
+
+    def _fetch_source_page_passages(self, source_item: SourceItem) -> List[str]:
+        if not source_item.url:
+            return []
+        try:
+            return self.search_service.fetch_web_passages(str(source_item.url), max_passages=5)
+        except Exception:
+            return []
 
     def _append_source_passage(
         self,
@@ -415,6 +397,55 @@ class MockTechRadarAgent:
         if source_item.source == SourceType.github:
             return "这是仓库描述，可用于判断项目主题和工程入口，但需要进一步检查 README、release、commit 和 issue 活跃度。"
         return "这是来源摘要，可用于初筛材料价值，但不能替代原文阅读。"
+
+    def _passage_analysis(
+        self,
+        source_item: SourceItem,
+        excerpt: str,
+        radar_context: List[str],
+    ) -> str:
+        text = " ".join([source_item.title, excerpt]).lower()
+        matched_terms = [
+            term
+            for term in self._display_context_terms(radar_context)
+            if term.lower() in text
+        ]
+        relation = ""
+        compacted_terms = self._compact_overlapping_terms(matched_terms)
+        if compacted_terms:
+            relation = "它与当前方向中的 " + "、".join(compacted_terms[:4]) + " 有直接词面关联。"
+
+        if self._contains_any(text, ["发布", "推出", "上线", "product", "launch", "release", "platform"]):
+            base = "这段的价值在于它描述了具体产品、平台或能力动作，可用于判断这条 Radar 是否只是新闻标题，还是有明确落地对象。"
+        elif self._contains_any(text, ["大学", "研究院", "实验室", "团队", "university", "institute", "lab", "researchers"]):
+            base = "这段的价值在于它给出了机构或团队来源，可用于判断信号是否来自研发主体、平台方或二手报道。"
+        elif self._contains_any(text, ["实验", "测试", "benchmark", "sota", "performance", "dataset", "评估", "指标"]):
+            base = "这段的价值在于它提供了实验、评估或性能证据线索，后续 Deep Dive 应优先确认指标、数据集和对比对象。"
+        elif self._contains_any(text, ["融资", "股价", "营收", "market share", "funding", "stock", "revenue"]):
+            base = "这段更偏商业或市场信号，需要谨慎判断是否包含真实技术进展，避免把融资、股价或宣传口径当成研发动态。"
+        else:
+            base = "这段提供了理解该动态的事实背景，后续应继续确认它具体解决什么问题、由谁发布、证据是否充分。"
+        return (base + relation).strip()
+
+    def _contains_any(self, text: str, needles: List[str]) -> bool:
+        return any(needle.lower() in text for needle in needles)
+
+    def _fallback_passage_inputs(self, source_item: SourceItem, summary: str):
+        return [
+            ("RSS 摘要摘录", summary, f"{source_item.source.value} description"),
+            ("标题摘录", source_item.title, f"{source_item.source.value} title"),
+            ("来源线索摘录", self._source_metadata_text(source_item), "source metadata"),
+        ]
+
+    def _fallback_passage_analysis(self, title: str, source_item: SourceItem, excerpt: str) -> str:
+        if title == "RSS 摘要摘录":
+            return (
+                "未能稳定抓取原网页正文时，Agent 暂用 RSS/搜索摘要作为兜底摘录。"
+                "它只能用于初筛，不能替代打开原文确认关键段落。"
+            )
+        if title == "标题摘录":
+            return "这是标题级事实线索，只能判断主题方向，不能证明材料中有实质技术、产品或成果细节。"
+        return "这是来源和时间线索，用于辅助判断可信度与时效性；正文抓取恢复后应以原文段落为准。"
 
     def _matched_context_text(self, source_item: SourceItem, radar_context: List[str]) -> str:
         haystack = " ".join(

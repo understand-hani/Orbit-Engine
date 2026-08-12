@@ -37,10 +37,22 @@ class StaticSearchService:
             fetched_at=datetime.now(timezone.utc),
         )
 
+    def fetch_web_passages(self, url: str, max_passages: int = 5):
+        return [
+            f"{url} 原文第一段：某机构发布了面向行业场景的新平台，并说明了产品能力和试点范围。",
+            f"{url} 原文第二段：材料提到平台已经在真实业务中完成测试，覆盖数据接入、风险识别和结果回传。",
+            f"{url} 原文第三段：报道列出了研发团队、合作机构和后续迭代方向，可用于判断信号来源。",
+        ][:max_passages]
+
 
 class FailingSearchService:
     def search_industry_sources(self, query: str, max_results: int = 5) -> CombinedSearchResponse:
         raise RuntimeError("network unavailable")
+
+
+class EmptyPassageSearchService:
+    def fetch_web_passages(self, url: str, max_passages: int = 5):
+        return []
 
 
 def test_saved_tech_radar_sessions_exclude_previous_source_urls():
@@ -173,7 +185,7 @@ def test_radar_relevance_allows_industry_signal_without_exact_goal_sentence():
 
 
 def test_radar_source_passages_separate_excerpt_and_agent_analysis():
-    agent = MockTechRadarAgent()
+    agent = MockTechRadarAgent(search_service=StaticSearchService())
     source_item = SourceItem(
         id="web_002",
         source=SourceType.web,
@@ -189,14 +201,35 @@ def test_radar_source_passages_separate_excerpt_and_agent_analysis():
     passages = agent._source_passages(source_item, source_item.summary, ["量化交易风控平台"])
 
     assert len(passages) >= 3
-    assert passages[0].title == "标题信号"
-    assert passages[0].excerpt == source_item.title
-    assert passages[1].title == "摘要摘录"
-    assert passages[1].excerpt == source_item.summary
-    assert "Agent" not in passages[1].excerpt
-    assert passages[1].analysis
-    assert any(passage.title == "与当前目标的匹配依据" for passage in passages)
-    assert any("金融科技日报" in passage.excerpt for passage in passages)
+    assert passages[0].title == "原文摘录 1"
+    assert "原文第一段" in passages[0].excerpt
+    assert "Agent" not in passages[0].excerpt
+    assert passages[0].analysis
+    assert "产品" in passages[0].analysis or "平台" in passages[0].analysis
+    assert all(passage.title.startswith("原文摘录") for passage in passages)
+
+
+def test_radar_source_passages_fallback_to_rss_when_page_unreadable():
+    agent = MockTechRadarAgent(search_service=EmptyPassageSearchService())
+    source_item = SourceItem(
+        id="web_003",
+        source=SourceType.web,
+        item_type=SourceItemType.article,
+        title="某金融科技公司发布新一代风控产品",
+        url="https://example.com/fintech-risk-product",
+        summary="该产品面向证券机构，提供平台化风险管理能力。",
+        published_at=datetime(2026, 8, 12, tzinfo=timezone.utc),
+        tags=["public_web", "金融科技日报"],
+        extra={"publisher": "金融科技日报", "publisher_url": "https://example.com"},
+    )
+
+    passages = agent._source_passages(source_item, source_item.summary, ["量化交易风控平台"])
+
+    assert len(passages) >= 3
+    assert passages[0].title == "RSS 摘要摘录"
+    assert passages[0].excerpt == source_item.summary
+    assert "兜底摘录" in passages[0].analysis
+    assert any(passage.title == "来源线索摘录" for passage in passages)
 
 
 def test_tech_radar_refresh_does_not_fallback_to_mock_items():

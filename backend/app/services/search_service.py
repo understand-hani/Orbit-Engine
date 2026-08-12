@@ -3,6 +3,7 @@ import html
 import re
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from html.parser import HTMLParser
 from typing import List
 from urllib.parse import quote_plus, urlencode
 from xml.etree import ElementTree as ET
@@ -22,6 +23,55 @@ from app.schemas.source import (
 ATOM_NS = "{http://www.w3.org/2005/Atom}"
 ARXIV_NS = "{http://arxiv.org/schemas/atom}"
 RSS_NS = "{http://www.w3.org/2005/Atom}"
+ARTICLE_TEXT_TAGS = {"article", "p", "li", "h1", "h2", "h3"}
+SKIP_TEXT_TAGS = {"script", "style", "noscript", "svg", "nav", "footer", "header", "form", "button"}
+
+
+class _ReadableHTMLParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._capture_stack: List[str] = []
+        self._skip_depth = 0
+        self._current: List[str] = []
+        self.paragraphs: List[str] = []
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        lowered = tag.lower()
+        if lowered in SKIP_TEXT_TAGS:
+            self._skip_depth += 1
+            return
+        if self._skip_depth:
+            return
+        if lowered in ARTICLE_TEXT_TAGS:
+            self._flush_current()
+            self._capture_stack.append(lowered)
+
+    def handle_endtag(self, tag: str) -> None:
+        lowered = tag.lower()
+        if lowered in SKIP_TEXT_TAGS and self._skip_depth:
+            self._skip_depth -= 1
+            return
+        if self._skip_depth:
+            return
+        if lowered in ARTICLE_TEXT_TAGS and self._capture_stack:
+            self._flush_current()
+            self._capture_stack.pop()
+
+    def handle_data(self, data: str) -> None:
+        if self._skip_depth or not self._capture_stack:
+            return
+        cleaned = " ".join(data.split())
+        if cleaned:
+            self._current.append(cleaned)
+
+    def _flush_current(self) -> None:
+        if not self._current:
+            return
+        text = " ".join(self._current)
+        text = re.sub(r"\s+", " ", html.unescape(text)).strip()
+        if text:
+            self.paragraphs.append(text)
+        self._current = []
 
 
 class SearchService:
@@ -135,6 +185,25 @@ class SearchService:
 
     def search_product_strategy_sources(self, query: str, max_results: int = 5) -> CombinedSearchResponse:
         return self.search_industry_sources(query, max_results=max_results)
+
+    def fetch_web_passages(self, url: str, max_passages: int = 5) -> List[str]:
+        if not url:
+            return []
+        response = httpx.get(
+            url,
+            timeout=self.settings.source_timeout_sec,
+            trust_env=False,
+            follow_redirects=True,
+            headers={"User-Agent": "OrbitEngineRadar/0.1"},
+        )
+        response.raise_for_status()
+        content_type = response.headers.get("content-type", "")
+        if "html" not in content_type.lower():
+            return []
+        parser = _ReadableHTMLParser()
+        parser.feed(response.text)
+        parser.close()
+        return self._clean_readable_paragraphs(parser.paragraphs, max_passages=max_passages)
 
     def _parse_arxiv(self, xml_text: str) -> List[SourceItem]:
         root = ET.fromstring(xml_text)
@@ -277,3 +346,45 @@ class SearchService:
         text = text.replace("\xa0", " ")
         text = re.sub(r"\s+", " ", text)
         return text.strip()
+
+    def _clean_readable_paragraphs(self, paragraphs: List[str], max_passages: int) -> List[str]:
+        cleaned: List[str] = []
+        seen = set()
+        for paragraph in paragraphs:
+            text = html.unescape(paragraph).replace("\xa0", " ")
+            text = re.sub(r"\s+", " ", text).strip()
+            if not self._is_useful_paragraph(text):
+                continue
+            if len(text) > 700:
+                text = text[:697].rstrip() + "..."
+            key = text.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned.append(text)
+            if len(cleaned) >= max(1, max_passages):
+                break
+        return cleaned
+
+    def _is_useful_paragraph(self, text: str) -> bool:
+        if not text:
+            return False
+        cjk_count = len(re.findall(r"[\u4e00-\u9fff]", text))
+        if len(text) < 80 and cjk_count < 30:
+            return False
+        lowered = text.lower()
+        boilerplate_terms = [
+            "cookie",
+            "privacy policy",
+            "terms of service",
+            "subscribe",
+            "sign in",
+            "版权所有",
+            "隐私政策",
+            "用户协议",
+            "广告",
+            "登录",
+            "注册",
+            "转载",
+        ]
+        return not any(term in lowered for term in boilerplate_terms)
