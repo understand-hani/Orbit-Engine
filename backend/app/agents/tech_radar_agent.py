@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from app.schemas.common import VisualAsset, VisualType, VisualUsage
 from app.schemas.source import SourceItem, SourceItemType, SourceType
@@ -8,20 +8,25 @@ from app.services.search_service import SearchService
 
 
 RADAR_ITEM_LIMIT = 3
+RADAR_SEARCH_FETCH_LIMIT = 12
 
 
 class MockTechRadarAgent:
     def __init__(self, search_service: Optional[SearchService] = None) -> None:
         self.search_service = search_service or SearchService()
 
-    def generate(self, payload: TechRadarPayload) -> TechRadarPayload:
+    def generate(
+        self,
+        payload: TechRadarPayload,
+        excluded_source_keys: Optional[Set[str]] = None,
+    ) -> TechRadarPayload:
         if payload.radar_type == RadarType.product_strategy_radar:
             items = self._product_strategy_items()
             summary = "本周样例信号覆盖产品功能、技术路线、法规和具身智能产品。"
             top_signals = ["产品功能正在从单点能力展示转向系统体验闭环。"]
             follow_up = ["哪些产品信号能反向说明 WM/仿真/重建方向的工程价值？"]
         else:
-            items = self._technical_method_items_from_search(payload)
+            items = self._technical_method_items_from_search(payload, excluded_source_keys or set())
             if items:
                 summary = "本周技术 Radar 已基于 arXiv / GitHub 公开源生成外部信号。"
                 top_signals = [items[0].summary]
@@ -47,19 +52,28 @@ class MockTechRadarAgent:
             }
         )
 
-    def _technical_method_items_from_search(self, payload: TechRadarPayload) -> List[RadarItem]:
+    def _technical_method_items_from_search(
+        self,
+        payload: TechRadarPayload,
+        excluded_source_keys: Set[str],
+    ) -> List[RadarItem]:
         queries = self._technical_queries(payload)
         collected: List[SourceItem] = []
         seen_urls = set()
         for query in queries:
             try:
-                response = self.search_service.search_technical_sources(query, max_results=RADAR_ITEM_LIMIT)
+                response = self.search_service.search_technical_sources(
+                    query,
+                    max_results=RADAR_SEARCH_FETCH_LIMIT,
+                )
             except Exception:
                 continue
             for source_item in response.items:
                 if source_item.id.endswith("_search_error") or "error" in source_item.tags:
                     continue
-                dedupe_key = str(source_item.url) if source_item.url else f"{source_item.source.value}:{source_item.id}"
+                dedupe_key = self._source_key(source_item)
+                if dedupe_key in excluded_source_keys:
+                    continue
                 if dedupe_key in seen_urls:
                     continue
                 seen_urls.add(dedupe_key)
@@ -69,6 +83,9 @@ class MockTechRadarAgent:
             if len(collected) >= RADAR_ITEM_LIMIT:
                 break
         return [self._radar_item_from_source(item, index) for index, item in enumerate(collected[:RADAR_ITEM_LIMIT], start=1)]
+
+    def _source_key(self, source_item: SourceItem) -> str:
+        return str(source_item.url) if source_item.url else f"{source_item.source.value}:{source_item.id}"
 
     def _technical_queries(self, payload: TechRadarPayload) -> List[str]:
         topics = [topic.strip() for topic in payload.scope.topics if topic.strip()]

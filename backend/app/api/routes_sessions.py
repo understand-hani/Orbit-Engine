@@ -93,6 +93,14 @@ def rename_session(session_id: str, request: SessionRenameRequest) -> BaseSessio
     return session
 
 
+@router.post("/sessions/{session_id}/radar/refresh", response_model=BaseSession)
+def refresh_radar_session(session_id: str) -> BaseSession:
+    session = feed_service.refresh_tech_radar_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Radar session not found")
+    return session
+
+
 @router.post("/sessions/{session_id}/research/selected-materials", response_model=BaseSession)
 def save_selected_research_materials(
     session_id: str, materials: List[ConfirmedResearchMaterial]

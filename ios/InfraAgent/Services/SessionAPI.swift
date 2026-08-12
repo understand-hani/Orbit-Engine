@@ -47,6 +47,10 @@ struct SessionAPI {
         try await resolvedClient.post("/api/sessions/\(id)/rename", body: SessionRenameRequest(suffix: suffix))
     }
 
+    func refreshRadar(sessionID: String) async throws -> BaseSession {
+        try await resolvedClient.post("/api/sessions/\(sessionID)/radar/refresh")
+    }
+
     func saveSelectedResearchMaterials(
         sessionID: String,
         materials: [ConfirmedResearchMaterial]

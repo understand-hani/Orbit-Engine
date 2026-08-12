@@ -5,6 +5,8 @@ struct TechRadarView: View {
     let session: BaseSession
     let payload: TechRadarPayload
 
+    @State private var currentSession: BaseSession
+    @State private var currentPayload: TechRadarPayload
     @State private var context: UserContext?
     @State private var radarRun: RadarRun?
     @State private var isGeneratingRadar = false
@@ -12,15 +14,23 @@ struct TechRadarView: View {
     @State private var isShowingRadarInput = false
 
     private let contextAPI = UserContextAPI()
+    private let sessionAPI = SessionAPI()
+
+    init(session: BaseSession, payload: TechRadarPayload) {
+        self.session = session
+        self.payload = payload
+        _currentSession = State(initialValue: session)
+        _currentPayload = State(initialValue: payload)
+    }
 
     var body: some View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(session.title)
+                    Text(currentSession.title)
                         .font(.title3)
                         .fontWeight(.semibold)
-                    Text(payload.digest.summary)
+                    Text(currentPayload.digest.summary)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -102,7 +112,7 @@ struct TechRadarView: View {
                     ForEach(radarRun.decisions) { decision in
                         NavigationLink {
                             RadarDecisionDetailView(
-                                session: session,
+                                session: currentSession,
                                 decision: decision
                             )
                         } label: {
@@ -118,12 +128,12 @@ struct TechRadarView: View {
                     .foregroundStyle(.secondary)
             }
 
-            if !payload.digest.followUpQuestions.isEmpty {
+            if !currentPayload.digest.followUpQuestions.isEmpty {
                 Section("Agent 讨论") {
-                    ForEach(payload.digest.followUpQuestions, id: \.self) { question in
+                    ForEach(currentPayload.digest.followUpQuestions, id: \.self) { question in
                         NavigationLink {
                             AgentChatView(
-                                session: session,
+                                session: currentSession,
                                 contextRefs: ["tech_radar", "question:\(question)"],
                                 title: "Agent 讨论"
                             )
@@ -141,18 +151,24 @@ struct TechRadarView: View {
             }
         }
         .navigationTitle("技术雷达")
+        .onAppear {
+            restoreRadarRunIfNeeded()
+        }
         .task {
             await loadContext()
+            restoreRadarRunIfNeeded()
         }
         .sheet(isPresented: $isShowingRadarInput) {
             NavigationStack {
                 RadarInputSheet(
                     context: context,
-                    payload: payload,
+                    payload: currentPayload,
                     isGenerating: isGeneratingRadar,
                     onGenerate: { input in
-                        generateRadar(input: input)
                         isShowingRadarInput = false
+                        Task {
+                            await generateRadar(input: input)
+                        }
                     }
                 )
             }
@@ -174,12 +190,44 @@ struct TechRadarView: View {
         }
     }
 
-    private func generateRadar(input: RadarInput) {
+    private func generateRadar(input: RadarInput) async {
         isGeneratingRadar = true
         defer { isGeneratingRadar = false }
 
+        if input.source == .agent {
+            do {
+                let updatedSession = try await sessionAPI.refreshRadar(sessionID: currentSession.id)
+                guard case .techRadar(let updatedPayload) = updatedSession.payload else {
+                    message = "Radar 生成失败：后端返回了非 Radar session。"
+                    return
+                }
+                currentSession = updatedSession
+                currentPayload = updatedPayload
+                radarRun = makeRadarRun(
+                    input: input,
+                    items: updatedPayload.digest.items
+                )
+                message = nil
+            } catch {
+                message = "Radar 生成失败：\(error.localizedDescription)"
+            }
+            return
+        }
+
         let sourceItems = radarItems(for: input)
-        let decisions = Array(sourceItems.prefix(3)).enumerated().map { index, item in
+        radarRun = makeRadarRun(input: input, items: sourceItems)
+    }
+
+    private func restoreRadarRunIfNeeded() {
+        guard radarRun == nil, !currentPayload.digest.items.isEmpty else { return }
+        radarRun = makeRadarRun(
+            input: RadarInput(source: .agent, title: "", url: "", summary: ""),
+            items: currentPayload.digest.items
+        )
+    }
+
+    private func makeRadarRun(input: RadarInput, items: [RadarItem]) -> RadarRun {
+        let decisions = Array(items.prefix(3)).enumerated().map { index, item in
             RadarDecision(
                 id: item.id,
                 title: item.title,
@@ -199,7 +247,7 @@ struct TechRadarView: View {
             )
         }
 
-        radarRun = RadarRun(
+        return RadarRun(
             title: "本轮 Radar 扫描",
             summary: radarSummary(input: input, count: decisions.count),
             decisions: decisions
@@ -217,8 +265,8 @@ struct TechRadarView: View {
     private func radarItems(for input: RadarInput) -> [RadarItem] {
         switch input.source {
         case .agent:
-            if !payload.digest.items.isEmpty {
-                return payload.digest.items
+            if !currentPayload.digest.items.isEmpty {
+                return currentPayload.digest.items
             }
             return [manualRadarItem(input: input, suffix: "agent")]
         case .topic:
@@ -436,7 +484,7 @@ struct TechRadarView: View {
     ) -> RadarItem {
         RadarItem(
             id: "radar_\(suffix)",
-            radarType: payload.radarType,
+            radarType: currentPayload.radarType,
             title: title ?? input.titleOrFallback,
             source: input.sourceLabel,
             url: input.urlValue,

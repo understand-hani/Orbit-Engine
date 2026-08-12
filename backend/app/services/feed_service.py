@@ -15,6 +15,7 @@ from app.schemas.common import SessionStatus, SuggestedAction, TaskType
 from app.schemas.jd_analysis import JDInput, JDInputCreate
 from app.schemas.research_feeder import ConfirmedResearchMaterial, ResearchFeederPayload
 from app.schemas.session import BaseSession
+from app.schemas.tech_radar import TechRadarPayload
 
 
 class FeedService:
@@ -37,13 +38,17 @@ class FeedService:
         self,
         target_date: Optional[date] = None,
         task_type: Optional[TaskType] = None,
+        excluded_radar_keys: Optional[set] = None,
     ) -> BaseSession:
         session = self.coordinator.create_session(target_date, task_type_override=task_type)
         payload = session.payload
         action = session.suggested_action
 
         if session.task_type == TaskType.tech_radar:
-            payload = self.tech_radar_agent.generate(session.payload)
+            payload = self.tech_radar_agent.generate(
+                session.payload,
+                excluded_source_keys=excluded_radar_keys,
+            )
             action = SuggestedAction.open_weekly_radar
         elif session.task_type == TaskType.jd_analysis:
             payload = self.jd_agent.generate(session.payload)
@@ -60,7 +65,12 @@ class FeedService:
         target_date: Optional[date] = None,
         task_type: Optional[TaskType] = None,
     ) -> BaseSession:
-        session = self.generate_mock_session(target_date, task_type=task_type)
+        excluded_radar_keys = self._radar_source_keys()
+        session = self.generate_mock_session(
+            target_date,
+            task_type=task_type,
+            excluded_radar_keys=excluded_radar_keys,
+        )
         if self.sessions.get_by_id(session.id) is not None:
             suffix = uuid4().hex[:8]
             session = session.model_copy(
@@ -77,6 +87,28 @@ class FeedService:
 
     def get_session(self, session_id: str) -> Optional[BaseSession]:
         return self.sessions.get_by_id(session_id)
+
+    def refresh_tech_radar_session(self, session_id: str) -> Optional[BaseSession]:
+        session = self.sessions.get_by_id(session_id)
+        if session is None or session.task_type != TaskType.tech_radar:
+            return None
+
+        excluded_radar_keys = self._radar_source_keys(exclude_session_id=session_id)
+        payload = self.tech_radar_agent.generate(
+            session.payload,
+            excluded_source_keys=excluded_radar_keys,
+        )
+        if self._is_mock_technical_payload(payload) and session.payload.digest.items:
+            payload = session.payload
+
+        updated_session = session.model_copy(
+            update={
+                "payload": payload,
+                "suggested_action": SuggestedAction.open_weekly_radar,
+                "updated_at": datetime.now(timezone.utc),
+            }
+        )
+        return self.sessions.save(updated_session)
 
     def get_sessions_by_date(self, target_date: date) -> list:
         return self.sessions.get_by_date(target_date.isoformat())
@@ -205,6 +237,23 @@ class FeedService:
         session = session.model_copy(update={"id": session_id})
         session = self._apply_default_title(session, exclude_self=False)
         return self.sessions.save(session)
+
+    def _radar_source_keys(self, exclude_session_id: Optional[str] = None) -> set:
+        keys = set()
+        for session in self.sessions.list_by_task(TaskType.tech_radar.value):
+            if session.id == exclude_session_id or not isinstance(session.payload, TechRadarPayload):
+                continue
+            for item in session.payload.digest.items:
+                if item.url:
+                    keys.add(str(item.url))
+                elif item.source and item.id:
+                    keys.add(f"{item.source}:{item.id}")
+        return keys
+
+    def _is_mock_technical_payload(self, payload: TechRadarPayload) -> bool:
+        if not payload.digest.items:
+            return True
+        return all(not item.id.startswith("radar_real_") for item in payload.digest.items)
 
     def _apply_default_title(self, session: BaseSession, exclude_self: bool = True) -> BaseSession:
         if session.task_type != TaskType.research_feeder:
