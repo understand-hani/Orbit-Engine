@@ -1,6 +1,6 @@
 # 11 天双线并行计划：iOS 原生开发 + 竞赛文档
 
-最后更新：2026-08-06
+最后更新：2026-08-12
 
 截止日期：2026-08-16
 
@@ -61,14 +61,14 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 - [ ] 重写项目主叙事：为什么从 Web 切回 iOS。
 - [ ] 更新产品定位为 iOS-first mobile Agent。
-- [ ] 列出 proposal PPT 必备页面清单。
+- [x] 列出 proposal PPT 必备页面清单。
 - [ ] 梳理 60-90 秒 demo 的主链路，不展示 Web。
 
 完成标准：
 
 - [x] 明确 iOS 原生为主展示面。
 - [x] 形成 iOS 迁移清单。
-- [ ] 形成 PPT 页面目录。
+- [x] 形成 PPT 页面目录。
 
 ### Day 2（2026-08-07）：iOS 接入 GOAI 后端
 
@@ -92,9 +92,9 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 文档 / PPT / PDF 线：
 
-- [ ] 写 `problem` 页面草稿：不是缺计划，而是启动成本高。
-- [ ] 写 `user` 页面草稿：有长期目标、需要周期性行动和反馈的人。
-- [ ] 写 `scenario` 页面草稿：早晨/碎片时间打开 app，直接进入今日 session。
+- [x] 写 `problem` 页面草稿：不是缺计划，而是启动成本高。
+- [x] 写 `user` 页面草稿：有长期目标、需要周期性行动和反馈的人。
+- [x] 写 `scenario` 页面草稿：早晨/碎片时间打开 app，直接进入今日 session。
 - [ ] 收集 iOS Today 截图占位或草图。
 
 完成标准：
@@ -104,7 +104,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] iOS Manual 能看到四类 session 入口。
 - [x] iOS 底部栏变为 `今日 / 归档 / 计划 / 我的`。
 - [x] 后端默认 URL 已更新，同时仍可被用户配置覆盖。
-- [ ] PPT 前 3 页有文字初稿。
+- [x] PPT 前 3 页有文字初稿。
 
 ### Day 3（2026-08-08）：iOS Deep Dive 队列与新建入口
 
@@ -132,16 +132,16 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 文档 / PPT / PDF 线：
 
-- [ ] 写 `core workflow` 页面草稿。
-- [ ] 明确 workflow：Today -> Deep Dive -> Material -> Agent Guidance -> Check-in -> Archive。
-- [ ] 整理 demo 录屏脚本 v1。
-- [ ] 写清楚“材料源不等于论文源”。
+- [x] 写 `core workflow` 页面草稿。
+- [x] 明确 workflow：Today -> Deep Dive -> Material -> Agent Guidance -> Check-in -> Archive。
+- [x] 整理 demo 录屏脚本 v1。
+- [x] 写清楚“材料源不等于论文源”。
 
 完成标准：
 
 - [x] iOS 能从 Today 进入 Deep Dive 队列。
 - [x] iOS 能看到 Deep Dive 的三种材料入口。
-- [ ] 录屏路径 v1 明确。
+- [x] 录屏路径 v1 明确。
 
 ### Day 4（2026-08-09）：iOS Deep Dive 详情页
 
@@ -169,15 +169,15 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 文档 / PPT / PDF 线：
 
-- [ ] 写 `Agent capability` 页面草稿。
-- [ ] 解释 Agent 如何基于个人情况、计划、材料偏好生成推荐理由。
-- [ ] 解释 Agent 如何把材料处理变成下一步行动。
-- [ ] 准备一张 Agent 能力流程图草稿。
+- [x] 写 `Agent capability` 页面草稿。
+- [x] 解释 Agent 如何基于个人情况、计划、材料偏好生成推荐理由。
+- [x] 解释 Agent 如何把材料处理变成下一步行动。
+- [x] 准备一张 Agent 能力流程图草稿。
 
 完成标准：
 
 - [x] iOS Deep Dive 详情页可展示。
-- [ ] Agent 能力叙事成页。
+- [x] Agent 能力叙事成页。
 
 ### Day 5（2026-08-10）：iOS Check-in + Agent Guidance
 
@@ -193,15 +193,15 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 文档 / PPT / PDF 线：
 
-- [ ] 写 `closed-loop evidence` 页面草稿。
-- [ ] 解释 session status 如何变化。
-- [ ] 解释归档区如何沉淀 check-in。
-- [ ] 解释下一轮 Agent 如何复用历史和计划上下文。
+- [x] 写 `closed-loop evidence` 页面草稿。
+- [x] 解释 session status 如何变化。
+- [x] 解释归档区如何沉淀 check-in。
+- [x] 解释下一轮 Agent 如何复用历史和计划上下文。
 
 完成标准：
 
 - [x] 主闭环跑通：Deep Dive -> Agent draft -> Check-in -> Archive。
-- [ ] closed-loop evidence 页面有初稿。
+- [x] closed-loop evidence 页面有初稿。
 
 ### Day 6（2026-08-11）：iOS 计划 / 我的
 
@@ -239,16 +239,16 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 文档 / PPT / PDF 线：
 
-- [ ] 写 `data/context` 页面草稿。
-- [ ] 说明用户上下文包含哪些字段。
-- [ ] 说明本地记录和隐私边界。
-- [ ] 说明材料源类型。
+- [x] 写 `data/context` 页面草稿。
+- [x] 说明用户上下文包含哪些字段。
+- [x] 说明本地记录和隐私边界。
+- [x] 说明材料源类型。
 - [ ] 将 `source_compliance_note` 整理为提交材料可用版本。
 
 完成标准：
 
-- [ ] iOS 能解释“Agent 为什么推荐这份材料”。
-- [ ] 数据 / 隐私页有初稿。
+- [x] iOS 能解释“Agent 为什么推荐这份材料”。
+- [x] 数据 / 隐私页有初稿。
 
 ### Day 7（2026-08-12）：三类轻量 Session + 领域复用表
 
@@ -258,21 +258,25 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] Radar 工作区显示当前计划关键词、近期材料/归档信号、Agent 可扫描的 3 类信号：外部变化、方向变化、下一步机会。
 - [x] Radar 支持多种内容注入方式：Agent 自动扫描、输入主题、粘贴 URL、个人上传/PDF 登记、手动材料；生成后直接进入本轮 Radar 结果。
 - [x] Radar 生成弹窗的来源选择改为纵向可读列表，避免 5 个选项横向挤压导致文字不可读。
-- [x] Radar 支持 `新建 Radar`，直接生成本轮扫描结果：3 条信号、发生了什么、为什么相关、噪音判断和路由动作。
+- [x] Radar 支持 `新建 Radar`，先创建空 Radar 卡片；用户点击 `生成本轮 Radar` 后再生成 3 条信号、发生了什么、为什么相关、噪音判断和路由动作。
 - [x] Radar 结果以卡片展示，每条卡片可点开查看完整信号判断、来源详情、具体观察、验证问题、噪音判断和路由动作。
 - [x] Radar 详情展示原文 / 材料入口：URL 可打开原文，PDF / 手动材料 / Agent 扫描显示当前可追溯来源说明。
 - [x] Radar 详情展示关键信息段落提取与 Agent 解析，先基于当前 payload metadata 生成；真实网页/PDF 正文抽取后续接后端。
 - [x] Radar 详情支持 `Radar Check-in`，可把当前信号判断、关键洞察和下一步行动保存到归档。
 - [x] Radar 归档入口统一收敛到 `保存到归档`，避免上方 `归档` 按钮和 Check-in 归档语义重复。
+- [x] Radar 生成结果写回 session payload，重新进入同一个 Radar 卡片时直接恢复已生成结果，不再依赖前端临时状态。
 - [x] Radar 页面显示 `Agent 能做什么`：根据计划和归档发现值得追踪的新信号，帮助用户决定是否进入 Deep Dive。
 - [x] Radar 结果先只支持查看、转 Deep Dive / 暂存决策，不做完整信号 CRUD。
-- [x] Radar 真实外部检索闭环 v0：技术 Radar 已优先复用 arXiv / GitHub search service 生成 3 条外部信号，失败时 fallback 到 mock。
-- [ ] Radar 接入真实公开源：优先支持 arXiv、GitHub、官方博客 / release notes、指定 URL；先做技术源，产品 / 法规 / 新闻源后续扩展。
+- [x] Radar 真实外部检索闭环 v0：已接入公开网页 / 新闻 RSS 作为默认行业动态源，生成 3 条公开网页信号；arXiv / GitHub 不再作为默认 Radar 主来源。
+- [x] Radar 定向逻辑 v0：后端读取 UserContext 中的 `goal`、`current_stage`、`weekly_focus`、`active_tasks`、`tracking_keywords` 和 `preferences.fields`，动态生成 query 和相关性过滤，不写死具体领域方向。
+- [x] Radar 无 mock fallback：公开源检索失败或过滤后为空时返回空结果和失败说明，不再把样例 mock 材料伪装成真实推送。
+- [x] Radar 跨 session 去重 v0：生成 Radar 时排除历史已推送 URL，避免连续新建多个 Radar 时优先生成同一批材料。
+- [ ] Radar 接入更多真实公开源：继续补官方博客 / release notes、指定 URL、公众号公开网页、机构官网；arXiv / GitHub 后续作为技术证据补充源，而不是默认主推送源。
 - [ ] Radar 原文抓取与摘录：从网页、论文摘要、GitHub release 或官方文档中抽取 3-5 条 `source_passages`，每条包含 excerpt、source_url、location 和 Agent analysis。
-- [ ] Radar 去重和噪音过滤：过滤重复新闻、纯营销稿、股票 / 销量消息和无技术细节内容，只保留与当前计划有关的信号。
-- [ ] Radar 跨 session 去重：生成新 Radar 时排除历史已推送、已归档、已忽略、已转 Deep Dive 的 URL / source id，避免连续开多个任务时反复出现同一材料。
+- [ ] Radar 去重和噪音过滤增强：过滤重复新闻、纯营销稿、股票 / 销量消息、偏题泛科技内容和无实质产品 / 成果 / 机构动作的内容，只保留与用户当前目标有关的行业信号。
+- [ ] Radar 跨 session 去重增强：生成新 Radar 时继续补齐 source id、标题相似度、已归档、已忽略、已转 Deep Dive 的排除逻辑。
 - [ ] Radar 增量检索：按 published / updated 时间过滤新论文、新 repo release 和官方更新，支持每天固定节奏只推新增信号。
-- [ ] Radar query 轮换：根据用户方向配置、当前周计划、近期归档和噪音反馈自动调整检索词，而不是每次使用同一组 query。
+- [ ] Radar query 轮换增强：根据用户方向配置、当前周计划、近期归档和噪音反馈自动调整检索词，并支持多轮扩展同义词 / 机构名 / 平台名。
 - [ ] Radar 重复主题聚合：当多条来源指向同一技术主题时合并为一条主题信号，保留多个依据链接和 Agent 综合判断。
 - [ ] Radar 排序和路由：按与本周计划关系、证据强度、可行动性和噪音程度排序，并输出 `转 Deep Dive / 暂存 / 忽略` 的理由。
 - [ ] Radar 状态列表展示：在 Radar 工作区或归档页能查看 `track_later`、`noise`、`deep_dive`、`archived` 的单条 Radar item，而不是只能在详情页看到状态。
@@ -294,17 +298,17 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 文档 / PPT / PDF 线：
 
-- [ ] 写 `domain mapping table` 独立页。
-- [ ] 为 Radar 写 demo 叙事：用户不用主动搜资讯，Agent 基于计划和归档提示“今天值得看什么信号”。
-- [ ] 为 Weekly Studio 写 demo 叙事：用户不用从零复盘，Agent 把本周记录转成下周行动。
-- [ ] 为 Opportunity Alignment 写 demo 叙事：用户不用手动对齐机会，Agent 把目标、能力证据和机会缺口连起来。
-- [ ] 在 `domain mapping table` 中映射职业能力建设：Deep Dive=能力证据，Radar=行业信号，Weekly Studio=节奏管理，Opportunity Alignment=岗位/机会匹配。
-- [ ] 在 `domain mapping table` 中映射研究方向探索：Deep Dive=论文/技术路线，Radar=新论文/新项目，Weekly Studio=研究节奏，Opportunity Alignment=课题/合作机会。
-- [ ] 在 `domain mapping table` 中映射创作者 / 视觉 IP 运营：Deep Dive=案例拆解，Radar=趋势/平台信号，Weekly Studio=内容节奏，Opportunity Alignment=商业合作/选题匹配。
-- [ ] 在 `domain mapping table` 中映射创业 / 产品探索：Deep Dive=用户/竞品研究，Radar=市场信号，Weekly Studio=实验复盘，Opportunity Alignment=机会优先级。
-- [ ] 在 `domain mapping table` 中映射语言学习：Deep Dive=材料精读，Radar=输入源发现，Weekly Studio=学习复盘，Opportunity Alignment=考试/工作/表达场景匹配。
+- [x] 写 `domain mapping table` 独立页。
+- [x] 为 Radar 写 demo 叙事：用户不用主动搜资讯，Agent 基于计划和归档提示“今天值得看什么信号”。
+- [x] 为 Weekly Studio 写 demo 叙事：用户不用从零复盘，Agent 把本周记录转成下周行动。
+- [x] 为 Opportunity Alignment 写 demo 叙事：用户不用手动对齐机会，Agent 把目标、能力证据和机会缺口连起来。
+- [x] 在 `domain mapping table` 中映射职业能力建设：Deep Dive=能力证据，Radar=行业信号，Weekly Studio=节奏管理，Opportunity Alignment=岗位/机会匹配。
+- [x] 在 `domain mapping table` 中映射研究方向探索：Deep Dive=论文/技术路线，Radar=新论文/新项目，Weekly Studio=研究节奏，Opportunity Alignment=课题/合作机会。
+- [x] 在 `domain mapping table` 中映射创作者 / 视觉 IP 运营：Deep Dive=案例拆解，Radar=趋势/平台信号，Weekly Studio=内容节奏，Opportunity Alignment=商业合作/选题匹配。
+- [x] 在 `domain mapping table` 中映射创业 / 产品探索：Deep Dive=用户/竞品研究，Radar=市场信号，Weekly Studio=实验复盘，Opportunity Alignment=机会优先级。
+- [x] 在 `domain mapping table` 中映射语言学习：Deep Dive=材料精读，Radar=输入源发现，Weekly Studio=学习复盘，Opportunity Alignment=考试/工作/表达场景匹配。
 - [ ] 准备一页 `three lightweight sessions` 截图占位：三个卡片分别说明输入、Agent 处理、输出。
-- [ ] 更新 demo 录屏脚本：Deep Dive 作为主链路，Radar / Weekly Studio / Opportunity Alignment 作为轻量扩展镜头。
+- [x] 更新 demo 录屏脚本：Deep Dive 作为主链路，Radar / Weekly Studio / Opportunity Alignment 作为轻量扩展镜头。
 
 完成标准：
 
@@ -313,7 +317,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [ ] Weekly Studio 可生成或展示一份轻量周复盘草稿。
 - [ ] Opportunity Alignment 可生成或展示一份轻量机会匹配草稿。
 - [ ] 三类轻量 session 都能解释 `Agent 能做什么` 和引用了哪些上下文。
-- [ ] 领域复用映射表完成，并能放入 proposal draft。
+- [x] 领域复用映射表完成，并能放入 proposal draft。
 
 ### Day 8（2026-08-13）：调试冻结 + Proposal Draft
 
@@ -328,17 +332,17 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 文档 / PPT / PDF 线：
 
-- [ ] 合并 proposal draft。
-- [ ] 加入封面。
-- [ ] 加入问题、用户、workflow。
-- [ ] 加入 Agent 架构。
-- [ ] 加入 domain mapping。
-- [ ] 加入当前进度、限制和 roadmap。
+- [x] 合并 proposal draft。
+- [x] 加入封面。
+- [x] 加入问题、用户、workflow。
+- [x] 加入 Agent 架构。
+- [x] 加入 domain mapping。
+- [x] 加入当前进度、限制和 roadmap。
 
 完成标准：
 
 - [ ] iOS 可录屏候选版本形成。
-- [ ] PPT/PDF draft v1 完成。
+- [x] PPT/PDF draft v1 完成。
 
 ### Day 9（2026-08-14）：Dry Run + 项目介绍
 
@@ -441,29 +445,37 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 ## 文档 / PPT / PDF 线范围
 
-PPT/PDF 建议页：
+当前 canonical proposal deck：
 
-1. 封面：圆周引擎 / Orbit Engine。
-2. 问题：不是缺计划，而是每天启动学习/探索的摩擦太高。
-3. 用户：有长期目标、需要周期性行动和反馈的人。
-4. 产品定义：周期性 Agent session，而不是 todo app。
-5. 核心 workflow：Today -> Deep Dive -> Agent Guidance -> Check-in -> Archive。
-6. Agent 能力：根据用户上下文组织材料、任务、草稿和下一步。
-7. 四类 session：Radar / Deep Dive / Weekly Studio / Opportunity Alignment。
-8. 领域复用映射表：独立页。
-9. 系统架构：iOS SwiftUI + FastAPI + SQLite + session payload。
-10. 数据与隐私：本地上下文、材料 metadata、无云同步。
-11. 当前进度：已完成和 8/16 demo 范围。
-12. 限制与 roadmap：真实文件上传、公开源抓取、多领域模板、云同步。
+```text
+ppt/orbit_engine_value_proposal.pptx
+submission/orbit_engine_value_proposal.pptx
+```
 
-必须写清：
+当前 deck 覆盖情况：
 
-- [ ] 为什么不是 todo app。
-- [ ] 为什么不是论文阅读器。
-- [ ] 为什么不是单纯打卡工具。
-- [ ] Agent 在哪里产生价值。
-- [ ] 8/16 demo 的边界是什么。
-- [ ] 哪些是已实现，哪些是 roadmap。
+1. [x] 封面：圆周引擎 / Orbit Engine。
+2. [x] Track Fit：为什么适合 Boundless Agents。
+3. [x] 问题：不是缺计划，而是每天启动学习 / 探索的摩擦太高。
+4. [x] 用户：有长期目标、需要周期性行动和反馈的人。
+5. [x] 产品定义：周期性 Agent session，而不是 todo app。
+6. [x] 四类 session：Signal Radar / Deep Dive / Opportunity Alignment / Weekly Studio。
+7. [x] Demo Loop：Today -> Queue -> Material -> Guidance -> Check-in -> History。
+8. [x] Product Evidence：移动端产品形态和当前截图证据。
+9. [x] 系统架构：SwiftUI / mobile Web demo + FastAPI + SQLite + BaseSession + MaterialSource。
+10. [x] 数据与安全：本地 UserContext、材料 metadata、公开 / 用户登记材料、human-in-the-loop。
+11. [x] 领域复用映射表：职业能力、研究探索、创作者/IP、产品创业、语言学习。
+12. [x] 当前进度与 roadmap：已完成、进行中、下一步。
+13. [x] Scoring Alignment：行业场景价值 / Agent 能力与闭环 / 产品体验 / 技术可行性 / 合规边界 / 开源复用。
+14. [x] Demo Walkthrough：60-90 秒视频每一步怎么点、证明什么。
+15. [x] Why Orbit Engine Wins：对比 Todo、Notion、Readwise、普通论文助手、打卡工具、职业规划工具。
+16. [x] Value Summary：一句话价值收束。
+
+仍需随最终录屏更新：
+
+- [ ] Product Evidence 页替换为最终 iOS 录屏截图，而不是 mobile Web / iOS-style 占位截图。
+- [ ] Progress & Roadmap 页根据 8/15 最终代码状态更新措辞。
+- [ ] Demo Walkthrough 页根据最终录屏路径微调按钮名称和步骤名。
 
 ## Demo 视频脚本范围
 
@@ -565,3 +577,20 @@ PPT/PDF 建议页：
 - [x] `我的 -> 方向配置` 方向输入框保持空白，按钮改为纯文本居中，修复图标导致的视觉不对齐。
 - [x] `我的 -> 方向配置` 增加目标周期和全周期计划；Agent 生成内容均保持可编辑，保存后进入个人上下文 UserContext。
 - [x] `我的 -> 方向配置` 改为底部弹出分步确认：全周期计划 -> 第一周计划 -> 检索策略 / 约束 -> 保存到个人情况。
+
+### 2026-08-12
+
+- [x] Review 当前手工 PPT：`ppt/圆周引擎OrbitEngine.pptx`。
+- [x] 当前 PPT 已从 8 页扩展到 9 页，已覆盖封面、Boundless Agents 适配、问题、目标用户、四类 session、六步闭环和领域复用映射表。
+- [x] 当前 PPT 的主叙事进度可用：已经能说明“不是缺计划，而是启动成本 / 筛选成本 / 沉淀断层”，也能说明四类 session 如何服务周期性能力建设。
+- [!] 当前 PPT 第 8-9 页 `Agent Ability` 仍是明显占位：只抽取到标题，缺少 Task Input / Intent / Planning / MaterialSource / Guidance / Check-in / History 的完整映射。
+- [x] Reference proposal deck `ppt/orbit_engine_value_proposal.pptx` 已覆盖初赛关键价值页：`Scoring Alignment`、`Demo Walkthrough`、`Why Orbit Engine Wins`。
+- [x] Reference proposal deck 已覆盖提交关键页：技术架构、数据与安全边界、当前进度 / 限制 / roadmap、移动端产品证据截图。
+- [x] 已据此更新文档线 checklist：以 `orbit_engine_value_proposal.pptx` 作为 canonical proposal deck，已覆盖项标记完成；只保留最终录屏后需要更新的截图、进度措辞和按钮名。
+- [x] 补充 `Why Orbit Engine Wins` 页：增加“打卡工具”对比，明确 Check-in 只是验证节点，不是产品边界。
+- [x] Radar 新建行为修正：新建 Radar 只创建空卡片，点击 `生成本轮 Radar` 后才触发后端公开源检索并写回 session payload。
+- [x] Radar 真实行业动态源修正：默认推送改为公开网页 / 新闻 RSS 的行业动态，不再把论文 / GitHub 作为默认主来源。
+- [x] Radar 定向逻辑修正：检索 query 和相关性过滤改为读取用户方向配置、当前计划、active tasks、tracking keywords 和偏好领域，不再写死自动驾驶 / 机器人 / 世界模型等方向。
+- [x] Radar 空结果问题修正：中文长目标会拆成更短的可检索关键词，中文 query 使用中文行业动态后缀，避免中英混拼导致 Google News RSS 返回 0 条。
+- [x] Radar mock 问题修正：公开源失败时返回空结果和说明，不再 fallback 到 mock；旧 session 中的 `mock_` item 在 iOS 侧过滤不展示。
+- [x] Radar smoke 通过：临时数据库中非 Radar 日期显式新建 `tech_radar` session 初始 0 条，点击生成后返回 3 条公开网页行业动态。
