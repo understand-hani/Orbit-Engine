@@ -266,7 +266,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] Radar 归档入口统一收敛到 `保存到归档`，避免上方 `归档` 按钮和 Check-in 归档语义重复。
 - [x] Radar 页面显示 `Agent 能做什么`：根据计划和归档发现值得追踪的新信号，帮助用户决定是否进入 Deep Dive。
 - [x] Radar 结果先只支持查看、转 Deep Dive / 暂存决策，不做完整信号 CRUD。
-- [ ] Radar 真实外部检索闭环：基于 UserContext、全周期计划、本周计划、tracking keywords 和材料源偏好，自动生成 3-5 个检索 query。
+- [x] Radar 真实外部检索闭环 v0：技术 Radar 已优先复用 arXiv / GitHub search service 生成 3-5 条外部信号，失败时 fallback 到 mock。
 - [ ] Radar 接入真实公开源：优先支持 arXiv、GitHub、官方博客 / release notes、指定 URL；先做技术源，产品 / 法规 / 新闻源后续扩展。
 - [ ] Radar 原文抓取与摘录：从网页、论文摘要、GitHub release 或官方文档中抽取 3-5 条 `source_passages`，每条包含 excerpt、source_url、location 和 Agent analysis。
 - [ ] Radar 去重和噪音过滤：过滤重复新闻、纯营销稿、股票 / 销量消息和无技术细节内容，只保留与当前计划有关的信号。

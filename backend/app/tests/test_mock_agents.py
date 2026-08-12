@@ -1,8 +1,11 @@
 from datetime import date
+from datetime import datetime, timezone
 
+from app.agents.tech_radar_agent import MockTechRadarAgent
 from app.schemas.common import SuggestedAction, TaskType
 from app.schemas.research_feeder import ResearchDayRole
-from app.schemas.tech_radar import RadarType
+from app.schemas.source import CombinedSearchResponse, SourceItem, SourceItemType, SourceType
+from app.schemas.tech_radar import RadarDigest, RadarScope, RadarType, TechRadarPayload
 from app.services.feed_service import FeedService
 
 
@@ -20,6 +23,47 @@ def test_mock_technical_radar_session_has_items():
     assert session.task_type == TaskType.tech_radar
     assert session.payload.radar_type == RadarType.technical_method_radar
     assert len(session.payload.digest.items) >= 1
+
+
+def test_technical_radar_agent_uses_search_results():
+    class FakeSearchService:
+        def search_technical_sources(self, query: str, max_results: int = 5) -> CombinedSearchResponse:
+            return CombinedSearchResponse(
+                query=query,
+                items=[
+                    SourceItem(
+                        id="2501.00001",
+                        source=SourceType.arxiv,
+                        item_type=SourceItemType.paper,
+                        title="Driving World Model Test",
+                        url="https://arxiv.org/abs/2501.00001",
+                        summary="A test paper about action-conditioned driving video generation.",
+                        authors=["A. Researcher"],
+                        published_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
+                        tags=["cs.CV", "world-model"],
+                        extra={"pdf_url": "https://arxiv.org/pdf/2501.00001"},
+                    )
+                ],
+                fetched_at=datetime.now(timezone.utc),
+            )
+
+    payload = TechRadarPayload(
+        radar_type=RadarType.technical_method_radar,
+        scope=RadarScope(topics=["driving world model"]),
+        digest=RadarDigest(
+            week_start=date(2026, 8, 10),
+            week_end=date(2026, 8, 16),
+            summary="pending",
+        ),
+    )
+
+    generated = MockTechRadarAgent(search_service=FakeSearchService()).generate(payload)
+    item = generated.digest.items[0]
+    assert item.source == "arxiv"
+    assert item.title == "Driving World Model Test"
+    assert item.url is not None
+    assert len(item.source_passages) >= 3
+    assert "公开源" in generated.digest.summary
 
 
 def test_mock_jd_session_has_analysis_and_resume_suggestion():

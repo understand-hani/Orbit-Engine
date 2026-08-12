@@ -1,11 +1,16 @@
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 from app.schemas.common import VisualAsset, VisualType, VisualUsage
+from app.schemas.source import SourceItem, SourceItemType, SourceType
 from app.schemas.tech_radar import RadarItem, RadarSourcePassage, RadarType, RecommendedDepth, TechRadarPayload
+from app.services.search_service import SearchService
 
 
 class MockTechRadarAgent:
+    def __init__(self, search_service: Optional[SearchService] = None) -> None:
+        self.search_service = search_service or SearchService()
+
     def generate(self, payload: TechRadarPayload) -> TechRadarPayload:
         if payload.radar_type == RadarType.product_strategy_radar:
             items = self._product_strategy_items()
@@ -13,10 +18,16 @@ class MockTechRadarAgent:
             top_signals = ["产品功能正在从单点能力展示转向系统体验闭环。"]
             follow_up = ["哪些产品信号能反向说明 WM/仿真/重建方向的工程价值？"]
         else:
-            items = self._technical_method_items()
-            summary = "本周样例信号覆盖 WM、生成式驾驶视频、3D/4D 表征和仿真评测方法。"
-            top_signals = ["技术方法正在从单帧感知走向时空生成、闭环评测和可控仿真。"]
-            follow_up = ["哪些技术方法值得进入周四/周五的精读候选？"]
+            items = self._technical_method_items_from_search(payload)
+            if items:
+                summary = "本周技术 Radar 已基于 arXiv / GitHub 公开源生成外部信号。"
+                top_signals = [items[0].summary]
+                follow_up = ["哪条真实外部信号值得转入周四/周五的 Deep Dive？"]
+            else:
+                items = self._technical_method_items()
+                summary = "本周样例信号覆盖 WM、生成式驾驶视频、3D/4D 表征和仿真评测方法。"
+                top_signals = ["技术方法正在从单帧感知走向时空生成、闭环评测和可控仿真。"]
+                follow_up = ["哪些技术方法值得进入周四/周五的精读候选？"]
 
         return payload.model_copy(
             update={
@@ -32,6 +43,164 @@ class MockTechRadarAgent:
                 ),
             }
         )
+
+    def _technical_method_items_from_search(self, payload: TechRadarPayload) -> List[RadarItem]:
+        queries = self._technical_queries(payload)
+        collected: List[SourceItem] = []
+        seen_urls = set()
+        for query in queries:
+            try:
+                response = self.search_service.search_technical_sources(query, max_results=5)
+            except Exception:
+                continue
+            for source_item in response.items:
+                if source_item.id.endswith("_search_error") or "error" in source_item.tags:
+                    continue
+                dedupe_key = str(source_item.url) if source_item.url else f"{source_item.source.value}:{source_item.id}"
+                if dedupe_key in seen_urls:
+                    continue
+                seen_urls.add(dedupe_key)
+                collected.append(source_item)
+                if len(collected) >= 5:
+                    break
+            if len(collected) >= 5:
+                break
+        return [self._radar_item_from_source(item, index) for index, item in enumerate(collected[:5], start=1)]
+
+    def _technical_queries(self, payload: TechRadarPayload) -> List[str]:
+        topics = [topic.strip() for topic in payload.scope.topics if topic.strip()]
+        research_groups = [group.strip() for group in payload.scope.research_groups if group.strip()]
+        seeds = topics[:3] + research_groups[:2]
+        if not seeds:
+            seeds = ["driving world model", "4D Gaussian Splatting autonomous driving"]
+        queries: List[str] = []
+        for seed in seeds:
+            if any(token.lower() in seed.lower() for token in ["4d", "gaussian", "world model", "driving"]):
+                queries.append(seed)
+            else:
+                queries.append(f"{seed} autonomous driving")
+        return queries[:4]
+
+    def _radar_item_from_source(self, source_item: SourceItem, index: int) -> RadarItem:
+        source_label = source_item.source.value
+        summary = source_item.summary.strip() or "该来源缺少摘要，需要打开原文确认核心内容。"
+        signal_type = self._signal_type(source_item)
+        title = source_item.title.strip() or f"{source_label} source {index}"
+        tags = [source_label, signal_type, *source_item.tags[:4]]
+        return RadarItem(
+            id=f"radar_real_{source_label}_{source_item.id}".replace("/", "_"),
+            radar_type=RadarType.technical_method_radar,
+            title=title,
+            source=source_label,
+            url=source_item.url,
+            signal_type=signal_type,
+            summary=self._summary_for_source(source_item),
+            technical_substance=summary,
+            marketing_noise=self._noise_for_source(source_item),
+            why_it_matters=self._why_source_matters(source_item),
+            source_passages=self._source_passages(source_item, summary),
+            visuals=[],
+            recommended_depth=self._recommended_depth(source_item),
+            tags=tags,
+        )
+
+    def _signal_type(self, source_item: SourceItem) -> str:
+        if source_item.source == SourceType.arxiv or source_item.item_type == SourceItemType.paper:
+            return "论文"
+        if source_item.source == SourceType.github or source_item.item_type == SourceItemType.repo:
+            return "开源项目"
+        return "外部材料"
+
+    def _summary_for_source(self, source_item: SourceItem) -> str:
+        if source_item.source == SourceType.arxiv:
+            return f"发现一篇近期论文：{source_item.title}。"
+        if source_item.source == SourceType.github:
+            stars = source_item.extra.get("stars")
+            star_text = f"，stars={stars}" if stars is not None else ""
+            return f"发现一个近期更新的开源项目：{source_item.title}{star_text}。"
+        return f"发现一条外部技术材料：{source_item.title}。"
+
+    def _why_source_matters(self, source_item: SourceItem) -> str:
+        if source_item.source == SourceType.arxiv:
+            return "论文信号可用于判断技术路线、方法假设、评价指标和是否值得进入 Deep Dive。"
+        if source_item.source == SourceType.github:
+            return "开源项目信号可用于判断代码复现入口、工程活跃度、数据/评估接口和可实践性。"
+        return "外部材料可用于补充当前计划的技术证据和下一步阅读候选。"
+
+    def _noise_for_source(self, source_item: SourceItem) -> str:
+        if source_item.source == SourceType.github and not source_item.summary.strip():
+            return "仓库缺少描述，需打开 README 判断是否只是占位项目。"
+        if source_item.source == SourceType.arxiv and not source_item.summary.strip():
+            return "论文摘要缺失，需打开 arXiv 页面确认内容。"
+        return "仍需检查原文是否有实验、代码、数据或清晰问题定义，避免只凭标题判断。"
+
+    def _recommended_depth(self, source_item: SourceItem) -> RecommendedDepth:
+        if source_item.source == SourceType.arxiv:
+            return RecommendedDepth.read
+        if source_item.source == SourceType.github:
+            stars = source_item.extra.get("stars")
+            if isinstance(stars, int) and stars >= 100:
+                return RecommendedDepth.read
+        return RecommendedDepth.skim
+
+    def _source_passages(self, source_item: SourceItem, summary: str) -> List[RadarSourcePassage]:
+        passages = [
+            RadarSourcePassage(
+                id=f"{source_item.id}_p1".replace("/", "_"),
+                title="来源摘要",
+                excerpt=summary,
+                analysis="这是从公开源 metadata 中抽出的核心摘要，用来初筛是否值得打开原文。",
+                source_url=source_item.url,
+                location=f"{source_item.source.value} metadata",
+            ),
+            RadarSourcePassage(
+                id=f"{source_item.id}_p2".replace("/", "_"),
+                title="来源线索",
+                excerpt=self._source_metadata_text(source_item),
+                analysis="这段用于定位材料类型、发布时间、作者或仓库活跃度，帮助判断是否适合进入本周 Deep Dive。",
+                source_url=source_item.url,
+                location="source metadata",
+            ),
+            RadarSourcePassage(
+                id=f"{source_item.id}_p3".replace("/", "_"),
+                title="Agent 初筛",
+                excerpt=self._why_source_matters(source_item),
+                analysis="这是 Agent 对该来源和当前 Radar 任务关系的初步判断，后续需要用原文细读验证。",
+                source_url=source_item.url,
+                location="agent routing",
+            ),
+        ]
+        tag_text = "、".join(source_item.tags[:8])
+        if tag_text:
+            passages.append(
+                RadarSourcePassage(
+                    id=f"{source_item.id}_p4".replace("/", "_"),
+                    title="主题标签",
+                    excerpt=tag_text,
+                    analysis="标签用于快速判断它是否落在当前方向的关键词范围内。",
+                    source_url=source_item.url,
+                    location="source tags",
+                )
+            )
+        return passages[:5]
+
+    def _source_metadata_text(self, source_item: SourceItem) -> str:
+        lines = [f"来源：{source_item.source.value}", f"类型：{self._signal_type(source_item)}"]
+        if source_item.authors:
+            lines.append(f"作者：{'、'.join(source_item.authors[:5])}")
+        if source_item.published_at:
+            lines.append(f"发布时间：{source_item.published_at.date().isoformat()}")
+        if source_item.updated_at:
+            lines.append(f"更新时间：{source_item.updated_at.date().isoformat()}")
+        if source_item.extra:
+            details = []
+            for key in ["stars", "forks", "language", "pdf_url"]:
+                value = source_item.extra.get(key)
+                if value:
+                    details.append(f"{key}={value}")
+            if details:
+                lines.append("补充信息：" + "，".join(details))
+        return "\n".join(lines)
 
     def _product_strategy_items(self) -> List[RadarItem]:
         return [
