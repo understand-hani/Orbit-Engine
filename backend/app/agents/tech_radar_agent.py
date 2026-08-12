@@ -3,46 +3,36 @@ from typing import List, Optional, Set
 
 from app.schemas.source import SourceItem, SourceItemType, SourceType
 from app.schemas.tech_radar import RadarItem, RadarSourcePassage, RecommendedDepth, TechRadarPayload
+from app.schemas.user_context import UserContext
 from app.services.search_service import SearchService
 
 
 RADAR_ITEM_LIMIT = 3
 RADAR_SEARCH_FETCH_LIMIT = 12
-RADAR_RELEVANCE_TERMS = [
-    "autonomous",
-    "driving",
-    "vehicle",
-    "automotive",
-    "adas",
-    "robot",
-    "robotics",
-    "embodied",
-    "world model",
-    "ai",
-    "artificial intelligence",
-    "slam",
-    "lidar",
-    "mapping",
-    "localization",
-    "3d",
-    "4d",
-    "gaussian",
-    "reconstruction",
-    "simulation",
-    "waymo",
-    "tesla",
-    "nvidia",
-    "xiaomi",
-    "horizon robotics",
-    "deeproute",
-    "自动驾驶",
-    "智能驾驶",
-    "机器人",
-    "具身",
-    "世界模型",
-    "三维",
-    "重建",
-    "仿真",
+GENERIC_INDUSTRY_TERMS = [
+    "research",
+    "product",
+    "platform",
+    "release",
+    "launch",
+    "company",
+    "university",
+    "institute",
+    "lab",
+    "startup",
+    "open source",
+    "breakthrough",
+    "研发",
+    "产品",
+    "平台",
+    "发布",
+    "上线",
+    "公司",
+    "大学",
+    "研究院",
+    "实验室",
+    "开源",
+    "成果",
 ]
 
 
@@ -54,8 +44,10 @@ class MockTechRadarAgent:
         self,
         payload: TechRadarPayload,
         excluded_source_keys: Optional[Set[str]] = None,
+        user_context: Optional[UserContext] = None,
     ) -> TechRadarPayload:
-        items = self._industry_items_from_search(payload, excluded_source_keys or set())
+        radar_context = self._radar_context_terms(payload, user_context)
+        items = self._industry_items_from_search(payload, excluded_source_keys or set(), radar_context)
         if items:
             summary = "本轮 Radar 已基于公开网页、新闻/RSS、开源与论文 metadata 生成行业动态信号。"
             top_signals = [items[0].summary]
@@ -84,8 +76,9 @@ class MockTechRadarAgent:
         self,
         payload: TechRadarPayload,
         excluded_source_keys: Set[str],
+        radar_context: List[str],
     ) -> List[RadarItem]:
-        queries = self._industry_queries(payload)
+        queries = self._industry_queries(payload, radar_context)
         collected: List[SourceItem] = []
         seen_urls = set()
         for query in queries:
@@ -99,7 +92,7 @@ class MockTechRadarAgent:
             for source_item in response.items:
                 if source_item.id.endswith("_search_error") or "error" in source_item.tags:
                     continue
-                if not self._is_relevant_source(source_item):
+                if not self._is_relevant_source(source_item, radar_context):
                     continue
                 dedupe_key = self._source_key(source_item)
                 if dedupe_key in excluded_source_keys:
@@ -120,7 +113,7 @@ class MockTechRadarAgent:
     def _source_key(self, source_item: SourceItem) -> str:
         return str(source_item.url) if source_item.url else f"{source_item.source.value}:{source_item.id}"
 
-    def _is_relevant_source(self, source_item: SourceItem) -> bool:
+    def _is_relevant_source(self, source_item: SourceItem, radar_context: List[str]) -> bool:
         haystack = " ".join(
             [
                 source_item.title,
@@ -129,25 +122,70 @@ class MockTechRadarAgent:
                 str(source_item.extra.get("publisher", "")),
             ]
         ).lower()
-        return any(term in haystack for term in RADAR_RELEVANCE_TERMS)
+        meaningful_context = [term.lower() for term in radar_context if len(term.strip()) >= 2]
+        if not meaningful_context:
+            return any(term in haystack for term in GENERIC_INDUSTRY_TERMS)
+        return any(term in haystack for term in meaningful_context)
 
-    def _industry_queries(self, payload: TechRadarPayload) -> List[str]:
+    def _industry_queries(self, payload: TechRadarPayload, radar_context: List[str]) -> List[str]:
         topics = [topic.strip() for topic in payload.scope.topics if topic.strip()]
         companies = [company.strip() for company in payload.scope.companies if company.strip()]
         research_groups = [group.strip() for group in payload.scope.research_groups if group.strip()]
-        seeds = topics[:3] + companies[:3] + research_groups[:2]
+        seeds = radar_context[:5] + topics[:3] + companies[:3] + research_groups[:2]
+        seeds = self._dedupe_terms(seeds)
         if not seeds:
-            seeds = ["autonomous driving world model", "robotics embodied AI", "4D reconstruction autonomous driving"]
+            seeds = ["AI industry research product release", "technology platform university lab"]
         queries: List[str] = []
         for seed in seeds:
             queries.extend(
                 [
                     f"{seed} product release research lab company",
                     f"{seed} university research institute platform breakthrough",
-                    f"{seed} autonomous driving robotics AI news",
+                    f"{seed} industry news public report",
                 ]
             )
         return queries[:6]
+
+    def _radar_context_terms(
+        self,
+        payload: TechRadarPayload,
+        user_context: Optional[UserContext],
+    ) -> List[str]:
+        terms: List[str] = []
+        if user_context is not None:
+            terms.extend(
+                [
+                    user_context.profile.goal,
+                    user_context.profile.current_stage,
+                    user_context.plan.long_term_goal,
+                    user_context.plan.weekly_focus,
+                    user_context.plan.next_action,
+                    *user_context.plan.active_tasks,
+                    *user_context.plan.tracking_keywords,
+                    *user_context.preferences.fields,
+                ]
+            )
+        else:
+            terms.extend(
+                [
+                    *payload.scope.topics,
+                    *payload.scope.companies,
+                    *payload.scope.research_groups,
+                    *payload.scope.signal_types,
+                ]
+            )
+        return self._dedupe_terms([term.strip() for term in terms if term.strip()])
+
+    def _dedupe_terms(self, terms: List[str]) -> List[str]:
+        deduped: List[str] = []
+        seen = set()
+        for term in terms:
+            key = term.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(term)
+        return deduped
 
     def _radar_item_from_source(self, payload: TechRadarPayload, source_item: SourceItem, index: int) -> RadarItem:
         source_label = source_item.source.value

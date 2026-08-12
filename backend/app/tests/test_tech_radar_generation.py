@@ -7,20 +7,26 @@ from app.config import get_settings
 from app.db.migrations import init_db
 from app.schemas.common import TaskType
 from app.schemas.source import CombinedSearchResponse, SourceItem, SourceItemType, SourceType
+from app.schemas.user_context import PersonalProfile, UserContext, UserPreference, WorkLearningPlan
 from app.services.feed_service import FeedService
+from app.services.user_context_service import UserContextService
 
 
 class StaticSearchService:
+    def __init__(self) -> None:
+        self.queries = []
+
     def search_industry_sources(self, query: str, max_results: int = 5) -> CombinedSearchResponse:
+        self.queries.append(query)
         items = [
             SourceItem(
-                id=f"paper_{index}",
-                source=SourceType.arxiv,
-                item_type=SourceItemType.paper,
-                title=f"Autonomous driving robotics radar source {index}",
-                url=f"https://arxiv.org/abs/2608.{index:05d}",
-                summary=f"Autonomous driving and embodied AI industry signal {index}",
-                tags=["cs.CV"],
+                id=f"industry_{index}",
+                source=SourceType.web,
+                item_type=SourceItemType.article,
+                title=f"{query} industry radar source {index}",
+                url=f"https://example.com/radar/{index}",
+                summary=f"{query} public industry signal {index}",
+                tags=["public_web"],
             )
             for index in range(1, 7)
         ]
@@ -68,6 +74,58 @@ def test_saved_tech_radar_sessions_exclude_previous_source_urls():
         assert len(first_urls) == 3
         assert len(second_urls) == 3
         assert first_urls.isdisjoint(second_urls)
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
+def test_tech_radar_uses_user_goal_for_queries_and_relevance():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_radar_user_goal_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        now = datetime.now(timezone.utc)
+        UserContextService().save(
+            UserContext(
+                profile=PersonalProfile(
+                    goal="量化交易风控平台",
+                    background_summary="关注金融科技行业动态。",
+                    current_stage="寻找机构和平台的产品信号。",
+                    updated_at=now,
+                ),
+                plan=WorkLearningPlan(
+                    long_term_goal="跟踪量化交易风控平台的行业机会。",
+                    weekly_focus="观察证券公司和金融科技平台的风控产品发布。",
+                    active_tasks=["记录公开网页中的产品发布和机构动作"],
+                    tracking_keywords=["量化交易风控", "证券风控平台"],
+                    updated_at=now,
+                ),
+                preferences=UserPreference(
+                    fields=["金融科技", "量化交易"],
+                    updated_at=now,
+                ),
+            )
+        )
+        feed = FeedService()
+        search = StaticSearchService()
+        feed.tech_radar_agent.search_service = search
+
+        session = feed.generate_and_save_mock_session(
+            date(2026, 8, 11),
+            task_type=TaskType.tech_radar,
+        )
+        refreshed = feed.refresh_tech_radar_session(session.id)
+
+        assert refreshed is not None
+        assert len(refreshed.payload.digest.items) == 3
+        joined_queries = " ".join(search.queries)
+        assert "量化交易风控平台" in joined_queries
+        assert "autonomous driving" not in joined_queries.lower()
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)

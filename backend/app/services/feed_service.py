@@ -10,6 +10,7 @@ from app.agents.research_feeder_agent import MockResearchFeederAgent
 from app.agents.tech_radar_agent import MockTechRadarAgent
 from app.agents.weekly_coordinator import WeeklyCoordinator
 from app.db.repositories import CheckinRepository, SessionRepository
+from app.db.repositories import UserContextRepository
 from app.schemas.checkin import Checkin, CheckinStatus
 from app.schemas.common import SessionStatus, SuggestedAction, TaskType
 from app.schemas.jd_analysis import JDInput, JDInputCreate
@@ -26,6 +27,7 @@ class FeedService:
         self.research_agent = MockResearchFeederAgent()
         self.sessions = SessionRepository()
         self.checkins = CheckinRepository()
+        self.user_contexts = UserContextRepository()
 
     def preview_session(
         self,
@@ -98,9 +100,12 @@ class FeedService:
             return None
 
         excluded_radar_keys = self._radar_source_keys(exclude_session_id=session_id)
+        user_context = self.user_contexts.get()
+        enriched_payload = self._enrich_radar_payload_with_user_context(session.payload, user_context)
         payload = self.tech_radar_agent.generate(
-            session.payload,
+            enriched_payload,
             excluded_source_keys=excluded_radar_keys,
+            user_context=user_context,
         )
         if not payload.digest.items and self._has_real_radar_items(session):
             payload = session.payload
@@ -258,6 +263,43 @@ class FeedService:
         if not isinstance(session.payload, TechRadarPayload):
             return False
         return any(item.id.startswith("radar_real_") for item in session.payload.digest.items)
+
+    def _enrich_radar_payload_with_user_context(
+        self,
+        payload: TechRadarPayload,
+        user_context,
+    ) -> TechRadarPayload:
+        if user_context is None:
+            return payload
+        topics = self._dedupe_strings(
+            [
+                user_context.profile.goal,
+                user_context.profile.current_stage,
+                user_context.plan.long_term_goal,
+                user_context.plan.weekly_focus,
+                *user_context.plan.active_tasks,
+                *user_context.plan.tracking_keywords,
+                *user_context.preferences.fields,
+                *payload.scope.companies,
+                *payload.scope.research_groups,
+            ]
+        )
+        updated_scope = payload.scope.model_copy(update={"topics": topics})
+        return payload.model_copy(update={"scope": updated_scope})
+
+    def _dedupe_strings(self, values: list[str]) -> list[str]:
+        deduped: list[str] = []
+        seen = set()
+        for value in values:
+            cleaned = value.strip()
+            if not cleaned:
+                continue
+            key = cleaned.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(cleaned)
+        return deduped
 
     def _apply_default_title(self, session: BaseSession, exclude_self: bool = True) -> BaseSession:
         if session.task_type != TaskType.research_feeder:
