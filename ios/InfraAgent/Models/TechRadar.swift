@@ -70,6 +70,7 @@ struct RadarItem: Codable, Identifiable {
     let technicalSubstance: String
     let marketingNoise: String
     let whyItMatters: String
+    let evidenceStatus: String
     let sourcePassages: [RadarSourcePassage]
     let visuals: [VisualAsset]
     let recommendedDepth: String
@@ -89,6 +90,7 @@ struct RadarItem: Codable, Identifiable {
         case technicalSubstance = "technical_substance"
         case marketingNoise = "marketing_noise"
         case whyItMatters = "why_it_matters"
+        case evidenceStatus = "evidence_status"
         case sourcePassages = "source_passages"
         case visuals
         case recommendedDepth = "recommended_depth"
@@ -109,6 +111,7 @@ struct RadarItem: Codable, Identifiable {
         technicalSubstance: String,
         marketingNoise: String,
         whyItMatters: String,
+        evidenceStatus: String = "metadata_only",
         sourcePassages: [RadarSourcePassage] = [],
         visuals: [VisualAsset],
         recommendedDepth: String,
@@ -127,6 +130,7 @@ struct RadarItem: Codable, Identifiable {
         self.technicalSubstance = technicalSubstance
         self.marketingNoise = marketingNoise
         self.whyItMatters = whyItMatters
+        self.evidenceStatus = evidenceStatus
         self.sourcePassages = sourcePassages
         self.visuals = visuals
         self.recommendedDepth = recommendedDepth
@@ -148,6 +152,7 @@ struct RadarItem: Codable, Identifiable {
         technicalSubstance = try container.decodeIfPresent(String.self, forKey: .technicalSubstance) ?? ""
         marketingNoise = try container.decodeIfPresent(String.self, forKey: .marketingNoise) ?? ""
         whyItMatters = try container.decodeIfPresent(String.self, forKey: .whyItMatters) ?? ""
+        evidenceStatus = try container.decodeIfPresent(String.self, forKey: .evidenceStatus) ?? "metadata_only"
         sourcePassages = try container.decodeIfPresent([RadarSourcePassage].self, forKey: .sourcePassages) ?? []
         visuals = try container.decodeIfPresent([VisualAsset].self, forKey: .visuals) ?? []
         recommendedDepth = try container.decodeIfPresent(String.self, forKey: .recommendedDepth) ?? "skim"

@@ -62,7 +62,8 @@ def test_technical_radar_agent_uses_search_results():
     assert item.source == "arxiv"
     assert item.title == "Driving World Model Test"
     assert item.url is not None
-    assert len(item.source_passages) >= 3
+    assert item.source_passages == []
+    assert item.evidence_status == "metadata_with_structured_summary"
     assert "公开源" in generated.digest.summary
 
 

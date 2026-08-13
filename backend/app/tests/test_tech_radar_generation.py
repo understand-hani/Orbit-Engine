@@ -7,6 +7,7 @@ from app.config import get_settings
 from app.db.migrations import init_db
 from app.schemas.common import TaskType
 from app.schemas.source import CombinedSearchResponse, SourceItem, SourceItemType, SourceType
+from app.schemas.tech_radar import RadarDigest, RadarScope, RadarType, TechRadarPayload
 from app.schemas.user_context import PersonalProfile, UserContext, UserPreference, WorkLearningPlan
 from app.agents.tech_radar_agent import MockTechRadarAgent
 from app.services.feed_service import FeedService
@@ -53,6 +54,11 @@ class FailingSearchService:
 class EmptyPassageSearchService:
     def fetch_web_passages(self, url: str, max_passages: int = 5):
         return []
+
+
+class RaisingPassageSearchService:
+    def fetch_web_passages(self, url: str, max_passages: int = 5):
+        raise AssertionError("Radar generation should not fetch web passages by default")
 
 
 def test_saved_tech_radar_sessions_exclude_previous_source_urls():
@@ -213,7 +219,7 @@ def test_radar_source_passages_separate_excerpt_and_agent_analysis():
     assert "建议" in passages[0].suggestion
 
 
-def test_radar_source_passages_fallback_to_fetch_failed_note_when_page_unreadable():
+def test_radar_source_passages_empty_when_page_unreadable():
     agent = MockTechRadarAgent(search_service=EmptyPassageSearchService())
     source_item = SourceItem(
         id="web_003",
@@ -229,11 +235,40 @@ def test_radar_source_passages_fallback_to_fetch_failed_note_when_page_unreadabl
 
     passages = agent._source_passages(source_item, source_item.summary, ["量化交易风控平台"])
 
-    assert len(passages) == 1
-    assert passages[0].title == "原文正文抓取失败"
-    assert "无法从原文提取关键段落" in passages[0].excerpt
-    assert "建议打开原文链接" in passages[0].suggestion
-    assert passages[0].source_url is not None
+    assert passages == []
+
+
+def test_radar_item_marks_metadata_only_when_page_unreadable():
+    agent = MockTechRadarAgent(search_service=RaisingPassageSearchService())
+    source_item = SourceItem(
+        id="web_004",
+        source=SourceType.web,
+        item_type=SourceItemType.article,
+        title="某金融科技公司发布新一代风控产品",
+        url="https://example.com/fintech-risk-product",
+        summary="该产品面向证券机构，提供平台化风险管理能力。",
+        published_at=datetime(2026, 8, 12, tzinfo=timezone.utc),
+        tags=["public_web", "金融科技日报"],
+        extra={"publisher": "金融科技日报", "publisher_url": "https://example.com"},
+    )
+
+    item = agent._radar_item_from_source(
+        TechRadarPayload(
+            radar_type=RadarType.product_strategy_radar,
+            scope=RadarScope(topics=["量化交易风控平台"]),
+            digest=RadarDigest(
+                week_start=date(2026, 8, 10),
+                week_end=date(2026, 8, 16),
+                summary="pending",
+            ),
+        ),
+        source_item,
+        1,
+        ["量化交易风控平台"],
+    )
+
+    assert item.source_passages == []
+    assert item.evidence_status == "metadata_only"
 
 
 def test_tech_radar_refresh_does_not_fallback_to_mock_items():

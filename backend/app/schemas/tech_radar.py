@@ -62,6 +62,7 @@ class RadarItem(BaseModel):
     technical_substance: str = ""
     marketing_noise: str = ""
     why_it_matters: str
+    evidence_status: str = "metadata_only"
     source_passages: List[RadarSourcePassage] = []
     visuals: List[VisualAsset] = []
     recommended_depth: RecommendedDepth = RecommendedDepth.skim

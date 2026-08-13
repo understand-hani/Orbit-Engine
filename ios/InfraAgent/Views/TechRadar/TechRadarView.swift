@@ -241,6 +241,7 @@ struct TechRadarView: View {
                 validationQuestions: validationQuestions(for: item),
                 sourceReference: sourceReference(for: item, input: input),
                 keyPassages: keyPassages(for: item),
+                evidenceStatus: evidenceStatusText(for: item),
                 sourceType: input.sourceLabel,
                 sourceDetail: input.sourceDetail,
                 userMark: item.userMark,
@@ -412,17 +413,20 @@ struct TechRadarView: View {
             }
         }
 
-        // 旧 session 无 source_passages 时的兜底：给出一条失败说明，而不是拼装占位卡片。
-        return [
-            RadarKeyPassage(
-                title: "原文正文抓取失败",
-                excerpt: "Agent 未能读取该推送的完整正文，无法从原文提取关键段落。",
-                analysis: "当前只能依据 RSS 摘要 / 标题 / 来源信息判断主题方向，这些信息不能替代原文事实。",
-                suggestion: "建议打开原文链接确认核心内容；如果链接失效，可把这条信号登记为手动材料，或粘贴原文 URL 重新扫描。",
-                sourceURL: item.url,
-                location: "web page fetch failed"
-            )
-        ]
+        return []
+    }
+
+    private func evidenceStatusText(for item: RadarItem) -> String {
+        switch item.evidenceStatus {
+        case "excerpt_available":
+            return "已抓到正文摘录：可用摘录辅助判断，但进入 Deep Dive 前仍要打开原文确认上下文。"
+        case "full_text_available":
+            return "已获取全文：Radar 仍只做初筛，深入结论放到 Deep Dive。"
+        case "metadata_with_structured_summary":
+            return "结构化摘要判断：基于论文摘要、仓库描述或来源 metadata，未额外抓取网页正文。"
+        default:
+            return "元数据判断：当前基于标题、摘要、来源和链接做初筛，没有把网页正文抓取作为必要前提。"
+        }
     }
 
     private func manualRadarItem(
@@ -443,6 +447,7 @@ struct TechRadarView: View {
             technicalSubstance: input.summaryOrFallback,
             marketingNoise: noise,
             whyItMatters: input.relevanceOrFallback(context: context),
+            evidenceStatus: "metadata_only",
             sourcePassages: [],
             visuals: [],
             recommendedDepth: "radar",
@@ -603,6 +608,7 @@ private struct RadarDecision: Identifiable {
     let validationQuestions: [String]
     let sourceReference: RadarSourceReference
     let keyPassages: [RadarKeyPassage]
+    let evidenceStatus: String
     let sourceType: String
     let sourceDetail: String
     let userMark: String
@@ -853,11 +859,18 @@ private struct RadarDecisionDetailView: View {
             }
 
             Section("关键信息摘录") {
-                ForEach(decision.keyPassages) { passage in
-                    NavigationLink {
-                        RadarPassageDetailView(passage: passage)
-                    } label: {
-                        RadarPassageCardView(passage: passage)
+                if decision.keyPassages.isEmpty {
+                    Text(decision.evidenceStatus)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                } else {
+                    ForEach(decision.keyPassages) { passage in
+                        NavigationLink {
+                            RadarPassageDetailView(passage: passage)
+                        } label: {
+                            RadarPassageCardView(passage: passage)
+                        }
                     }
                 }
             }

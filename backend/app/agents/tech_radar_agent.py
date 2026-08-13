@@ -251,6 +251,11 @@ class MockTechRadarAgent:
         signal_type = self._signal_type(source_item)
         title = source_item.title.strip() or f"{source_label} source {index}"
         tags = [source_label, signal_type, *source_item.tags[:4]]
+        source_passages = (
+            self._source_passages(source_item, summary, radar_context)
+            if self._should_fetch_source_passages(source_item)
+            else []
+        )
         return RadarItem(
             id=f"radar_real_{source_label}_{source_item.id}".replace("/", "_"),
             radar_type=payload.radar_type,
@@ -262,7 +267,8 @@ class MockTechRadarAgent:
             technical_substance=summary,
             marketing_noise=self._noise_for_source(source_item),
             why_it_matters=self._why_source_matters(source_item),
-            source_passages=self._source_passages(source_item, summary, radar_context),
+            evidence_status=self._evidence_status(source_item, source_passages),
+            source_passages=source_passages,
             visuals=[],
             recommended_depth=self._recommended_depth(source_item),
             tags=tags,
@@ -341,17 +347,14 @@ class MockTechRadarAgent:
                 )
             return passages[:5]
 
-        return [
-            RadarSourcePassage(
-                id=f"{source_item.id}_fetch_failed".replace("/", "_"),
-                title="原文正文抓取失败",
-                excerpt="Agent 未能读取该推送的完整正文，无法从原文提取关键段落。",
-                analysis="当前只能依据 RSS 摘要 / 标题 / 来源信息判断主题方向，这些信息不能替代原文事实。",
-                suggestion="建议打开原文链接确认核心内容；如果链接失效，可把这条信号登记为手动材料，或粘贴原文 URL 重新扫描。",
-                source_url=source_item.url,
-                location="web page fetch failed",
-            )
-        ]
+        return []
+
+    def _evidence_status(self, source_item: SourceItem, source_passages: List[RadarSourcePassage]) -> str:
+        if source_passages:
+            return "excerpt_available"
+        if source_item.source in {SourceType.arxiv, SourceType.github} and source_item.summary.strip():
+            return "metadata_with_structured_summary"
+        return "metadata_only"
 
     def _fetch_source_page_passages(self, source_item: SourceItem) -> List[str]:
         if not source_item.url:
@@ -360,6 +363,9 @@ class MockTechRadarAgent:
             return self.search_service.fetch_web_passages(str(source_item.url), max_passages=5)
         except Exception:
             return []
+
+    def _should_fetch_source_passages(self, source_item: SourceItem) -> bool:
+        return source_item.extra.get("fetch_passages") is True
 
     def _passage_title(self, excerpt: str, index: int) -> str:
         cleaned = " ".join(excerpt.split())
@@ -481,4 +487,3 @@ class MockTechRadarAgent:
         return self._dedupe_terms(
             [term for term in terms if len(term) >= 2 and term not in stop_terms]
         )
-
