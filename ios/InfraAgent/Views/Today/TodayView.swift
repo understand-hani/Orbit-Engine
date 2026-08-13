@@ -70,7 +70,6 @@ struct TodayView: View {
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text(entry.title)
                                                 .font(.headline)
-                                                .foregroundStyle(.primary)
                                             Text(entry.subtitle)
                                                 .font(.subheadline)
                                                 .foregroundStyle(.secondary)
