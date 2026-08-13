@@ -858,6 +858,18 @@ private struct RadarDecisionDetailView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Agent 讨论") {
+                NavigationLink {
+                    AgentChatView(
+                        session: session,
+                        contextRefs: ["tech_radar", "signal:\(decision.id)"],
+                        title: "Agent 讨论"
+                    )
+                } label: {
+                    Label("和 Agent 讨论这条信号", systemImage: "bubble.left.and.bubble.right")
+                }
+            }
+
             Section("关键信息摘录") {
                 if decision.keyPassages.isEmpty {
                     Text(decision.evidenceStatus)

@@ -15,9 +15,11 @@ from app.schemas.chat import (
     ChatRole,
 )
 from app.schemas.research_feeder import PaperReader, ResearchFeederPayload
+from app.schemas.tech_radar import RadarItem, TechRadarPayload
 from app.services.llm_service import (
     DEEP_DIVE_DISCUSSION_SYSTEM_PROMPT,
     JD_DISCUSSION_SYSTEM_PROMPT,
+    RADAR_DISCUSSION_SYSTEM_PROMPT,
     MockLLMService,
     OpenRouterChatService,
 )
@@ -37,8 +39,15 @@ class ChatService:
         if session is None:
             return None
         now = datetime.now(timezone.utc)
+        existing_threads = self.chats.get_by_session(session.id)
+        for thread in existing_threads:
+            if sorted(thread.context_refs) == sorted(request.context_refs):
+                return thread
+        thread_id = session.ai_chat_thread_id
+        if existing_threads:
+            thread_id = f"chat_{uuid4().hex[:12]}"
         thread = AIChatThread(
-            id=session.ai_chat_thread_id or f"chat_{uuid4().hex[:12]}",
+            id=thread_id,
             session_id=session.id,
             task_type=session.task_type,
             context_refs=request.context_refs,
@@ -162,6 +171,8 @@ class ChatService:
     def _system_prompt_for(self, thread: AIChatThread) -> str:
         if thread.task_type.value == "jd_analysis":
             return JD_DISCUSSION_SYSTEM_PROMPT
+        if thread.task_type.value == "tech_radar":
+            return RADAR_DISCUSSION_SYSTEM_PROMPT
         return DEEP_DIVE_DISCUSSION_SYSTEM_PROMPT
 
     def _messages_for(self, thread: AIChatThread, content: str) -> list[dict[str, str]]:
@@ -193,7 +204,11 @@ class ChatService:
 
     def _context_message_for(self, thread: AIChatThread) -> str:
         session = self.sessions.get_by_id(thread.session_id)
-        if session is None or session.task_type != TaskType.research_feeder:
+        if session is None:
+            return ""
+        if session.task_type == TaskType.tech_radar:
+            return self._radar_context_message(thread, session)
+        if session.task_type != TaskType.research_feeder:
             return ""
         payload = session.payload
         if not isinstance(payload, ResearchFeederPayload):
@@ -258,6 +273,71 @@ class ChatService:
             )
 
         return "\n".join(line for line in lines if line.strip())
+
+    def _radar_context_message(self, thread: AIChatThread, session) -> str:
+        payload = session.payload
+        if not isinstance(payload, TechRadarPayload):
+            return ""
+        lines = [
+            "Radar 信号上下文如下。回答用户时必须优先基于这些内容，不要把 signal id 当成唯一信息。",
+            f"Session: {session.title}",
+            f"Radar 类型: {payload.radar_type.value}",
+            f"本轮摘要: {payload.digest.summary}",
+        ]
+        scope_parts = [
+            f"topics={', '.join(payload.scope.topics)}" if payload.scope.topics else "",
+            f"companies={', '.join(payload.scope.companies)}" if payload.scope.companies else "",
+            f"research_groups={', '.join(payload.scope.research_groups)}" if payload.scope.research_groups else "",
+        ]
+        if any(scope_parts):
+            lines.append(f"扫描范围: {', '.join(part for part in scope_parts if part)}")
+
+        item = self._matching_radar_item(thread.context_refs, payload)
+        if item is not None:
+            lines.extend(self._radar_item_lines(item))
+        elif payload.digest.items:
+            lines.append("当前信号列表（未匹配到具体 signal 引用时使用前 3 条）:")
+            for item in payload.digest.items[:3]:
+                lines.extend(self._radar_item_lines(item))
+        return "\n".join(line for line in lines if line.strip())
+
+    def _matching_radar_item(self, context_refs: List[str], payload: TechRadarPayload) -> Optional[RadarItem]:
+        item_ids = {item.id for item in payload.digest.items}
+        for ref in context_refs:
+            candidate = ref
+            if ref.startswith("signal:"):
+                candidate = ref[len("signal:"):]
+            if candidate in item_ids:
+                return next(item for item in payload.digest.items if item.id == candidate)
+        return None
+
+    def _radar_item_lines(self, item: RadarItem) -> List[str]:
+        lines = [
+            "Radar 信号:",
+            f"- id: {item.id}",
+            f"- title: {item.title}",
+            f"- source: {item.source}",
+            f"- signal_type: {item.signal_type}",
+            f"- url: {str(item.url) if item.url else ''}",
+            f"- summary: {item.summary}",
+            f"- technical_substance: {item.technical_substance}",
+            f"- marketing_noise: {item.marketing_noise}",
+            f"- why_it_matters: {item.why_it_matters}",
+            f"- evidence_status: {item.evidence_status}",
+            f"- recommended_depth: {item.recommended_depth.value}",
+            f"- tags: {', '.join(item.tags)}",
+            f"- user_mark: {item.user_mark.value}",
+        ]
+        if item.source_passages:
+            lines.append("- source_passages:")
+            for passage in item.source_passages[:5]:
+                passage_url = str(passage.source_url) if passage.source_url else ""
+                lines.append(
+                    f"  - [{passage.title}] {passage.excerpt}"
+                    f"（analysis: {passage.analysis}；suggestion: {passage.suggestion}；"
+                    f"url: {passage_url}；location: {passage.location}）"
+                )
+        return lines
 
     def _first_matching_paper_ref(
         self,

@@ -1,11 +1,13 @@
 import os
 import tempfile
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from app.config import get_settings
 from app.db.migrations import init_db
 from app.schemas.chat import AIChatThreadCreate
 from app.schemas.common import TaskType
+from app.schemas.source import CombinedSearchResponse, SourceItem, SourceItemType, SourceType
 from app.services.chat_service import ChatService
 from app.services.feed_service import FeedService
 
@@ -138,6 +140,128 @@ def test_deep_dive_chat_messages_include_real_material_context():
         assert passage.text_excerpt in material_context
         assert figure.visual.caption in material_context
         assert "不要把 paper_id 当成唯一信息" in material_context
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
+class FakeRadarSearchService:
+    def search_industry_sources(self, query: str, max_results: int = 5) -> CombinedSearchResponse:
+        items = [
+            SourceItem(
+                id=f"industry_{index}",
+                source=SourceType.web,
+                item_type=SourceItemType.article,
+                title=f"{query} radar source {index}",
+                url=f"https://example.com/radar/{index}",
+                summary=f"{query} public industry signal {index}",
+                tags=["public_web"],
+                extra={"fetch_passages": True},
+            )
+            for index in range(1, 7)
+        ]
+        return CombinedSearchResponse(
+            query=query,
+            items=items[:max_results],
+            fetched_at=datetime.now(timezone.utc),
+        )
+
+    def fetch_web_passages(self, url: str, max_passages: int = 5):
+        return [
+            f"{url} 原文第一段：某机构发布了面向行业场景的新平台。",
+            f"{url} 原文第二段：平台已在真实业务中完成测试，覆盖数据接入、风险识别。",
+        ][:max_passages]
+
+
+def _generate_radar_session_with_items():
+    feed = FeedService()
+    feed.tech_radar_agent.search_service = FakeRadarSearchService()
+    seed = feed.generate_and_save_mock_session(
+        date(2026, 8, 13),
+        task_type=TaskType.tech_radar,
+    )
+    refreshed = feed.refresh_tech_radar_session(seed.id)
+    assert refreshed is not None
+    assert len(refreshed.payload.digest.items) >= 2
+    return refreshed
+
+
+def test_radar_chat_messages_include_real_signal_context():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_chat_radar_context_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        session = _generate_radar_session_with_items()
+        chat_service = ChatService()
+        item = session.payload.digest.items[0]
+
+        thread = chat_service.create_thread(
+            AIChatThreadCreate(
+                session_id=session.id,
+                context_refs=["tech_radar", f"signal:{item.id}"],
+            )
+        )
+        assert thread is not None
+
+        messages = chat_service._messages_for(thread, "这条信号值得跟踪吗？")
+        material_context = "\n".join(message["content"] for message in messages)
+
+        assert item.title in material_context
+        assert item.summary in material_context
+        assert item.technical_substance in material_context
+        assert item.source_passages[0].excerpt in material_context
+        assert "不要把 signal id 当成唯一信息" in material_context
+        assert "不要把 paper_id 当成唯一信息" not in material_context
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
+def test_radar_per_item_threads_do_not_clobber_each_other():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_chat_radar_threads_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        session = _generate_radar_session_with_items()
+        chat_service = ChatService()
+        item_a = session.payload.digest.items[0]
+        item_b = session.payload.digest.items[1]
+
+        thread_a = chat_service.create_thread(
+            AIChatThreadCreate(
+                session_id=session.id,
+                context_refs=["tech_radar", f"signal:{item_a.id}"],
+            )
+        )
+        thread_b = chat_service.create_thread(
+            AIChatThreadCreate(
+                session_id=session.id,
+                context_refs=["tech_radar", f"signal:{item_b.id}"],
+            )
+        )
+        assert thread_a is not None
+        assert thread_b is not None
+        assert thread_a.id != thread_b.id
+
+        thread_a_again = chat_service.create_thread(
+            AIChatThreadCreate(
+                session_id=session.id,
+                context_refs=["tech_radar", f"signal:{item_a.id}"],
+            )
+        )
+        assert thread_a_again is not None
+        assert thread_a_again.id == thread_a.id
+        assert chat_service.get_thread(thread_b.id) is not None
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)
