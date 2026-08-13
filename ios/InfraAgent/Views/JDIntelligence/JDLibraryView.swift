@@ -35,7 +35,7 @@ struct JDLibraryView: View {
     var body: some View {
         List {
             if isLoading {
-                LoadingView(title: "正在加载 JD 库")
+                LoadingView(title: "正在加载机会库")
             }
 
             if let errorMessage {
@@ -54,7 +54,7 @@ struct JDLibraryView: View {
                 }
             }
         }
-        .navigationTitle("JD 库")
+        .navigationTitle("机会库")
         .searchable(text: $searchText, prompt: "公司、岗位、技能")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {

@@ -82,7 +82,7 @@ struct JDAddOptionsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("添加 JD") {
+                Section("添加机会") {
                     Button {
                         dismiss()
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -102,7 +102,7 @@ struct JDAddOptionsView: View {
                     }
                 }
             }
-            .navigationTitle("添加 JD")
+            .navigationTitle("添加机会")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -216,12 +216,12 @@ struct JDEntryFormView: View {
                     Button {
                         Task { await save() }
                     } label: {
-                        Label(isSaving ? "正在保存" : "保存 JD", systemImage: "tray.and.arrow.down")
+                        Label(isSaving ? "正在保存" : "保存机会", systemImage: "tray.and.arrow.down")
                     }
                     .disabled(isSaving || roleTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
-            .navigationTitle("添加 JD")
+            .navigationTitle("添加机会")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

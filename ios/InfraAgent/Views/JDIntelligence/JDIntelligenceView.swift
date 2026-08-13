@@ -12,7 +12,7 @@ struct JDIntelligenceView: View {
             List {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("JD 智能分析")
+                        Text("Opportunity Alignment")
                             .font(.title2)
                             .fontWeight(.semibold)
                         Text("集中管理市场信号、能力状态、任务状态和候选行动。")
@@ -23,7 +23,7 @@ struct JDIntelligenceView: View {
                 }
 
                 if viewModel.isLoading {
-                    LoadingView(title: "正在加载 JD 智能分析")
+                    LoadingView(title: "正在加载 Opportunity Alignment")
                 }
 
                 if let error = viewModel.errorMessage {
@@ -34,7 +34,7 @@ struct JDIntelligenceView: View {
 
                 Section("概览") {
                     HStack {
-                        MetricCell(title: "JD", value: "\(viewModel.entries.count)")
+                        MetricCell(title: "机会", value: "\(viewModel.entries.count)")
                         MetricCell(title: "星标", value: "\(viewModel.favoriteEntries.count)")
                         MetricCell(title: "高优先级", value: "\(viewModel.highPriorityEntries.count)")
                         MetricCell(title: "行动", value: "\(viewModel.suggestedActions.count)")
@@ -47,13 +47,13 @@ struct JDIntelligenceView: View {
                         draftEntry = nil
                         isShowingAddOptions = true
                     } label: {
-                        Label("添加 JD", systemImage: "plus.rectangle.on.rectangle")
+                        Label("添加机会", systemImage: "plus.rectangle.on.rectangle")
                     }
 
                     NavigationLink {
                         JDLibraryView()
                     } label: {
-                        Label("JD 库", systemImage: "books.vertical")
+                        Label("机会库", systemImage: "books.vertical")
                     }
 
                     NavigationLink {
@@ -83,7 +83,7 @@ struct JDIntelligenceView: View {
                     }
                 }
             }
-            .navigationTitle("JD")
+            .navigationTitle("Opportunity Alignment")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
