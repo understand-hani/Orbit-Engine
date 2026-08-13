@@ -166,6 +166,18 @@ class WeeklyCoordinator:
                 id=f"jd_input_{target_date.isoformat()}",
                 source_type=JDSourceType.manual_note,
                 user_question="请粘贴或录入一个真实 JD，Agent 将结合结构化简历和学习计划分析。",
+                jd_text=(
+                    "岗位名称：世界模型研发工程师（自动驾驶仿真方向）\n"
+                    "职位描述：\n"
+                    "1. 负责基于世界模型（World Model）的自动驾驶仿真场景生成与评测；\n"
+                    "2. 使用 3DGS / 4DGS 对真实场景进行重建，构建可控的仿真环境；\n"
+                    "3. 基于 PyTorch 实现视频生成模型的训练、评估与调优；\n"
+                    "4. 与 SLAM 与重建团队协作，把几何信息融入生成式 pipeline。\n"
+                    "任职要求：\n"
+                    "1. 有自动驾驶或仿真领域项目经验；\n"
+                    "2. 熟悉深度学习训练工程，具备实验纪律与结果记录习惯；\n"
+                    "3. 对 reconstruction vs generation 方向有技术判断力。"
+                ),
                 created_at=now,
             ),
             analysis=JDAnalysis(

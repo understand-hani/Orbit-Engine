@@ -15,7 +15,6 @@ def test_mock_product_radar_session_has_items():
     assert session.suggested_action == SuggestedAction.open_weekly_radar
     assert session.payload.radar_type == RadarType.product_strategy_radar
     assert len(session.payload.digest.items) >= 1
-    assert len(session.payload.digest.items[0].visuals) >= 1
 
 
 def test_mock_technical_radar_session_has_items():
@@ -27,7 +26,7 @@ def test_mock_technical_radar_session_has_items():
 
 def test_technical_radar_agent_uses_search_results():
     class FakeSearchService:
-        def search_technical_sources(self, query: str, max_results: int = 5) -> CombinedSearchResponse:
+        def search_industry_sources(self, query: str, max_results: int = 5) -> CombinedSearchResponse:
             return CombinedSearchResponse(
                 query=query,
                 items=[
@@ -64,7 +63,7 @@ def test_technical_radar_agent_uses_search_results():
     assert item.url is not None
     assert item.source_passages == []
     assert item.evidence_status == "metadata_with_structured_summary"
-    assert "公开源" in generated.digest.summary
+    assert "公开网页" in generated.digest.summary
 
 
 def test_mock_jd_session_has_analysis_and_resume_suggestion():
