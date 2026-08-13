@@ -58,24 +58,46 @@ struct TodayView: View {
                 if viewModel.mode == .manual {
                     Section("Manual") {
                         ForEach(ManualSessionEntry.all) { entry in
-                            Button {
-                                Task { await viewModel.loadManual(entry) }
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: entry.systemImage)
-                                        .font(.title3)
-                                        .foregroundStyle(.blue)
-                                        .frame(width: 28)
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(entry.title)
-                                            .font(.headline)
-                                            .foregroundStyle(.primary)
-                                        Text(entry.subtitle)
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
+                            if entry.opensDirectly {
+                                NavigationLink {
+                                    JDIntelligenceView()
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: entry.systemImage)
+                                            .font(.title3)
+                                            .foregroundStyle(.blue)
+                                            .frame(width: 28)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(entry.title)
+                                                .font(.headline)
+                                                .foregroundStyle(.primary)
+                                            Text(entry.subtitle)
+                                                .font(.subheadline)
+                                                .foregroundStyle(.secondary)
+                                        }
                                     }
+                                    .padding(.vertical, 4)
                                 }
-                                .padding(.vertical, 4)
+                            } else {
+                                Button {
+                                    Task { await viewModel.loadManual(entry) }
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: entry.systemImage)
+                                            .font(.title3)
+                                            .foregroundStyle(.blue)
+                                            .frame(width: 28)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(entry.title)
+                                                .font(.headline)
+                                                .foregroundStyle(.primary)
+                                            Text(entry.subtitle)
+                                                .font(.subheadline)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    .padding(.vertical, 4)
+                                }
                             }
                         }
                     }
@@ -113,7 +135,11 @@ struct TodayView: View {
                     if let session = viewModel.session, isActive(session) {
                         Section("今日工作区") {
                             NavigationLink {
-                                SessionQueueView(seedSession: session)
+                                if session.taskType == .jdAnalysis {
+                                    JDIntelligenceView()
+                                } else {
+                                    SessionQueueView(seedSession: session)
+                                }
                             } label: {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text(displayTitle(for: session))

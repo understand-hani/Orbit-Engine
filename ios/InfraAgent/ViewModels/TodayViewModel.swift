@@ -100,6 +100,7 @@ struct ManualSessionEntry: Identifiable {
     let systemImage: String
     let date: String
     let taskTypeOverride: TaskType?
+    var opensDirectly: Bool = false
 
     static var all: [ManualSessionEntry] {
         [
@@ -133,7 +134,8 @@ struct ManualSessionEntry: Identifiable {
             subtitle: "把学习行动和真实机会、要求、反馈对齐。",
             systemImage: "scope",
             date: "2026-08-05",
-            taskTypeOverride: nil
+            taskTypeOverride: nil,
+            opensDirectly: true
         ),
         ]
     }
