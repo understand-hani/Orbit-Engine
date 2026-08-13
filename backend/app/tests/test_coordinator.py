@@ -46,4 +46,8 @@ def test_weekend_modes_keep_three_task_types():
     sunday = coordinator.create_session(date(2026, 7, 19))
     assert sunday.task_type == TaskType.research_feeder
     assert sunday.session_mode == SessionMode.review
-
+    assert sunday.payload.research_day_role == ResearchDayRole.manual_deep_dive
+    assert [criterion.id for criterion in sunday.completion.criteria] == [
+        "weekly_review_summary",
+        "weekly_next_priorities",
+    ]

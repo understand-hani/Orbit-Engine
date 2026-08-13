@@ -364,12 +364,20 @@ struct SessionDestinationView: View {
             case .jdAnalysis:
                 JDIntelligenceView()
             case .researchFeeder(let payload):
-                ResearchReaderView(session: session, payload: payload) { mode, context in
-                    completionStartMode = mode
-                    checkinSourceContext = context
-                    isShowingCompletion = true
-                } onSourceContextChanged: { context in
-                    checkinSourceContext = context
+                if isWeeklyStudio(session) {
+                    WeeklyStudioView(session: session) { mode, context in
+                        completionStartMode = mode
+                        checkinSourceContext = context
+                        isShowingCompletion = true
+                    }
+                } else {
+                    ResearchReaderView(session: session, payload: payload) { mode, context in
+                        completionStartMode = mode
+                        checkinSourceContext = context
+                        isShowingCompletion = true
+                    } onSourceContextChanged: { context in
+                        checkinSourceContext = context
+                    }
                 }
             }
         }

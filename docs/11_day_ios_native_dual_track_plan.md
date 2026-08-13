@@ -1,6 +1,6 @@
 # 11 天双线并行计划：iOS 原生开发 + 竞赛文档
 
-最后更新：2026-08-12
+最后更新：2026-08-13
 
 截止日期：2026-08-16
 
@@ -262,6 +262,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] Radar 结果以卡片展示，每条卡片可点开查看完整信号判断、来源详情、具体观察、验证问题、噪音判断和路由动作。
 - [x] Radar 详情展示原文 / 材料入口：URL 可打开原文，PDF / 手动材料 / Agent 扫描显示当前可追溯来源说明。
 - [x] Radar 详情展示关键信息段落提取与 Agent 解析，先基于当前 payload metadata 生成；真实网页/PDF 正文抽取后续接后端。
+- [x] Radar 详情页每条信号新增 `Agent 讨论` 入口：进入 AgentChatView 讨论该条目的具体内容；后端按 `signal:<id>` 匹配并把该条目的摘要、技术实质、营销噪音、为何重要、证据状态、关键段落（含摘录 / 分析 / 建议）注入 LLM，配套 `RADAR_DISCUSSION_SYSTEM_PROMPT`；同一条目重复进入复用同一 thread，不同条目各自独立，避免互相覆盖。
 - [x] Radar 详情支持 `Radar Check-in`，可把当前信号判断、关键洞察和下一步行动保存到归档。
 - [x] Radar 归档入口统一收敛到 `保存到归档`，避免上方 `归档` 按钮和 Check-in 归档语义重复。
 - [x] Radar 生成结果写回 session payload，重新进入同一个 Radar 卡片时直接恢复已生成结果，不再依赖前端临时状态。
@@ -272,8 +273,9 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [x] Radar 无 mock fallback：公开源检索失败或过滤后为空时返回空结果和失败说明，不再把样例 mock 材料伪装成真实推送。
 - [x] Radar 跨 session 去重 v0：生成 Radar 时排除历史已推送 URL，避免连续新建多个 Radar 时优先生成同一批材料。
 - [ ] Radar 接入更多真实公开源：继续补官方博客 / release notes、指定 URL、公众号公开网页、机构官网；arXiv / GitHub 后续作为技术证据补充源，而不是默认主推送源。
-- [x] Radar 原文抓取与摘录 v0：从公开网页 / 新闻 RSS 的 title、description、publisher、发布时间和用户目标命中词生成 3-5 条 `source_passages`，严格区分来源摘录 `excerpt` 和 Agent 解析 `analysis`。
-- [ ] Radar 原文正文抓取增强：继续支持打开真实网页正文、官方文档、GitHub release 和论文摘要，补充更细的段落位置、正文摘录和引用定位。
+- [x] Radar 原文抓取与摘录 v0：优先抓取推送网页正文并提取 3-5 条有信息量的原文段落，卡片标题用段落主旨短句，严格区分来源摘录 `excerpt` 与 Agent 解析 `analysis`，并为每条 passage 生成针对性 `suggestion`。
+- [x] Radar 正文抓取改为可选 + 证据状态标记：radar 生成默认不再同步抓原文（避免 Google News 跳转页抓取失败拖慢并产出无意义占位），item 用 `evidence_status` 区分 `excerpt_available` / `metadata_with_structured_summary` / `metadata_only`；读原文全文留待 Deep Dive。
+- [ ] Radar 原文正文抓取增强：后续接更稳定的公开源 / 官方文档 / GitHub release / 论文摘要，补充更细的段落位置、正文摘录和引用定位；真实正文阅读能力应下沉到 Deep Dive 阶段，而不是 radar skim 阶段。
 - [ ] Radar 去重和噪音过滤增强：过滤重复新闻、纯营销稿、股票 / 销量消息、偏题泛科技内容和无实质产品 / 成果 / 机构动作的内容，只保留与用户当前目标有关的行业信号。
 - [ ] Radar 跨 session 去重增强：生成新 Radar 时继续补齐 source id、标题相似度、已归档、已忽略、已转 Deep Dive 的排除逻辑。
 - [ ] Radar 增量检索：按 published / updated 时间过滤新论文、新 repo release 和官方更新，支持每天固定节奏只推新增信号。
@@ -282,11 +284,11 @@ Web 仅保留为后端 API smoke / 兜底演示。
 - [ ] Radar 排序和路由：按与本周计划关系、证据强度、可行动性和噪音程度排序，并输出 `转 Deep Dive / 暂存 / 忽略` 的理由。
 - [ ] Radar 状态列表展示：在 Radar 工作区或归档页能查看 `track_later`、`noise`、`deep_dive`、`archived` 的单条 Radar item，而不是只能在详情页看到状态。
 - [ ] Radar 定时 / 手动刷新策略：明确当前竞赛版是点击生成，后续版本再接固定节奏自动拉取和推送。
-- [ ] Today / Manual 中的 `Weekly Studio` 入口进入原生轻量工作区。
-- [ ] Weekly Studio 工作区显示本周重点、当前任务、已完成/未完成归档摘要和下周候选动作。
-- [ ] Weekly Studio 支持 `新建 Weekly Studio`，生成一份轻量周复盘草稿：本周完成、卡点、下周 3 个优先任务。
-- [ ] Weekly Studio 页面显示 `Agent 能做什么`：把归档记录、计划和未完成项整理成可执行的下一周安排。
-- [ ] Weekly Studio 结果先只支持编辑草稿和保存到计划上下文，不做完整周报系统。
+- [x] Today / Manual 中的 `Weekly Studio` 入口进入原生轻量工作区。
+- [x] Weekly Studio 工作区显示本周重点、当前任务、已完成/未完成归档摘要和下周候选动作。
+- [x] Weekly Studio 支持 `新建 Weekly Studio`，生成一份轻量周复盘草稿：本周完成、卡点、下周 3 个优先任务。
+- [x] Weekly Studio 页面显示 `Agent 能做什么`：把归档记录、计划和未完成项整理成可执行的下一周安排。
+- [x] Weekly Studio 结果先只支持编辑草稿和保存到计划上下文，不做完整周报系统。
 - [ ] Today / Manual 中的 `Opportunity Alignment` 入口进入原生轻量工作区。
 - [ ] Opportunity Alignment 工作区显示当前方向、目标版本、能力证据和机会/岗位/项目匹配维度。
 - [ ] Opportunity Alignment 支持 `新建 Alignment`，生成一份轻量匹配草稿：机会描述、匹配点、缺口、下一步动作。
@@ -315,7 +317,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 
 - [ ] 四类 session 在 iOS 可见，且都能从 Today / Manual 进入。
 - [x] Radar 可生成或展示一份轻量信号扫描结果。
-- [ ] Weekly Studio 可生成或展示一份轻量周复盘草稿。
+- [x] Weekly Studio 可生成或展示一份轻量周复盘草稿。
 - [ ] Opportunity Alignment 可生成或展示一份轻量机会匹配草稿。
 - [ ] 三类轻量 session 都能解释 `Agent 能做什么` 和引用了哪些上下文。
 - [x] 领域复用映射表完成，并能放入 proposal draft。
@@ -431,7 +433,7 @@ Web 仅保留为后端 API smoke / 兜底演示。
 轻量做：
 
 - [ ] Radar 当前工作区 + 新建入口。
-- [ ] Weekly Studio 当前工作区 + 新建入口。
+- [x] Weekly Studio 当前工作区 + 新建入口。
 - [ ] Opportunity Alignment 当前工作区 + 新建入口。
 - [ ] Agent 能做什么的解释页。
 
@@ -603,3 +605,18 @@ submission/orbit_engine_value_proposal.pptx
 - [x] 后端 `RadarSourcePassage` 新增 `suggestion` 字段；`_source_passages` 重写：原文正文抓取成功时生成主旨标题 + excerpt + analysis + suggestion（suggestion 结合当前方向关键词和段落类型生成针对性建议）；抓取失败时不再 fallback 到 RSS 摘要 / 标题 / 来源线索，改为单条「原文正文抓取失败」说明并提示打开原文链接。
 - [x] iOS `TechRadar.swift` 的 `RadarSourcePassage` 增加 `suggestion`；`TechRadarView.swift` 的 `keyPassages` / `RadarPassageCardView` / `RadarPassageDetailView` 同步更新；旧 session 无 source_passages 时给出失败说明而非拼装占位卡片。
 - [!] Google News RSS 跳转链接（news.google.com/rss/articles/...）正文抓取不稳定，当前实际生成结果多为「原文正文抓取失败」；真实段落展示需要更稳定的公开源或网页正文抓取增强，已列入 roadmap。
+
+### 2026-08-13
+
+- [x] Radar 正文抓取改为可选（commit `263f007`）：radar 生成默认不再同步抓原文，`_should_fetch_source_passages` 仅在 `extra.fetch_passages is True` 时触发；`_source_passages` 抓取失败返回 `[]`，不再塞固定「原文正文抓取失败」占位。
+- [x] `RadarItem` 新增 `evidence_status`：`excerpt_available`（抓到段落）/ `metadata_with_structured_summary`（arXiv / GitHub 带摘要）/ `metadata_only`（仅标题摘要）；iOS `TechRadar.swift` 同步 `evidenceStatus`，默认 `metadata_only`。
+- [x] Radar 详情页每条信号新增 `Agent 讨论` 入口（commit `ba228ec`）：`RadarDecisionDetailView` 增加 `Agent 讨论` Section，进入 `AgentChatView` 并携带 `context_refs=["tech_radar", "signal:<id>"]`。
+- [x] 后端 `ChatService` 支持 radar 讨论上下文注入：`_radar_context_message` 按 `signal:<id>` 匹配条目并序列化 title / summary / technical_substance / marketing_noise / why_it_matters / evidence_status / recommended_depth / source_passages 注入 LLM；未命中时回退用前 3 条；新增 `RADAR_DISCUSSION_SYSTEM_PROMPT`。
+- [x] 修复 `ChatService.create_thread` 互相覆盖问题：同 session 相同 context_refs 复用已有 thread（幂等），不同 context_refs 各自新建独立 thread；之前复用同一个 `session.ai_chat_thread_id` + `INSERT OR REPLACE` 会清空前一条讨论。
+- [x] 新增后端测试 2 个：`test_radar_chat_messages_include_real_signal_context`（验证讨论消息带真实条目 + 段落上下文）、`test_radar_per_item_threads_do_not_clobber_each_other`（验证多条目讨论独立、同条目复用）；`test_chat_api.py` 6/6 通过，全量 49 通过。
+- [x] 修复 3 个既有失败测试（commit `3a0f037`）：`test_technical_radar_agent_uses_search_results` 的 fake 方法名对齐 `search_industry_sources`、summary 断言改 `公开网页`；删除 `test_mock_product_radar_session_has_items` 过时的 `visuals >= 1` 断言；给 mock JD seed 补真实技术 JD 文本使 `role_type` 产出 `research_engineer`。
+- [x] 默认后端 URL 更新为 `https://limits-celebrate-ide-termination.trycloudflare.com`，旧默认加入 legacy 迁移列表，`UserDefaults` 覆盖逻辑保留。
+- [x] Opportunity Alignment 用户可见命名收口（commit `fc90bfb`，已推送）：主页面标题与 navigation title 统一为 `Opportunity Alignment`；`添加 JD` / `保存 JD` 改为“添加机会” / “保存机会”；`JD 库` 改为“机会库”；概览数量指标改为“机会”。仅修改 SwiftUI 展示文案，保留 `JDIntelligenceView`、`JDEntry` 等内部类型和数据结构，避免无必要的迁移风险。
+- [x] Weekly Studio 轻量复盘闭环：周日 review session 在 iOS 路由中从 `ResearchReaderView` 分流到 `WeeklyStudioView`，不再显示“材料生成”；页面读取当前周 `UserContext.plan` 与周一至周日的 Check-in，展示完成/未完成摘要，生成可编辑的“本周完成 / 卡点 / 下周 3 个优先任务”草稿；保存只更新 `weekly_focus`、`active_tasks` 和 `next_action`。后端仍复用 `research_feeder` 内部类型，但为 `manual_deep_dive` review 下发专用完成标准；`test_coordinator.py` 2/2 通过。
+- [x] iOS 默认后端 URL 更新为 `https://basis-assignment-capable-soc.trycloudflare.com`；前一 tunnel 加入 legacy 列表，使旧 `UserDefaults` 覆盖自动迁移到新默认地址。
+- [!] 仍有两项与 radar 无关的既有失败测试未处理：`test_material_resume_archive.py`（`str.removeprefix` 需 Python 3.9+，当前 venv 为 3.8）、`test_persistence.py::test_direction_profile_suggestion_uses_edited_full_cycle_plan`。

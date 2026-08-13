@@ -62,7 +62,10 @@ class WeeklyCoordinator:
             payload_type=config["task_type"],
             payload=payload,
             ai_chat_thread_id=self._chat_thread_id(day, config["task_type"]),
-            completion=self._completion_for(config["task_type"]),
+            completion=self._completion_for(
+                config["task_type"],
+                config.get("research_day_role"),
+            ),
             created_at=now,
             updated_at=now,
         )
@@ -216,7 +219,11 @@ class WeeklyCoordinator:
             notes=PaperNotes(),
         )
 
-    def _completion_for(self, task_type: TaskType) -> CompletionState:
+    def _completion_for(
+        self,
+        task_type: TaskType,
+        research_day_role: Optional[ResearchDayRole] = None,
+    ) -> CompletionState:
         if task_type == TaskType.tech_radar:
             criteria = [
                 CompletionCriterion(
@@ -237,6 +244,17 @@ class WeeklyCoordinator:
                 CompletionCriterion(
                     id="jd_action_confirmed",
                     description="确认至少一个能力提升或简历优化动作。",
+                ),
+            ]
+        elif research_day_role == ResearchDayRole.manual_deep_dive:
+            criteria = [
+                CompletionCriterion(
+                    id="weekly_review_summary",
+                    description="整理本周已完成事项和未完成卡点。",
+                ),
+                CompletionCriterion(
+                    id="weekly_next_priorities",
+                    description="确认下周 3 个优先任务并保存到计划上下文。",
                 ),
             ]
         else:
