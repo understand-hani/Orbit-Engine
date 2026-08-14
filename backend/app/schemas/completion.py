@@ -66,3 +66,10 @@ class CompletionDraftResponse(BaseModel):
     key_insight: str
     next_action: str
     provider: str = "mock"
+
+
+class WeeklyStudioDraftResponse(BaseModel):
+    completion_summary: str
+    blockers: str
+    suggested_priorities: List[str] = []
+    provider: str = "mock"

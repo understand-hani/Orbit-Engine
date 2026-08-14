@@ -365,11 +365,7 @@ struct SessionDestinationView: View {
                 JDIntelligenceView()
             case .researchFeeder(let payload):
                 if isWeeklyStudio(session) {
-                    WeeklyStudioView(session: session) { mode, context in
-                        completionStartMode = mode
-                        checkinSourceContext = context
-                        isShowingCompletion = true
-                    }
+                    WeeklyStudioView(session: session)
                 } else {
                     ResearchReaderView(session: session, payload: payload) { mode, context in
                         completionStartMode = mode

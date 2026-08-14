@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query, Response
 
 from app.schemas.checkin import Checkin, CheckinCreate
-from app.schemas.completion import CompletionConfirmRequest, CompletionDraftRequest, CompletionDraftResponse
+from app.schemas.completion import CompletionConfirmRequest, CompletionDraftRequest, CompletionDraftResponse, WeeklyStudioDraftResponse
 from app.services.checkin_service import CheckinService
 
 
@@ -54,4 +54,12 @@ def draft_session_completion(
     result = checkin_service.draft_completion(session_id, request)
     if result is None:
         raise HTTPException(status_code=404, detail="Session not found")
+    return result
+
+
+@router.post("/sessions/{session_id}/weekly-studio/draft", response_model=WeeklyStudioDraftResponse)
+def draft_weekly_studio(session_id: str) -> WeeklyStudioDraftResponse:
+    result = checkin_service.draft_weekly_studio(session_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Weekly Studio session or user context not found")
     return result

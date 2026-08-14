@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from uuid import uuid4
 
-from app.db.repositories import ChatRepository, CheckinRepository, SessionRepository
+from app.db.repositories import ChatRepository, CheckinRepository, SessionRepository, UserContextRepository
 from app.schemas.chat import ChatRole
 from app.schemas.checkin import Checkin, CheckinCreate, CheckinStatus
 from app.schemas.common import SessionStatus, TaskType
@@ -13,6 +13,7 @@ from app.schemas.completion import (
     CompletionDraftRequest,
     CompletionDraftResponse,
     CompletionSuggestion,
+    WeeklyStudioDraftResponse,
 )
 from app.schemas.research_feeder import ResearchFeederPayload
 from app.schemas.session import BaseSession
@@ -20,7 +21,9 @@ from app.config import get_settings
 from app.services.llm_service import (
     DEEP_DIVE_COMPLETION_DRAFT_SYSTEM_PROMPT,
     LLMCompletionDraftOutput,
+    LLMWeeklyStudioDraftOutput,
     OpenRouterChatService,
+    WEEKLY_STUDIO_DRAFT_SYSTEM_PROMPT,
 )
 
 
@@ -29,6 +32,7 @@ class CheckinService:
         self.checkins = CheckinRepository()
         self.sessions = SessionRepository()
         self.chats = ChatRepository()
+        self.user_contexts = UserContextRepository()
         self.settings = get_settings()
         self.llm = OpenRouterChatService()
 
@@ -77,6 +81,54 @@ class CheckinService:
 
         mock = self._mock_draft(session, request)
         return mock.model_copy(update={"provider": "mock"})
+
+    def draft_weekly_studio(self, session_id: str) -> Optional[WeeklyStudioDraftResponse]:
+        session = self.sessions.get_by_id(session_id)
+        context = self.user_contexts.get()
+        if session is None or context is None:
+            return None
+
+        checkins = self._week_checkins(session.date)
+        payload = {
+            "plan": context.plan.model_dump(mode="json"),
+            "checkins": [item.model_dump(mode="json") for item in checkins],
+        }
+        if self.settings.llm_provider == "openrouter":
+            try:
+                output = self.llm.generate_json(
+                    system_prompt=WEEKLY_STUDIO_DRAFT_SYSTEM_PROMPT,
+                    user_payload=payload,
+                    output_model=LLMWeeklyStudioDraftOutput,
+                    schema_name="weekly_studio_draft",
+                )
+                return WeeklyStudioDraftResponse(
+                    completion_summary=output.completion_summary,
+                    blockers=output.blockers,
+                    suggested_priorities=output.suggested_priorities[:3],
+                    provider="openrouter",
+                )
+            except Exception:
+                pass
+
+        completed = [item.summary for item in checkins if item.status == CheckinStatus.completed and item.summary]
+        blocked = [item.next_action or item.summary for item in checkins if item.status in {CheckinStatus.partial, CheckinStatus.archived}]
+        priorities = [item for item in context.plan.active_tasks if item][:3]
+        if not priorities and context.plan.next_action:
+            priorities = [context.plan.next_action]
+        return WeeklyStudioDraftResponse(
+            completion_summary="\n".join(completed[:3]) or f"本周围绕「{context.plan.weekly_focus}」推进，尚未形成已完成归档。",
+            blockers="\n".join(blocked[:3]) or "没有已归档的卡点；继续按原计划完成当前最小任务。",
+            suggested_priorities=priorities,
+            provider="mock",
+        )
+
+    def _week_checkins(self, session_date) -> List[Checkin]:
+        week_start = session_date - timedelta(days=session_date.weekday())
+        week_end = week_start + timedelta(days=6)
+        return [
+            item for item in self.checkins.list_by_date()
+            if week_start <= item.date <= week_end
+        ]
 
     def confirm_completion(
         self, session_id: str, request: CompletionConfirmRequest

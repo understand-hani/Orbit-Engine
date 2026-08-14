@@ -72,6 +72,12 @@ class LLMCompletionDraftOutput(BaseModel):
     next_action: str
 
 
+class LLMWeeklyStudioDraftOutput(BaseModel):
+    completion_summary: str
+    blockers: str
+    suggested_priorities: List[str] = []
+
+
 class OpenRouterChatService:
     def __init__(self) -> None:
         self.settings = get_settings()
@@ -283,6 +289,17 @@ Rules:
   user notes, and agent_discussions when they are present.
 - If source/user notes are thin, produce a safe, specific draft based on the
 available reading goal and completion criteria. Do not invent paper facts.
+""".strip()
+
+
+WEEKLY_STUDIO_DRAFT_SYSTEM_PROMPT = """
+You are the Weekly Studio review agent in a private personal Infra Agent app.
+Return only structured JSON matching the supplied schema.
+
+Summarize the week's completed work and blockers from the supplied check-ins.
+Then propose at most three next priorities that preserve the user's confirmed
+weekly focus and active tasks. Reorder, narrow, or continue existing work; do
+not replace the plan with a different direction. Do not invent achievements.
 """.strip()
 
 

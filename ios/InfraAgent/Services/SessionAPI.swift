@@ -61,6 +61,10 @@ struct SessionAPI {
         )
     }
 
+    func draftWeeklyStudio(sessionID: String) async throws -> WeeklyStudioDraftResponse {
+        try await resolvedClient.post("/api/sessions/\(sessionID)/weekly-studio/draft")
+    }
+
     func analyzeJD(sessionID: String, request: JDInputCreate) async throws -> BaseSession {
         try await resolvedClient.post("/api/sessions/\(sessionID)/jd-analysis", body: request)
     }

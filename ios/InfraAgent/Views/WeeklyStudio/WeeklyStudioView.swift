@@ -2,8 +2,6 @@ import SwiftUI
 
 struct WeeklyStudioView: View {
     let session: BaseSession
-    var onArchiveRequested: ((CompletionStartMode, CheckinSourceContext?) -> Void)?
-
     @State private var context: UserContext?
     @State private var checkins: [Checkin] = []
     @State private var weekSessions: [BaseSession] = []
@@ -13,12 +11,12 @@ struct WeeklyStudioView: View {
     @State private var hasDraft = false
     @State private var completionSummary = ""
     @State private var blockers = ""
-    @State private var nextWeekFocus = ""
     @State private var firstPriority = ""
     @State private var secondPriority = ""
     @State private var thirdPriority = ""
     @State private var errorMessage: String?
     @State private var saveMessage: String?
+    @State private var draftProvider = ""
 
     private let userContextAPI = UserContextAPI()
     private let checkinAPI = CheckinAPI()
@@ -72,34 +70,38 @@ struct WeeklyStudioView: View {
                 if !hasDraft {
                     Section {
                         Button {
-                            generateDraft(from: context)
+                            Task { await generateDraft() }
                         } label: {
                             Label(isGenerating ? "正在生成 Weekly Studio" : "生成 Weekly Studio", systemImage: "sparkles")
                         }
                         .disabled(isGenerating)
                     } footer: {
-                        Text("草稿引用当前 UserContext.plan 和本周 Check-in；生成后仍可编辑。")
+                        Text("Agent 基于当前计划与本周 Check-in 总结；优先顺序只在原计划内做小范围调整。")
                     }
                 } else {
                     Section("本周完成") {
-                        TextField("本周完成", text: $completionSummary, axis: .vertical)
-                            .lineLimit(3...6)
+                        Text(completionSummary)
+                            .font(.subheadline)
                     }
 
                     Section("卡点") {
-                        TextField("卡点", text: $blockers, axis: .vertical)
-                            .lineLimit(3...6)
+                        Text(blockers)
+                            .font(.subheadline)
                     }
 
-                    Section("下周 3 个优先任务") {
-                        TextField("下周重点", text: $nextWeekFocus, axis: .vertical)
-                            .lineLimit(2...4)
+                    Section("下周优先顺序") {
                         TextField("优先任务 1", text: $firstPriority, axis: .vertical)
                             .lineLimit(2...3)
                         TextField("优先任务 2", text: $secondPriority, axis: .vertical)
                             .lineLimit(2...3)
                         TextField("优先任务 3", text: $thirdPriority, axis: .vertical)
                             .lineLimit(2...3)
+                    }
+
+                    if !draftProvider.isEmpty {
+                        Text("由 \(draftProvider == "openrouter" ? "Agent" : "规则 Agent") 基于本周记录生成；不重写本周重点或任务列表。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
 
                     if let saveMessage {
@@ -112,13 +114,13 @@ struct WeeklyStudioView: View {
 
                     Section {
                         Button {
-                            Task { await saveNextWeekPlan(from: context) }
+                            Task { await saveNextAction(from: context) }
                         } label: {
-                            Label(isSaving ? "正在保存到计划" : "保存到计划上下文", systemImage: "checkmark.circle.fill")
+                            Label(isSaving ? "正在同步下一步" : "同步下一步到计划", systemImage: "checkmark.circle.fill")
                         }
-                        .disabled(isSaving || priorities.isEmpty || trimmed(nextWeekFocus).isEmpty)
+                        .disabled(isSaving || priorities.isEmpty)
                     } footer: {
-                        Text("保存后会更新下一周的重点、当前任务和下一步；本周完成与卡点保留在本次复盘草稿中。")
+                        Text("只同步首项优先任务为下一步；本周重点和任务列表保持不变。")
                     }
                 }
             }
@@ -136,6 +138,7 @@ struct WeeklyStudioView: View {
             guard let day = calendar.date(byAdding: .day, value: offset, to: weekStart) else { return nil }
             let dateValue = dateString(day)
             let weekday = calendar.component(.weekday, from: day)
+            guard scheduleTypeTitle(weekday) != "Weekly Studio" else { return nil }
             let daySessions = weekSessions.filter { $0.date == dateValue }
             let isCompleted = daySessions.contains { $0.status == .completed || $0.status == .archived }
             return WeekPlanItem(
@@ -222,48 +225,38 @@ struct WeeklyStudioView: View {
         }
     }
 
-    private func generateDraft(from context: UserContext) {
+    private func generateDraft() async {
         isGenerating = true
-        defer {
-            isGenerating = false
+        errorMessage = nil
+        defer { isGenerating = false }
+        do {
+            let draft = try await sessionAPI.draftWeeklyStudio(sessionID: session.id)
+            completionSummary = draft.completionSummary
+            blockers = draft.blockers
+            let priorities = draft.suggestedPriorities
+            firstPriority = priorities.indices.contains(0) ? priorities[0] : ""
+            secondPriority = priorities.indices.contains(1) ? priorities[1] : ""
+            thirdPriority = priorities.indices.contains(2) ? priorities[2] : ""
+            draftProvider = draft.provider
+            saveMessage = nil
             hasDraft = true
+        } catch {
+            errorMessage = error.localizedDescription
         }
-
-        let completed = completedCheckins.map { $0.summary }.filter { !trimmed($0).isEmpty }
-        completionSummary = completed.isEmpty
-            ? "本周尚未形成归档记录；已确认当前重点是：\(context.plan.weeklyFocus)"
-            : completed.prefix(3).joined(separator: "\n")
-
-        let partial = partialCheckins.map { checkin in
-            let next = trimmed(checkin.nextAction)
-            return next.isEmpty ? checkin.summary : "\(checkin.summary) 下一步：\(next)"
-        }.filter { !trimmed($0).isEmpty }
-        blockers = partial.isEmpty
-            ? "暂无未完成归档；复盘时确认是否有需要缩小范围或延后处理的事项。"
-            : partial.prefix(3).joined(separator: "\n")
-
-        nextWeekFocus = context.plan.weeklyFocus
-        let existingTasks = context.plan.activeTasks.filter { !trimmed($0).isEmpty }
-        firstPriority = existingTasks.indices.contains(0) ? existingTasks[0] : context.plan.nextAction
-        secondPriority = existingTasks.indices.contains(1) ? existingTasks[1] : "处理本周未完成项，形成明确的继续、跟踪或放弃判断。"
-        thirdPriority = existingTasks.indices.contains(2) ? existingTasks[2] : "完成一次 Check-in，并把结论沉淀到归档。"
-        saveMessage = nil
     }
 
-    private func saveNextWeekPlan(from context: UserContext) async {
+    private func saveNextAction(from context: UserContext) async {
         isSaving = true
         errorMessage = nil
         saveMessage = nil
         defer { isSaving = false }
 
         var updated = context
-        updated.plan.weeklyFocus = trimmed(nextWeekFocus)
-        updated.plan.activeTasks = priorities
-        updated.plan.nextAction = priorities.first ?? trimmed(nextWeekFocus)
+        updated.plan.nextAction = priorities[0]
 
         do {
             self.context = try await userContextAPI.save(updated)
-            saveMessage = "下周计划已保存到计划上下文。"
+            saveMessage = "下一步已同步到计划；本周重点和任务列表未改动。"
         } catch {
             errorMessage = error.localizedDescription
         }
