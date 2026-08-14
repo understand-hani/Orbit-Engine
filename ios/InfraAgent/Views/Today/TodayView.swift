@@ -183,7 +183,7 @@ struct TodayView: View {
             return "Signal Radar"
         case .researchFeeder:
             if viewModel.mode == .manual,
-               session.date == "2026-08-09" {
+               session.date == "2026-08-09" || session.date == "2026-08-16" {
                 return "Weekly Studio"
             }
             return deepDiveDisplayTitle(for: session)
@@ -198,7 +198,7 @@ struct TodayView: View {
             return "radar"
         case .researchFeeder:
             if viewModel.mode == .manual,
-               session.date == "2026-08-09" {
+               session.date == "2026-08-09" || session.date == "2026-08-16" {
                 return "weekly_studio"
             }
             return "deep_dive"

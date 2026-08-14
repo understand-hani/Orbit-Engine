@@ -6,6 +6,7 @@ struct WeeklyStudioView: View {
 
     @State private var context: UserContext?
     @State private var checkins: [Checkin] = []
+    @State private var weekSessions: [BaseSession] = []
     @State private var isLoading = true
     @State private var isGenerating = false
     @State private var isSaving = false
@@ -21,6 +22,7 @@ struct WeeklyStudioView: View {
 
     private let userContextAPI = UserContextAPI()
     private let checkinAPI = CheckinAPI()
+    private let sessionAPI = SessionAPI()
 
     var body: some View {
         List {
@@ -41,30 +43,28 @@ struct WeeklyStudioView: View {
                     WeeklyStudioLine(title: "下一步", value: context.plan.nextAction)
                 }
 
-                Section("本周归档摘要") {
-                    LabeledContent("已完成", value: "\(completedCheckins.count) 条")
-                    LabeledContent("未完成归档", value: "\(partialCheckins.count) 条")
-                    if recentCheckins.isEmpty {
-                        Text("本周还没有归档记录。生成草稿时会以当前计划作为起点。")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(recentCheckins) { checkin in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(checkin.summary.isEmpty ? "未填写总结" : checkin.summary)
+                Section("本周计划进度") {
+                    ForEach(weekPlanItems) { item in
+                        HStack(alignment: .top, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.title)
                                     .font(.subheadline)
-                                Text(checkin.status == "completed" ? "已完成" : "未完成归档")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                if !item.subtitle.isEmpty {
+                                    Text(item.subtitle)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
-                            .padding(.vertical, 2)
+                            Spacer()
+                            Text(item.statusText)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(item.isCompleted ? .green : .secondary)
                         }
+                        .padding(.vertical, 2)
                     }
-                }
-
-                Section("Agent 能做什么") {
-                    Text("把本周归档、当前计划和未完成项收束成一份可执行的下周安排；它不会替你扩展成完整周报系统。")
-                        .font(.subheadline)
+                } footer: {
+                    Text("本周归档：已完成 \(completedCheckins.count) 条 · 未完成归档 \(partialCheckins.count) 条")
                 }
 
                 if !hasDraft {
@@ -127,8 +127,58 @@ struct WeeklyStudioView: View {
         }
     }
 
-    private var recentCheckins: [Checkin] {
-        Array(weekCheckins.sorted { $0.createdAt > $1.createdAt }.prefix(5))
+    private var weekPlanItems: [WeekPlanItem] {
+        guard let weekStart = startOfWeek(for: session.date) else { return [] }
+        let calendar = Calendar(identifier: .iso8601)
+        return (0..<7).compactMap { offset in
+            guard let day = calendar.date(byAdding: .day, value: offset, to: weekStart) else { return nil }
+            let dateValue = dateString(day)
+            let weekday = calendar.component(.weekday, from: day)
+            let daySessions = weekSessions.filter { $0.date == dateValue }
+            let isCompleted = daySessions.contains { $0.status == .completed || $0.status == .archived }
+            return WeekPlanItem(
+                id: dateValue,
+                title: "\(weekdayLabel(weekday)) \(shortDate(dateValue)) · \(scheduleTypeTitle(weekday))",
+                isCompleted: isCompleted,
+                subtitle: daySessions.first?.title ?? ""
+            )
+        }
+    }
+
+    private func weekdayLabel(_ weekday: Int) -> String {
+        switch weekday {
+        case 1: return "周一"
+        case 2: return "周二"
+        case 3: return "周三"
+        case 4: return "周四"
+        case 5: return "周五"
+        case 6: return "周六"
+        default: return "周日"
+        }
+    }
+
+    private func scheduleTypeTitle(_ weekday: Int) -> String {
+        switch weekday {
+        case 1, 2: return "Signal Radar"
+        case 3: return "Opportunity Alignment"
+        case 4, 5: return "Deep Dive"
+        default: return "Weekly Studio"
+        }
+    }
+
+    private func shortDate(_ value: String) -> String {
+        String(value.dropFirst(5))
+    }
+
+    private func loadWeekSessions() async throws -> [BaseSession] {
+        guard let weekStart = startOfWeek(for: session.date) else { return [] }
+        let calendar = Calendar(identifier: .iso8601)
+        var all: [BaseSession] = []
+        for offset in 0..<7 {
+            guard let day = calendar.date(byAdding: .day, value: offset, to: weekStart) else { continue }
+            all += try await sessionAPI.sessionsByDate(dateString(day))
+        }
+        return all
     }
 
     private var completedCheckins: [Checkin] {
@@ -161,8 +211,10 @@ struct WeeklyStudioView: View {
         do {
             async let loadedContext = userContextAPI.get()
             async let loadedCheckins = checkinAPI.list()
+            async let loadedWeekSessions = loadWeekSessions()
             context = try await loadedContext
             checkins = try await loadedCheckins
+            weekSessions = try await loadedWeekSessions
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -237,6 +289,15 @@ struct WeeklyStudioView: View {
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
     }
+}
+
+private struct WeekPlanItem: Identifiable {
+    let id: String
+    let title: String
+    let isCompleted: Bool
+    let subtitle: String
+
+    var statusText: String { isCompleted ? "已完成" : "未完成" }
 }
 
 private struct WeeklyStudioLine: View {
