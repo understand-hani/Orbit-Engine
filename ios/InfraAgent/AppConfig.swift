@@ -4,8 +4,9 @@ struct AppConfig {
     static let appName = "圆周引擎"
     static let backendBaseURLKey = "backend_base_url"
     static let apiTimeoutInterval: TimeInterval = 30
-    static let defaultBackendBaseURL = URL(string: "https://arising-ban-economies-sciences.trycloudflare.com")!
+    static let defaultBackendBaseURL = URL(string: "https://euro-prostate-atlanta-sanyo.trycloudflare.com")!
     private static let legacyDefaultBackendBaseURLs = [
+        "https://arising-ban-economies-sciences.trycloudflare.com",
         "https://prime-maintained-ist-emily.trycloudflare.com",
         "https://horizon-zinc-profiles-magnitude.trycloudflare.com",
         "https://basis-assignment-capable-soc.trycloudflare.com",

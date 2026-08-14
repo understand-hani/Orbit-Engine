@@ -337,6 +337,30 @@ def test_radar_and_weekly_studio_titles_follow_session_rules():
         get_settings.cache_clear()
 
 
+def test_deep_dive_sequence_does_not_reuse_discarded_number():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_deep_dive_discarded_sequence_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        feed_service = FeedService()
+        target_date = date.fromisoformat("2026-08-14")
+
+        first = feed_service.generate_and_save_mock_session(target_date, task_type=TaskType.research_feeder)
+        assert feed_service.delete_session(first.id) is True
+        replacement = feed_service.generate_and_save_mock_session(target_date, task_type=TaskType.research_feeder)
+
+        assert first.title == "Deep Dive-2026/08/14-No.1"
+        assert replacement.title == "Deep Dive-2026/08/14-No.2"
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
 def test_research_session_title_sequence_counts_archived_duplicates():
     original_path = os.environ.get("DATABASE_PATH")
     db_path = Path(tempfile.mkdtemp()) / "infra_session_duplicate_sequence_test.db"

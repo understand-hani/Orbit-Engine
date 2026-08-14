@@ -362,17 +362,12 @@ class FeedService:
         used_sequences = {
             sequence
             for item in existing
-            if item.status != SessionStatus.skipped
             if (sequence := self._title_sequence(item)) is not None
         }
         next_sequence = (max(used_sequences) + 1) if used_sequences else 1
 
         for item in existing:
-            if (
-                item.status == SessionStatus.skipped
-                or self._is_weekly_studio(item)
-                or self._title_sequence(item) is not None
-            ):
+            if self._is_weekly_studio(item) or self._title_sequence(item) is not None:
                 continue
             while next_sequence in used_sequences:
                 next_sequence += 1
@@ -425,8 +420,6 @@ class FeedService:
 
         used_sequences = set()
         for item in existing:
-            if item.status == SessionStatus.skipped:
-                continue
             if exclude_self and item.id == session.id:
                 continue
             sequence = self._title_sequence(item)

@@ -298,14 +298,6 @@ struct SessionQueueView: View {
         return "\(prefix)\(index + 1)"
     }
 
-    private func deepDiveDisplayName(for session: BaseSession, index: Int) -> String {
-        let prefix = renamePrefix(for: session)
-        if session.title.hasPrefix(prefix) {
-            return session.title
-        }
-        return "\(prefix)\(index + 1)"
-    }
-
     private func renamePrefix(for session: BaseSession) -> String {
         if isWeeklyStudio(session) {
             return "Weekly Studio-\(displayDateForTitle(session.date))"

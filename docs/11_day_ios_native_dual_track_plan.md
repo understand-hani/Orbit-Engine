@@ -622,4 +622,5 @@ submission/orbit_engine_value_proposal.pptx
 - [x] iOS 默认后端 URL 更新为 `https://basis-assignment-capable-soc.trycloudflare.com`；前一 tunnel 加入 legacy 列表，使旧 `UserDefaults` 覆盖自动迁移到新默认地址。
 - [x] 修复 Manual session 日期：Signal Radar、Deep Dive 与 Weekly Studio 均按创建当天生成，不再使用 2026-08 的固定演示日期；Weekly Studio 通过显式 `weekly_studio` 参数和 `manual_deep_dive` review payload 路由，不再依赖日期猜测。
 - [x] 统一 session 卡片命名：Signal Radar / Deep Dive 使用“session 名称-建立日期-No.x”，同类别同日按新建顺序递增并在归档后保留；Weekly Studio 使用“Weekly Studio-建立日期”，不编号且当前不允许在队列中重命名。每周多建 Weekly Studio 的告警 / 拒绝策略留待初赛后。
+- [x] Deep Dive 序号规则补强：丢弃、暂存或完成的历史卡片仍占用 `No.x`，后续新建不会复用编号；iOS 默认后端地址更新为 `https://euro-prostate-atlanta-sanyo.trycloudflare.com`，上一地址加入 legacy 自动迁移列表。
 - [!] 仍有两项与 radar 无关的既有失败测试未处理：`test_material_resume_archive.py`（`str.removeprefix` 需 Python 3.9+，当前 venv 为 3.8）、`test_persistence.py::test_direction_profile_suggestion_uses_edited_full_cycle_plan`。
