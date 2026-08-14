@@ -78,7 +78,7 @@ struct WeeklyStudioView: View {
                         Text("Agent 基于本周 Radar、Deep Dive 和 Check-in 总结；优先顺序只在原计划内做小范围调整。")
                     }
                 } else {
-                    Section("本周学习总结") {
+                    Section("本周学习总结（已完成归档）") {
                         Text(completionSummary)
                             .font(.subheadline)
                     }

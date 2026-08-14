@@ -91,10 +91,11 @@ class CheckinService:
 
         checkins = self._week_checkins(session.date)
         weekly_sessions = self._week_sessions(session)
+        completed_checkins = [item for item in checkins if item.status == CheckinStatus.completed]
         payload = {
             "plan": context.plan.model_dump(mode="json"),
-            "checkins": [item.model_dump(mode="json") for item in checkins],
-            "weekly_evidence": self._weekly_evidence(weekly_sessions),
+            "completed_checkins": [item.model_dump(mode="json") for item in completed_checkins],
+            "weekly_evidence": self._weekly_evidence(weekly_sessions, completed_checkins),
         }
         if self.settings.llm_provider == "openrouter":
             try:
@@ -118,7 +119,7 @@ class CheckinService:
         return WeeklyStudioDraftResponse(
             completion_summary=self._structured_weekly_summary(
                 weekly_sessions,
-                checkins,
+                completed_checkins,
                 context.plan.weekly_focus,
             ),
             suggested_priorities=priorities,
@@ -140,16 +141,24 @@ class CheckinService:
             sessions.extend(self.sessions.get_by_date((week_start + timedelta(days=offset)).isoformat()))
         return [item for item in sessions if item.id != weekly_studio.id]
 
-    def _weekly_evidence(self, sessions: List[BaseSession]) -> List[dict]:
+    def _weekly_evidence(self, sessions: List[BaseSession], checkins: List[Checkin]) -> List[dict]:
+        completed_by_session = {item.session_id: item for item in checkins}
         evidence = []
         for item in sessions:
+            checkin = completed_by_session.get(item.id)
+            if checkin is None:
+                continue
+            completion = {
+                "summary": checkin.summary,
+                "key_insight": checkin.key_insight,
+                "user_notes": checkin.user_notes,
+                "source_summary": checkin.source_summary,
+            }
             if isinstance(item.payload, TechRadarPayload):
                 evidence.append(
                     {
                         "type": "radar",
-                        "title": item.title,
-                        "digest_summary": item.payload.digest.summary,
-                        "top_signals": item.payload.digest.top_signals[:3],
+                        "completion": completion,
                         "signals": [
                             {
                                 "title": signal.title,
@@ -164,18 +173,10 @@ class CheckinService:
                     }
                 )
             elif isinstance(item.payload, ResearchFeederPayload):
-                primary = next(
-                    (paper for paper in item.payload.papers if paper.id == item.payload.reading_pack.primary_paper_id),
-                    item.payload.papers[0] if item.payload.papers else None,
-                )
                 evidence.append(
                     {
                         "type": "deep_dive",
-                        "title": item.title,
-                        "current_task": item.payload.research_context.current_task,
-                        "reading_goal": item.payload.reading_pack.reading_goal,
-                        "primary_material": primary.title if primary else "",
-                        "selected_materials": [material.title for material in item.payload.selected_materials[:3]],
+                        "completion": completion,
                         "notes": {
                             "core_idea": item.payload.notes.core_idea,
                             "evidence": item.payload.notes.evidence,
@@ -193,41 +194,27 @@ class CheckinService:
         checkins: List[Checkin],
         weekly_focus: str,
     ) -> str:
-        conclusions = []
-        radar = next((item.payload for item in sessions if isinstance(item.payload, TechRadarPayload)), None)
-        if radar:
-            signal = next(
-                (item for item in radar.digest.items if item.technical_substance or item.why_it_matters),
-                None,
+        insights = []
+        for item in checkins:
+            insight = next(
+                (
+                    value.strip()
+                    for value in (item.key_insight, item.user_notes, item.summary)
+                    if self._contains_chinese(value)
+                ),
+                "",
             )
-            if signal:
-                detail = signal.technical_substance or signal.summary
-                conclusions.append(
-                    f"Radar 聚焦「{signal.title}」：{detail}。这对当前方向的意义是 {signal.why_it_matters}。"
-                )
-            elif radar.digest.summary:
-                conclusions.append(f"Radar 本周的核心判断是：{radar.digest.summary}")
+            if insight:
+                insights.append(insight)
 
-        deep_dive = next((item.payload for item in sessions if isinstance(item.payload, ResearchFeederPayload)), None)
-        if deep_dive:
-            primary = next(
-                (paper for paper in deep_dive.papers if paper.id == deep_dive.reading_pack.primary_paper_id),
-                deep_dive.papers[0] if deep_dive.papers else None,
-            )
-            learning = deep_dive.notes.core_idea or deep_dive.notes.evidence or deep_dive.reading_pack.reading_goal
-            implication = deep_dive.notes.relation_to_my_plan or deep_dive.notes.next_action
-            if learning:
-                title = primary.title if primary else "本周 Deep Dive"
-                suffix = f" 对原计划的含义是：{implication}" if implication else ""
-                conclusions.append(f"Deep Dive 围绕「{title}」沉淀：{learning.rstrip('。')}。{suffix}")
+        if insights:
+            return f"本周完成的学习沉淀：{'；'.join(insights[:2])}。下一周继续围绕「{weekly_focus}」把这些判断落到一个可验证的小任务。"
+        if checkins:
+            return "本周已有完成归档，但没有记录可供提炼的中文关键洞察；为避免复制英文原文，本次不展示材料摘要。请在归档时补充一句“关键洞察”，再生成周总结。"
+        return f"本周尚无完成归档可供总结；下周继续围绕「{weekly_focus}」完成一个可验证的最小学习闭环。"
 
-        if conclusions:
-            return "\n\n".join(conclusions[:2])
-
-        completed = [item.summary for item in checkins if item.status == CheckinStatus.completed and item.summary]
-        if completed:
-            return f"本周围绕「{weekly_focus}」推进：{'；'.join(completed[:2])}。下一周应继续把这些记录沉淀为可复用的技术判断。"
-        return f"本周尚无足够的 Radar、Deep Dive 或归档记录可供总结；下周继续围绕「{weekly_focus}」完成一个可验证的最小学习闭环。"
+    def _contains_chinese(self, value: str) -> bool:
+        return any("\u4e00" <= char <= "\u9fff" for char in value)
 
     def confirm_completion(
         self, session_id: str, request: CompletionConfirmRequest

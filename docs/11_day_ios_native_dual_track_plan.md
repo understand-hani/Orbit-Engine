@@ -618,6 +618,6 @@ submission/orbit_engine_value_proposal.pptx
 - [x] 默认后端 URL 更新为 `https://limits-celebrate-ide-termination.trycloudflare.com`，旧默认加入 legacy 迁移列表，`UserDefaults` 覆盖逻辑保留。
 - [x] Opportunity Alignment 用户可见命名收口（commit `fc90bfb`，已推送）：主页面标题与 navigation title 统一为 `Opportunity Alignment`；`添加 JD` / `保存 JD` 改为“添加机会” / “保存机会”；`JD 库` 改为“机会库”；概览数量指标改为“机会”。仅修改 SwiftUI 展示文案，保留 `JDIntelligenceView`、`JDEntry` 等内部类型和数据结构，避免无必要的迁移风险。
 - [x] Weekly Studio 轻量复盘闭环：周日 review session 在 iOS 路由中从 `ResearchReaderView` 分流到 `WeeklyStudioView`，不再显示“材料生成”；页面读取当前周 `UserContext.plan` 与周一至周日的 Check-in，展示完成/未完成摘要。后端仍复用 `research_feeder` 内部类型，但为 `manual_deep_dive` review 下发专用完成标准；`test_coordinator.py` 2/2 通过。
-- [x] Weekly Studio 复盘语义收紧：本周计划进度不再把 Weekly Studio 自身当作待完成工作，移除无实质内容的“卡点”；“本周学习总结”由后端 Weekly Studio Agent 基于本周 Radar 信号、Deep Dive 笔记与 Check-in 生成（LLM 不可用时走同一证据输入的结构化总结）；下周只给原计划内的优先顺序建议，保存默认仅同步首项 `next_action`，不重写 `weekly_focus` 或 `active_tasks`。
+- [x] Weekly Studio 复盘语义收紧：本周计划进度不再把 Weekly Studio 自身当作待完成工作，移除无实质内容的“卡点”；“本周学习总结”只使用已完成归档的 Radar、Deep Dive 与 Check-in，Agent 将英文原始材料翻译并提炼为中文核心判断，规则回退不回显英文标题或摘要；下周只给原计划内的优先顺序建议，保存默认仅同步首项 `next_action`，不重写 `weekly_focus` 或 `active_tasks`。
 - [x] iOS 默认后端 URL 更新为 `https://basis-assignment-capable-soc.trycloudflare.com`；前一 tunnel 加入 legacy 列表，使旧 `UserDefaults` 覆盖自动迁移到新默认地址。
 - [!] 仍有两项与 radar 无关的既有失败测试未处理：`test_material_resume_archive.py`（`str.removeprefix` 需 Python 3.9+，当前 venv 为 3.8）、`test_persistence.py::test_direction_profile_suggestion_uses_edited_full_cycle_plan`。

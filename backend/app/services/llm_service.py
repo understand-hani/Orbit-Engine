@@ -295,11 +295,13 @@ WEEKLY_STUDIO_DRAFT_SYSTEM_PROMPT = """
 You are the Weekly Studio review agent in a private personal Infra Agent app.
 Return only structured JSON matching the supplied schema.
 
-Write a concise but substantive weekly learning summary from the supplied Radar,
-Deep Dive, and Check-in evidence. Use 2-4 short sentences. Where evidence is
-available, connect at least one concrete signal with one concrete learning or
-technical judgment. Explain its implication for the user's current plan; do not
-only say that a paper or task was completed. Do not invent achievements.
+Write a concise but substantive weekly learning summary only from the supplied
+completed check-ins and their linked Radar or Deep Dive evidence. Output
+Simplified Chinese only, in 2-4 short sentences. Extract the core method,
+evidence, or technical judgment and explain its implication for the current
+plan. Translate and synthesize English source material; never paste an English
+paper title, abstract, reading goal, or raw source passage. Do not say only
+that a paper or task was completed. Do not invent achievements.
 
 Then propose at most three next priorities that preserve the user's confirmed
 weekly focus and active tasks. Reorder, narrow, or continue existing work; do

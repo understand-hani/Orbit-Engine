@@ -6,6 +6,7 @@ from pathlib import Path
 from app.config import get_settings
 from app.db.migrations import init_db
 from app.schemas.chat import AIChatThreadCreate
+from app.schemas.checkin import CheckinCreate, CheckinStatus
 from app.schemas.common import SessionStatus, TaskType
 from app.schemas.completion import CompletionConfirmRequest, CompletionDraftRequest, CompletionSuggestion
 from app.schemas.research_feeder import ConfirmedResearchMaterial
@@ -136,6 +137,18 @@ def test_weekly_studio_mock_summary_uses_radar_and_deep_dive_evidence():
             }
         )
         feed_service.sessions.save(deep_dive)
+        CheckinService().create_checkin(
+            CheckinCreate(
+                session_id=deep_dive.id,
+                date=deep_dive.date,
+                task_type=TaskType.research_feeder,
+                duration_min=30,
+                status=CheckinStatus.completed,
+                summary="完成了本周 Deep Dive 归档。",
+                key_insight="用条件编码区分可控输入与场景状态。",
+                source_summary="An English source abstract that must not appear in the weekly summary.",
+            )
+        )
 
         weekly_studio = feed_service.generate_and_save_mock_session(
             date.fromisoformat("2026-08-16"),
@@ -144,9 +157,8 @@ def test_weekly_studio_mock_summary_uses_radar_and_deep_dive_evidence():
         draft = CheckinService().draft_weekly_studio(weekly_studio.id)
 
         assert draft is not None
-        assert "Radar 本周的核心判断" in draft.completion_summary
-        assert "Deep Dive 围绕" in draft.completion_summary
         assert "用条件编码区分可控输入与场景状态" in draft.completion_summary
+        assert "English source abstract" not in draft.completion_summary
         assert draft.provider == "mock"
     finally:
         if original_path is None:
