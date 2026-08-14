@@ -620,4 +620,5 @@ submission/orbit_engine_value_proposal.pptx
 - [x] Weekly Studio 轻量复盘闭环：周日 review session 在 iOS 路由中从 `ResearchReaderView` 分流到 `WeeklyStudioView`，不再显示“材料生成”；页面读取当前周 `UserContext.plan` 与周一至周日的 Check-in，展示完成/未完成摘要。后端仍复用 `research_feeder` 内部类型，但为 `manual_deep_dive` review 下发专用完成标准；`test_coordinator.py` 2/2 通过。
 - [x] Weekly Studio 复盘语义收紧：本周计划进度不再把 Weekly Studio 自身当作待完成工作，移除无实质内容的“卡点”；“本周学习总结”只使用已完成归档的 Radar、Deep Dive 与 Check-in，直接提炼 Deep Dive 的核心方法、输入输出和与当前计划的关系，以及 Radar 的技术信号与意义；Agent 将英文原始材料翻译为中文，规则回退也不回显英文标题或摘要；下周只给原计划内的优先顺序建议，保存默认仅同步首项 `next_action`，不重写 `weekly_focus` 或 `active_tasks`。
 - [x] iOS 默认后端 URL 更新为 `https://basis-assignment-capable-soc.trycloudflare.com`；前一 tunnel 加入 legacy 列表，使旧 `UserDefaults` 覆盖自动迁移到新默认地址。
+- [x] 修复 Manual session 日期：Signal Radar、Deep Dive 与 Weekly Studio 均按创建当天生成，不再使用 2026-08 的固定演示日期；Weekly Studio 通过显式 `weekly_studio` 参数和 `manual_deep_dive` review payload 路由，不再依赖日期猜测。
 - [!] 仍有两项与 radar 无关的既有失败测试未处理：`test_material_resume_archive.py`（`str.removeprefix` 需 Python 3.9+，当前 venv 为 3.8）、`test_persistence.py::test_direction_profile_suggestion_uses_edited_full_cycle_plan`。

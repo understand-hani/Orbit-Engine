@@ -205,8 +205,11 @@ struct SessionQueueView: View {
         defer { isCreating = false }
 
         do {
-            let date = nextManualDate()
-            let session = try await sessionAPI.generateAndSaveMock(date: date, taskType: taskTypeOverrideForNewSession())
+            let session = try await sessionAPI.generateAndSaveMock(
+                date: currentDateString(),
+                taskType: taskTypeOverrideForNewSession(),
+                weeklyStudio: isWeeklyStudio(seedSession),
+            )
             guard belongsToCurrentQueue(session) else {
                 errorMessage = "后端返回了 \(sessionDisplayTitle(session))，不是当前 \(sessionDisplayTitle(seedSession)) 队列的工作区。"
                 return
@@ -270,13 +273,12 @@ struct SessionQueueView: View {
         }
     }
 
-    private func nextManualDate() -> String {
-        if seedSession.taskType == .researchFeeder && !isWeeklyStudio(seedSession) {
-            return seedSession.date
-        }
-        let dates = manualDates(for: seedSession)
-        let existingDates = Set(sessions.filter(belongsToCurrentQueue).map(\.date))
-        return dates.first { !existingDates.contains($0) } ?? dates.last ?? seedSession.date
+    private func currentDateString() -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
     }
 
     private var activeSessions: [BaseSession] {
@@ -700,20 +702,9 @@ private func sessionDisplayType(_ session: BaseSession) -> String {
     }
 }
 
-private func manualDates(for session: BaseSession) -> [String] {
-    switch session.taskType {
-    case .techRadar:
-        return ["2026-08-04", "2026-08-10", "2026-08-11"]
-    case .jdAnalysis:
-        return ["2026-08-05", "2026-08-12"]
-    case .researchFeeder:
-        if isWeeklyStudio(session) {
-            return ["2026-08-09", "2026-08-16"]
-        }
-        return ["2026-08-06", "2026-08-07", "2026-08-08", "2026-08-13", "2026-08-14", "2026-08-15"]
-    }
-}
-
 private func isWeeklyStudio(_ session: BaseSession) -> Bool {
-    session.date == "2026-08-09" || session.date == "2026-08-16"
+    guard case .researchFeeder(let payload) = session.payload else {
+        return false
+    }
+    return payload.researchDayRole == "manual_deep_dive"
 }

@@ -15,12 +15,12 @@ struct SessionAPI {
         try await resolvedClient.get("/api/sessions/preview", queryItems: sessionQuery(date: date, taskType: taskType))
     }
 
-    func mock(date: String? = nil, taskType: TaskType? = nil) async throws -> BaseSession {
-        try await resolvedClient.get("/api/sessions/mock", queryItems: sessionQuery(date: date, taskType: taskType))
+    func mock(date: String? = nil, taskType: TaskType? = nil, weeklyStudio: Bool = false) async throws -> BaseSession {
+        try await resolvedClient.get("/api/sessions/mock", queryItems: sessionQuery(date: date, taskType: taskType, weeklyStudio: weeklyStudio))
     }
 
-    func generateAndSaveMock(date: String? = nil, taskType: TaskType? = nil) async throws -> BaseSession {
-        try await resolvedClient.post("/api/sessions/mock", queryItems: sessionQuery(date: date, taskType: taskType))
+    func generateAndSaveMock(date: String? = nil, taskType: TaskType? = nil, weeklyStudio: Bool = false) async throws -> BaseSession {
+        try await resolvedClient.post("/api/sessions/mock", queryItems: sessionQuery(date: date, taskType: taskType, weeklyStudio: weeklyStudio))
     }
 
     func sessionsByDate(_ date: String) async throws -> [BaseSession] {
@@ -74,10 +74,13 @@ struct SessionAPI {
         return [URLQueryItem(name: "date", value: date)]
     }
 
-    private func sessionQuery(date: String?, taskType: TaskType?) -> [URLQueryItem] {
+    private func sessionQuery(date: String?, taskType: TaskType?, weeklyStudio: Bool = false) -> [URLQueryItem] {
         var items = dateQuery(date)
         if let taskType {
             items.append(URLQueryItem(name: "task_type", value: taskType.rawValue))
+        }
+        if weeklyStudio {
+            items.append(URLQueryItem(name: "weekly_studio", value: "true"))
         }
         return items
     }

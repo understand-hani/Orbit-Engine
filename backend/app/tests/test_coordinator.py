@@ -51,3 +51,15 @@ def test_weekend_modes_keep_three_task_types():
         "weekly_review_summary",
         "weekly_next_priorities",
     ]
+
+
+def test_manual_weekly_studio_keeps_review_role_on_any_date():
+    session = WeeklyCoordinator().create_session(
+        date(2026, 8, 14),
+        weekly_studio=True,
+    )
+
+    assert session.date == date(2026, 8, 14)
+    assert session.session_mode == SessionMode.review
+    assert session.title == "Weekly Studio"
+    assert session.payload.research_day_role == ResearchDayRole.manual_deep_dive

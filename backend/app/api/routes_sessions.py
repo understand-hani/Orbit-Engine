@@ -18,24 +18,27 @@ feed_service = FeedService()
 def preview_session(
     target_date: Optional[date] = Query(default=None, alias="date"),
     task_type: Optional[TaskType] = Query(default=None),
+    weekly_studio: bool = False,
 ) -> BaseSession:
-    return feed_service.preview_session(target_date, task_type)
+    return feed_service.preview_session(target_date, task_type, weekly_studio)
 
 
 @router.get("/sessions/mock", response_model=BaseSession)
 def mock_session(
     target_date: Optional[date] = Query(default=None, alias="date"),
     task_type: Optional[TaskType] = Query(default=None),
+    weekly_studio: bool = False,
 ) -> BaseSession:
-    return feed_service.generate_mock_session(target_date, task_type)
+    return feed_service.generate_mock_session(target_date, task_type, weekly_studio=weekly_studio)
 
 
 @router.post("/sessions/mock", response_model=BaseSession)
 def generate_and_save_mock_session(
     target_date: Optional[date] = Query(default=None, alias="date"),
     task_type: Optional[TaskType] = Query(default=None),
+    weekly_studio: bool = False,
 ) -> BaseSession:
-    return feed_service.generate_and_save_mock_session(target_date, task_type)
+    return feed_service.generate_and_save_mock_session(target_date, task_type, weekly_studio=weekly_studio)
 
 
 @router.get("/sessions/today", response_model=BaseSession)

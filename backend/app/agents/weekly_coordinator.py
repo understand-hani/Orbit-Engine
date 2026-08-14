@@ -43,9 +43,10 @@ class WeeklyCoordinator:
         self,
         target_date: Optional[date] = None,
         task_type_override: Optional[TaskType] = None,
+        weekly_studio: bool = False,
     ) -> BaseSession:
         day = target_date or date.today()
-        config = self._resolve_config(day, task_type_override)
+        config = self._resolve_config(day, task_type_override, weekly_studio)
         payload = self._build_payload(day, config)
         now = datetime.now(timezone.utc)
 
@@ -74,7 +75,18 @@ class WeeklyCoordinator:
         self,
         target_date: date,
         task_type_override: Optional[TaskType] = None,
+        weekly_studio: bool = False,
     ) -> Dict:
+        if weekly_studio:
+            return {
+                "task_type": TaskType.research_feeder,
+                "session_mode": SessionMode.review,
+                "title": "Weekly Studio",
+                "subtitle": "回看本周材料、打卡和下周重点",
+                "suggested_action": SuggestedAction.edit_notes,
+                "research_day_role": ResearchDayRole.manual_deep_dive,
+            }
+
         if task_type_override == TaskType.tech_radar:
             return {
                 "task_type": TaskType.tech_radar,

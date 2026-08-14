@@ -53,7 +53,11 @@ final class TodayViewModel: ObservableObject {
         state = .loading
         await refreshContext()
         do {
-            session = try await sessionAPI.mock(date: entry.date, taskType: entry.taskTypeOverride)
+            session = try await sessionAPI.mock(
+                date: entry.date,
+                taskType: entry.taskTypeOverride,
+                weeklyStudio: entry.isWeeklyStudio,
+            )
             state = .loaded
         } catch {
             state = .failed(error.localizedDescription)
@@ -100,6 +104,7 @@ struct ManualSessionEntry: Identifiable {
     let systemImage: String
     let date: String
     let taskTypeOverride: TaskType?
+    var isWeeklyStudio: Bool = false
     var opensDirectly: Bool = false
 
     static var all: [ManualSessionEntry] {
@@ -109,8 +114,8 @@ struct ManualSessionEntry: Identifiable {
             title: "Signal Radar",
             subtitle: "发现趋势、信号、机会和外部变化。",
             systemImage: "dot.radiowaves.left.and.right",
-            date: "2026-08-04",
-            taskTypeOverride: nil
+            date: todayString(),
+            taskTypeOverride: .techRadar
         ),
         ManualSessionEntry(
             id: "deep_dive",
@@ -125,16 +130,17 @@ struct ManualSessionEntry: Identifiable {
             title: "Weekly Studio",
             subtitle: "复盘、归档、更新计划并准备下一轮。",
             systemImage: "calendar.badge.clock",
-            date: "2026-08-09",
-            taskTypeOverride: nil
+            date: todayString(),
+            taskTypeOverride: .researchFeeder,
+            isWeeklyStudio: true
         ),
         ManualSessionEntry(
             id: "opportunity_alignment",
             title: "Opportunity Alignment",
             subtitle: "把学习行动和真实机会、要求、反馈对齐。",
             systemImage: "scope",
-            date: "2026-08-05",
-            taskTypeOverride: nil,
+            date: todayString(),
+            taskTypeOverride: .jdAnalysis,
             opensDirectly: true
         ),
         ]

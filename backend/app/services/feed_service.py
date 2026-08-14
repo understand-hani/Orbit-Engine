@@ -33,16 +33,26 @@ class FeedService:
         self,
         target_date: Optional[date] = None,
         task_type: Optional[TaskType] = None,
+        weekly_studio: bool = False,
     ) -> BaseSession:
-        return self.coordinator.create_session(target_date, task_type_override=task_type)
+        return self.coordinator.create_session(
+            target_date,
+            task_type_override=task_type,
+            weekly_studio=weekly_studio,
+        )
 
     def generate_mock_session(
         self,
         target_date: Optional[date] = None,
         task_type: Optional[TaskType] = None,
         excluded_radar_keys: Optional[set] = None,
+        weekly_studio: bool = False,
     ) -> BaseSession:
-        session = self.coordinator.create_session(target_date, task_type_override=task_type)
+        session = self.coordinator.create_session(
+            target_date,
+            task_type_override=task_type,
+            weekly_studio=weekly_studio,
+        )
         payload = session.payload
         action = session.suggested_action
 
@@ -66,8 +76,13 @@ class FeedService:
         self,
         target_date: Optional[date] = None,
         task_type: Optional[TaskType] = None,
+        weekly_studio: bool = False,
     ) -> BaseSession:
-        seed_session = self.coordinator.create_session(target_date, task_type_override=task_type)
+        seed_session = self.coordinator.create_session(
+            target_date,
+            task_type_override=task_type,
+            weekly_studio=weekly_studio,
+        )
         if seed_session.task_type == TaskType.tech_radar:
             session = seed_session
         else:
@@ -76,6 +91,7 @@ class FeedService:
                 target_date,
                 task_type=task_type,
                 excluded_radar_keys=excluded_radar_keys,
+                weekly_studio=weekly_studio,
             )
         if self.sessions.get_by_id(session.id) is not None:
             suffix = uuid4().hex[:8]
@@ -302,7 +318,7 @@ class FeedService:
         return deduped
 
     def _apply_default_title(self, session: BaseSession, exclude_self: bool = True) -> BaseSession:
-        if session.task_type != TaskType.research_feeder:
+        if session.task_type != TaskType.research_feeder or self._is_weekly_studio(session):
             return session
 
         existing = self.sessions.get_by_date_and_task(
@@ -325,14 +341,14 @@ class FeedService:
         return session.model_copy(update={"title": title})
 
     def _ensure_default_title(self, session: BaseSession) -> BaseSession:
-        if session.task_type != TaskType.research_feeder:
+        if session.task_type != TaskType.research_feeder or self._is_weekly_studio(session):
             return session
         if self._title_sequence(session) is not None:
             return session
         return self._apply_default_title(session)
 
     def _normalize_existing_research_titles(self, session: BaseSession) -> None:
-        if session.task_type != TaskType.research_feeder:
+        if session.task_type != TaskType.research_feeder or self._is_weekly_studio(session):
             return
 
         existing = self.sessions.get_by_date_and_task(
@@ -348,7 +364,11 @@ class FeedService:
         next_sequence = (max(used_sequences) + 1) if used_sequences else 1
 
         for item in existing:
-            if item.status == SessionStatus.skipped or self._title_sequence(item) is not None:
+            if (
+                item.status == SessionStatus.skipped
+                or self._is_weekly_studio(item)
+                or self._title_sequence(item) is not None
+            ):
                 continue
             while next_sequence in used_sequences:
                 next_sequence += 1
@@ -366,6 +386,12 @@ class FeedService:
         if session.task_type == TaskType.research_feeder:
             return f"Deep Dive-{session.date.strftime('%Y/%m/%d')}-"
         return f"{session.title}-{session.date.isoformat()}-"
+
+    def _is_weekly_studio(self, session: BaseSession) -> bool:
+        return (
+            isinstance(session.payload, ResearchFeederPayload)
+            and session.payload.research_day_role.value == "manual_deep_dive"
+        )
 
     def _title_sequence(self, session: BaseSession) -> Optional[int]:
         if session.task_type != TaskType.research_feeder:

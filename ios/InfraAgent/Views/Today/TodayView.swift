@@ -182,8 +182,7 @@ struct TodayView: View {
         case .techRadar:
             return "Signal Radar"
         case .researchFeeder:
-            if viewModel.mode == .manual,
-               session.date == "2026-08-09" || session.date == "2026-08-16" {
+            if isWeeklyStudio(session) {
                 return "Weekly Studio"
             }
             return deepDiveDisplayTitle(for: session)
@@ -197,8 +196,7 @@ struct TodayView: View {
         case .techRadar:
             return "radar"
         case .researchFeeder:
-            if viewModel.mode == .manual,
-               session.date == "2026-08-09" || session.date == "2026-08-16" {
+            if isWeeklyStudio(session) {
                 return "weekly_studio"
             }
             return "deep_dive"
@@ -219,6 +217,13 @@ struct TodayView: View {
             return session.title
         }
         return "\(prefix)1"
+    }
+
+    private func isWeeklyStudio(_ session: BaseSession) -> Bool {
+        guard case .researchFeeder(let payload) = session.payload else {
+            return false
+        }
+        return payload.researchDayRole == "manual_deep_dive"
     }
 }
 
