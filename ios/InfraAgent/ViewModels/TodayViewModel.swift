@@ -106,7 +106,7 @@ struct ManualSessionEntry: Identifiable {
         [
         ManualSessionEntry(
             id: "radar",
-            title: "Radar",
+            title: "Signal Radar",
             subtitle: "发现趋势、信号、机会和外部变化。",
             systemImage: "dot.radiowaves.left.and.right",
             date: "2026-08-04",

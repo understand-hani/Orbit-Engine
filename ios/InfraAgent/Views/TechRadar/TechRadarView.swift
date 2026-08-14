@@ -48,7 +48,7 @@ struct TechRadarView: View {
             Section("当前工作区") {
                 VStack(alignment: .leading, spacing: 10) {
                     RadarSummaryLine(title: "本周重点", value: context?.plan.weeklyFocus ?? payload.digest.summary)
-                    RadarSummaryLine(title: "下一步动作", value: context?.plan.nextAction ?? "生成本轮 Radar 后，把最重要的信号分流到 Deep Dive、暂存或忽略。")
+                    RadarSummaryLine(title: "下一步动作", value: context?.plan.nextAction ?? "生成本轮 Signal Radar 后，把最重要的信号分流到 Deep Dive、暂存或忽略。")
                     if let context, !context.plan.trackingKeywords.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("计划关键词")
@@ -79,12 +79,12 @@ struct TechRadarView: View {
                 )
             }
 
-            Section("新建 Radar") {
+            Section("新建 Signal Radar") {
                 Button {
                     isShowingRadarInput = true
                 } label: {
                     HStack {
-                        Label("生成本轮 Radar", systemImage: "dot.radiowaves.left.and.right")
+                        Label("生成本轮 Signal Radar", systemImage: "dot.radiowaves.left.and.right")
                         Spacer()
                         if isGeneratingRadar {
                             ProgressView()
@@ -93,13 +93,13 @@ struct TechRadarView: View {
                 }
                 .disabled(isGeneratingRadar)
 
-                Text("Radar 不做候选池；点击后直接生成本轮扫描结果：摘要、为什么和我有关、噪音判断和路由动作。")
+                Text("Signal Radar 不做候选池；点击后直接生成本轮扫描结果：摘要、为什么和我有关、噪音判断和路由动作。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             if let radarRun {
-                Section("本轮 Radar") {
+                Section("本轮 Signal Radar") {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(radarRun.title)
                             .font(.headline)
@@ -177,9 +177,9 @@ struct TechRadarView: View {
 
     private var contextSources: String {
         if context == nil {
-            return "当前 Radar 引用 payload 中的 scope、top signals 和外部信号；用户上下文加载后会补充计划关键词、领域偏好和材料源偏好。"
+            return "当前 Signal Radar 引用 payload 中的 scope、top signals 和外部信号；用户上下文加载后会补充计划关键词、领域偏好和材料源偏好。"
         }
-        return "引用字段：UserContext.plan.weekly_focus、next_action、tracking_keywords，UserContext.preferences.fields、source_preferences，以及当前 Radar payload 的 top_signals、items 和 noise_filtered。"
+        return "引用字段：UserContext.plan.weekly_focus、next_action、tracking_keywords，UserContext.preferences.fields、source_preferences，以及当前 Signal Radar payload 的 top_signals、items 和 noise_filtered。"
     }
 
     private func loadContext() async {
@@ -198,7 +198,7 @@ struct TechRadarView: View {
             do {
                 let updatedSession = try await sessionAPI.refreshRadar(sessionID: currentSession.id)
                 guard case .techRadar(let updatedPayload) = updatedSession.payload else {
-                    message = "Radar 生成失败：后端返回了非 Radar session。"
+                    message = "Signal Radar 生成失败：后端返回了非 Signal Radar session。"
                     return
                 }
                 currentSession = updatedSession
@@ -209,7 +209,7 @@ struct TechRadarView: View {
                 )
                 message = nil
             } catch {
-                message = "Radar 生成失败：\(error.localizedDescription)"
+                message = "Signal Radar 生成失败：\(error.localizedDescription)"
             }
             return
         }
@@ -250,7 +250,7 @@ struct TechRadarView: View {
         }
 
         return RadarRun(
-            title: "本轮 Radar 扫描",
+            title: "本轮 Signal Radar 扫描",
             summary: radarSummary(input: input, count: decisions.count),
             decisions: decisions
         )
@@ -319,7 +319,7 @@ struct TechRadarView: View {
     private func introduction(for item: RadarItem, input: RadarInput) -> String {
         let sourcePart = "来源是\(input.sourceLabel)，当前信号指向「\(item.title)」。"
         let changePart = "它反映的核心变化是：\(item.summary)"
-        let actionPart = "Radar 的作用不是让用户立刻精读，而是先判断这条变化是否会影响当前计划、是否值得转入 Deep Dive。"
+        let actionPart = "Signal Radar 的作用不是让用户立刻精读，而是先判断这条变化是否会影响当前计划、是否值得转入 Deep Dive。"
         return [sourcePart, changePart, actionPart].joined(separator: "\n\n")
     }
 
@@ -351,7 +351,7 @@ struct TechRadarView: View {
                 displayType: input.source == .url ? "网页 / 原文链接" : "外部来源链接",
                 detail: url.absoluteString,
                 url: url,
-                note: "点击链接可打开原始网页。当前 Radar 先保存链接和 Agent 判断；网页正文抓取、截图和引用定位后续接后端。"
+                note: "点击链接可打开原始网页。当前 Signal Radar 先保存链接和 Agent 判断；网页正文抓取、截图和引用定位后续接后端。"
             )
         }
 
@@ -386,7 +386,7 @@ struct TechRadarView: View {
                 displayType: "Agent 自动扫描",
                 detail: item.source.isEmpty ? input.sourceDetail : item.source,
                 url: nil,
-                note: "这条信号来自当前 Radar payload。若没有 URL，说明后端暂未提供可点击原文。"
+                note: "这条信号来自当前 Signal Radar payload。若没有 URL，说明后端暂未提供可点击原文。"
             )
         case .url:
             return RadarSourceReference(
@@ -421,7 +421,7 @@ struct TechRadarView: View {
         case "excerpt_available":
             return "已抓到正文摘录：可用摘录辅助判断，但进入 Deep Dive 前仍要打开原文确认上下文。"
         case "full_text_available":
-            return "已获取全文：Radar 仍只做初筛，深入结论放到 Deep Dive。"
+            return "已获取全文：Signal Radar 仍只做初筛，深入结论放到 Deep Dive。"
         case "metadata_with_structured_summary":
             return "结构化摘要判断：基于论文摘要、仓库描述或来源 metadata，未额外抓取网页正文。"
         default:
@@ -486,13 +486,13 @@ private enum RadarInputSource: String, CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .agent:
-            return "按当前计划、关键词和已有 Radar payload 自动扫描。"
+            return "按当前计划、关键词和已有 Signal Radar payload 自动扫描。"
         case .topic:
             return "输入一个方向或问题，让 Agent 做广度信号判断。"
         case .url:
             return "粘贴网页、论文、产品页或新闻链接。"
         case .pdf:
-            return "登记个人文件或 PDF，先以标题和说明进入 Radar。"
+            return "登记个人文件或 PDF，先以标题和说明进入 Signal Radar。"
         case .manual:
             return "直接写下你观察到的一条变化。"
         }
@@ -535,7 +535,7 @@ private struct RadarInput {
         case .pdf:
             return "用户登记的 PDF / 文件信号"
         case .manual:
-            return "用户手动输入的 Radar 信号"
+            return "用户手动输入的 Signal Radar 信号"
         }
     }
 
@@ -546,15 +546,15 @@ private struct RadarInput {
         }
         switch source {
         case .agent:
-            return "Agent 根据当前计划、关键词和 Radar payload 生成本轮信号判断。"
+            return "Agent 根据当前计划、关键词和 Signal Radar payload 生成本轮信号判断。"
         case .topic:
             return "围绕该主题扫描外部变化、方向变化和下一步机会。"
         case .url:
-            return "基于用户提供的网址生成一条 Radar 信号判断。"
+            return "基于用户提供的网址生成一条 Signal Radar 信号判断。"
         case .pdf:
-            return "基于用户登记的 PDF / 文件材料生成一条 Radar 信号判断。"
+            return "基于用户登记的 PDF / 文件材料生成一条 Signal Radar 信号判断。"
         case .manual:
-            return "基于用户手动输入内容生成一条 Radar 信号判断。"
+            return "基于用户手动输入内容生成一条 Signal Radar 信号判断。"
         }
     }
 
@@ -567,7 +567,7 @@ private struct RadarInput {
         case .url:
             return url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? titleOrFallback : url
         case .pdf:
-            return "\(titleOrFallback)（文件内容当前以登记信息进入 Radar；真实二进制上传和正文抽取仍需后端接口支持。）"
+            return "\(titleOrFallback)（文件内容当前以登记信息进入 Signal Radar；真实二进制上传和正文抽取仍需后端接口支持。）"
         default:
             return titleOrFallback
         }
@@ -578,7 +578,7 @@ private struct RadarInput {
     }
 
     var tags: [String] {
-        [source.title, "Radar", "路由决策"]
+        [source.title, "Signal Radar", "路由决策"]
     }
 
     func relevanceOrFallback(context: UserContext?) -> String {
@@ -678,7 +678,7 @@ private struct RadarInputSheet: View {
             switch source {
             case .agent:
                 Section("Agent 自动扫描") {
-                    Text("Agent 会基于计划关键词、领域偏好、材料源偏好和当前 Radar payload，直接生成本轮信号路由结果。")
+                    Text("Agent 会基于计划关键词、领域偏好、材料源偏好和当前 Signal Radar payload，直接生成本轮信号路由结果。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if let context, !context.plan.trackingKeywords.isEmpty {
@@ -708,7 +708,7 @@ private struct RadarInputSheet: View {
                         .lineLimit(1...3)
                     TextField("描述文件来源、核心内容、为什么可能影响你的方向", text: $summary, axis: .vertical)
                         .lineLimit(4...8)
-                    Text("当前后端还没有 Radar 文件上传接口。这里先支持文件材料登记，后续可接真实上传、正文抽取和页码索引。")
+                    Text("当前后端还没有 Signal Radar 文件上传接口。这里先支持文件材料登记，后续可接真实上传、正文抽取和页码索引。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -721,13 +721,13 @@ private struct RadarInputSheet: View {
                 }
             }
 
-            Section("Radar 输出") {
-                Text("生成后不会进入候选池，而是直接得到本轮 Radar：每条信号包含摘要、为什么相关、噪音判断和路由动作。")
+            Section("Signal Radar 输出") {
+                Text("生成后不会进入候选池，而是直接得到本轮 Signal Radar：每条信号包含摘要、为什么相关、噪音判断和路由动作。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("生成 Radar")
+        .navigationTitle("生成 Signal Radar")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -910,7 +910,7 @@ private struct RadarDecisionDetailView: View {
                 }
                 .disabled(isUpdatingMark)
                 Button("暂存决策") {
-                    updateMark("track_later", message: "已暂存为 Radar 决策")
+                    updateMark("track_later", message: "已暂存为 Signal Radar 决策")
                 }
                 .disabled(isUpdatingMark)
                 Button("忽略") {
@@ -926,17 +926,17 @@ private struct RadarDecisionDetailView: View {
 
             PartRecordFormView(
                 session: session,
-                defaultSummary: "Radar 判断：\(decision.title)。\(decision.whatChanged)",
+                defaultSummary: "Signal Radar 判断：\(decision.title)。\(decision.whatChanged)",
                 defaultKeyInsight: decision.whyRelevant,
                 sourceTitle: decision.title,
                 sourceURL: decision.sourceURL,
                 sourceSummary: decision.introduction,
                 userNotes: "来源方式：\(decision.sourceType)\n来源详情：\(decision.sourceDetail)\n噪音判断：\(decision.noiseJudgement)\n路由动作：\(decision.route)",
-                sectionTitle: "Radar Check-in",
+                sectionTitle: "Signal Radar Check-in",
                 status: "completed"
             )
         }
-        .navigationTitle("Radar 详情")
+        .navigationTitle("Signal Radar 详情")
     }
 
     private func updateMark(_ mark: String, message: String) {
@@ -1102,7 +1102,7 @@ struct TechRadarItemDetailView: View {
                 sourceURL: item.url?.absoluteString,
                 sourceSummary: item.summary,
                 userNotes: "来源：\(item.source)\n噪音判断：\(item.marketingNoise)",
-                sectionTitle: "Radar Check-in",
+                sectionTitle: "Signal Radar Check-in",
                 status: "completed"
             )
 

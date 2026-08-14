@@ -279,9 +279,9 @@ class ChatService:
         if not isinstance(payload, TechRadarPayload):
             return ""
         lines = [
-            "Radar 信号上下文如下。回答用户时必须优先基于这些内容，不要把 signal id 当成唯一信息。",
+            "Signal Radar 信号上下文如下。回答用户时必须优先基于这些内容，不要把 signal id 当成唯一信息。",
             f"Session: {session.title}",
-            f"Radar 类型: {payload.radar_type.value}",
+            f"Signal Radar 类型: {payload.radar_type.value}",
             f"本轮摘要: {payload.digest.summary}",
         ]
         scope_parts = [
@@ -313,7 +313,7 @@ class ChatService:
 
     def _radar_item_lines(self, item: RadarItem) -> List[str]:
         lines = [
-            "Radar 信号:",
+            "Signal Radar 信号:",
             f"- id: {item.id}",
             f"- title: {item.title}",
             f"- source: {item.source}",

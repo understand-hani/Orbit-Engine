@@ -50,11 +50,11 @@ class MockTechRadarAgent:
         radar_context = self._radar_context_terms(payload, user_context)
         items = self._industry_items_from_search(payload, excluded_source_keys or set(), radar_context)
         if items:
-            summary = "本轮 Radar 已基于公开网页、新闻/RSS、开源与论文 metadata 生成行业动态信号。"
+            summary = "本轮 Signal Radar 已基于公开网页、新闻/RSS、开源与论文 metadata 生成行业动态信号。"
             top_signals = [items[0].summary]
             follow_up = ["哪条行业动态值得转入 Deep Dive，进一步确认原文、产品/成果边界和与你当前计划的关系？"]
         else:
-            summary = "本轮 Radar 未从公开源检索到可用行业动态；请稍后重试，或输入具体主题/URL。"
+            summary = "本轮 Signal Radar 未从公开源检索到可用行业动态；请稍后重试，或输入具体主题/URL。"
             top_signals = []
             follow_up = ["是否需要换一个更具体的行业主题、机构、公司、平台或产品关键词重新扫描？"]
 
@@ -451,7 +451,7 @@ class MockTechRadarAgent:
             relation = "它与当前方向中的 " + "、".join(compacted_terms[:4]) + " 有直接词面关联。"
 
         if self._contains_any(text, ["发布", "推出", "上线", "product", "launch", "release", "platform"]):
-            base = "这段的价值在于它描述了具体产品、平台或能力动作，可用于判断这条 Radar 是否只是新闻标题，还是有明确落地对象。"
+            base = "这段的价值在于它描述了具体产品、平台或能力动作，可用于判断这条 Signal Radar 是否只是新闻标题，还是有明确落地对象。"
         elif self._contains_any(text, ["大学", "研究院", "实验室", "团队", "university", "institute", "lab", "researchers"]):
             base = "这段的价值在于它给出了机构或团队来源，可用于判断信号是否来自研发主体、平台方或二手报道。"
         elif self._contains_any(text, ["实验", "测试", "benchmark", "sota", "performance", "dataset", "评估", "指标"]):

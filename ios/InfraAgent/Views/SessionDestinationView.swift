@@ -631,7 +631,7 @@ struct CompletionArchiveView: View {
             nextAction = nonEmpty(payload.notes.nextAction)
                 ?? "根据本次阅读结果，决定继续精读、加入跟踪列表或归档为阶段性参考。"
         case .techRadar:
-            summary = "完成了 Radar session：浏览并筛选了本次外部信号。"
+            summary = "完成了 Signal Radar session：浏览并筛选了本次外部信号。"
             keyInsight = "记录一个值得继续跟踪的技术、产品或市场变化。"
             nextAction = "把高价值信号转入 Deep Dive 或下周继续跟踪。"
         case .jdAnalysis:
@@ -679,7 +679,7 @@ struct CompletionArchiveView: View {
 private func sessionDisplayTitle(_ session: BaseSession) -> String {
     switch session.taskType {
     case .techRadar:
-        return "Radar"
+        return "Signal Radar"
     case .researchFeeder:
         if isWeeklyStudio(session) {
             return "Weekly Studio"

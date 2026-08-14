@@ -180,7 +180,7 @@ struct TodayView: View {
     private func displayTitle(for session: BaseSession) -> String {
         switch session.taskType {
         case .techRadar:
-            return "Radar"
+            return "Signal Radar"
         case .researchFeeder:
             if viewModel.mode == .manual,
                session.date == "2026-08-09" {

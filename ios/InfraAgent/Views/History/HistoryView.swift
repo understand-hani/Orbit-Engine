@@ -36,7 +36,7 @@ struct HistoryView: View {
                         EmptyStateView(
                             title: "暂无暂存工作区",
                             systemImage: "archivebox",
-                            message: "以后不想立刻做、但还可能继续的 Deep Dive 或 Radar 信号会先放在这里。"
+                            message: "以后不想立刻做、但还可能继续的 Deep Dive 或 Signal Radar 信号会先放在这里。"
                         )
                     } else {
                         ForEach(viewModel.archivedCheckins) { checkin in
@@ -79,9 +79,9 @@ struct HistoryView: View {
     private func archivedTitle(for checkin: Checkin) -> String {
         if checkin.taskType == .techRadar {
             if let sourceTitle = nonEmpty(checkin.sourceTitle) {
-                return "Radar：\(sourceTitle)"
+                return "Signal Radar：\(sourceTitle)"
             }
-            return nonEmpty(checkin.summary) ?? "Radar 暂存信号"
+            return nonEmpty(checkin.summary) ?? "Signal Radar 暂存信号"
         }
 
         let displayDate = checkin.date.replacingOccurrences(of: "-", with: "/")
