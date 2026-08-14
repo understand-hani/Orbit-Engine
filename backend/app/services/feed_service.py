@@ -318,7 +318,9 @@ class FeedService:
         return deduped
 
     def _apply_default_title(self, session: BaseSession, exclude_self: bool = True) -> BaseSession:
-        if session.task_type != TaskType.research_feeder or self._is_weekly_studio(session):
+        if self._is_weekly_studio(session):
+            return session.model_copy(update={"title": self._weekly_studio_title(session)})
+        if session.task_type not in {TaskType.tech_radar, TaskType.research_feeder}:
             return session
 
         existing = self.sessions.get_by_date_and_task(
@@ -341,7 +343,9 @@ class FeedService:
         return session.model_copy(update={"title": title})
 
     def _ensure_default_title(self, session: BaseSession) -> BaseSession:
-        if session.task_type != TaskType.research_feeder or self._is_weekly_studio(session):
+        if self._is_weekly_studio(session):
+            return self._apply_default_title(session)
+        if session.task_type not in {TaskType.tech_radar, TaskType.research_feeder}:
             return session
         if self._title_sequence(session) is not None:
             return session
@@ -384,8 +388,13 @@ class FeedService:
 
     def _title_prefix(self, session: BaseSession) -> str:
         if session.task_type == TaskType.research_feeder:
-            return f"Deep Dive-{session.date.strftime('%Y/%m/%d')}-"
-        return f"{session.title}-{session.date.isoformat()}-"
+            return f"Deep Dive-{session.date.strftime('%Y/%m/%d')}-No."
+        if session.task_type == TaskType.tech_radar:
+            return f"Signal Radar-{session.date.strftime('%Y/%m/%d')}-No."
+        return f"{session.title}-{session.date.isoformat()}-No."
+
+    def _weekly_studio_title(self, session: BaseSession) -> str:
+        return f"Weekly Studio-{session.date.strftime('%Y/%m/%d')}"
 
     def _is_weekly_studio(self, session: BaseSession) -> bool:
         return (
@@ -394,12 +403,14 @@ class FeedService:
         )
 
     def _title_sequence(self, session: BaseSession) -> Optional[int]:
-        if session.task_type != TaskType.research_feeder:
+        if session.task_type not in {TaskType.tech_radar, TaskType.research_feeder}:
             return None
 
-        date_slash = session.date.strftime("%Y/%m/%d")
-        date_dash = session.date.isoformat()
-        pattern = re.compile(rf"^Deep Dive-(?:{re.escape(date_slash)}|{re.escape(date_dash)})-(\d+)$")
+        if self._is_weekly_studio(session):
+            return None
+        prefix = self._title_prefix(session)
+        legacy_prefix = prefix.replace("-No.", "-")
+        pattern = re.compile(rf"^(?:{re.escape(prefix)}|{re.escape(legacy_prefix)})(\d+)$")
         match = pattern.match(session.title)
         return int(match.group(1)) if match else None
 
@@ -409,7 +420,7 @@ class FeedService:
         existing: list[BaseSession],
         exclude_self: bool,
     ) -> int:
-        if session.task_type != TaskType.research_feeder:
+        if session.task_type not in {TaskType.tech_radar, TaskType.research_feeder}:
             return 1
 
         used_sequences = set()

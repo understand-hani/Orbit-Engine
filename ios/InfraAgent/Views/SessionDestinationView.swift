@@ -89,13 +89,15 @@ struct SessionQueueView: View {
                             .tint(.orange)
                             .disabled(processingSessionIDs.contains(session.id))
 
-                            Button {
-                                startRenaming(session)
-                            } label: {
-                                Label("重命名", systemImage: "pencil")
+                            if !isWeeklyStudio(session) {
+                                Button {
+                                    startRenaming(session)
+                                } label: {
+                                    Label("重命名", systemImage: "pencil")
+                                }
+                                .tint(.blue)
+                                .disabled(processingSessionIDs.contains(session.id))
                             }
-                            .tint(.blue)
-                            .disabled(processingSessionIDs.contains(session.id))
                         }
                     }
                 }
@@ -285,15 +287,15 @@ struct SessionQueueView: View {
         sessions.filter { isActive($0) && belongsToCurrentQueue($0) }
     }
 
-    private func instanceLabel(for session: BaseSession, index: Int) -> String {
-        "第 \(index + 1) 个 · \(session.date)"
-    }
-
     private func displayName(for session: BaseSession, index: Int) -> String {
-        if session.taskType == .researchFeeder {
-            return deepDiveDisplayName(for: session, index: index)
+        if isWeeklyStudio(session) {
+            return "Weekly Studio-\(displayDateForTitle(session.date))"
         }
-        return "\(sessionDisplayTitle(session)) · \(instanceLabel(for: session, index: index))"
+        let prefix = renamePrefix(for: session)
+        if session.title.hasPrefix(prefix) {
+            return session.title
+        }
+        return "\(prefix)\(index + 1)"
     }
 
     private func deepDiveDisplayName(for session: BaseSession, index: Int) -> String {
@@ -305,10 +307,10 @@ struct SessionQueueView: View {
     }
 
     private func renamePrefix(for session: BaseSession) -> String {
-        if session.taskType == .researchFeeder {
-            return "\(sessionDisplayTitle(session))-\(displayDateForTitle(session.date))-"
+        if isWeeklyStudio(session) {
+            return "Weekly Studio-\(displayDateForTitle(session.date))"
         }
-        return "\(sessionDisplayTitle(session))-\(session.date)-"
+        return "\(sessionDisplayTitle(session))-\(displayDateForTitle(session.date))-No."
     }
 
     private func displayDateForTitle(_ date: String) -> String {
@@ -316,6 +318,7 @@ struct SessionQueueView: View {
     }
 
     private func suffixForRename(_ session: BaseSession) -> String {
+        guard !isWeeklyStudio(session) else { return "" }
         let prefix = renamePrefix(for: session)
         if session.title.hasPrefix(prefix) {
             return String(session.title.dropFirst(prefix.count))

@@ -289,14 +289,14 @@ def test_research_session_default_title_and_rename_rejects_duplicate():
         replacement = feed_service.generate_and_save_mock_session(first.date)
 
         title_date = first.date.strftime("%Y/%m/%d")
-        assert first.title == f"Deep Dive-{title_date}-1"
-        assert second.title == f"Deep Dive-{title_date}-2"
-        assert preview.title == f"Deep Dive-{title_date}-3"
-        assert replacement.title == f"Deep Dive-{title_date}-3"
+        assert first.title == f"Deep Dive-{title_date}-No.1"
+        assert second.title == f"Deep Dive-{title_date}-No.2"
+        assert preview.title == f"Deep Dive-{title_date}-No.3"
+        assert replacement.title == f"Deep Dive-{title_date}-No.3"
 
         renamed = feed_service.rename_session(second.id, "4")
         assert renamed is not None
-        assert renamed.title == f"Deep Dive-{title_date}-4"
+        assert renamed.title == f"Deep Dive-{title_date}-No.4"
 
         try:
             feed_service.rename_session(renamed.id, "3")
@@ -304,6 +304,31 @@ def test_research_session_default_title_and_rename_rejects_duplicate():
             assert "名称已存在" in str(exc)
         else:
             raise AssertionError("duplicate rename should be rejected")
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
+def test_radar_and_weekly_studio_titles_follow_session_rules():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_session_type_title_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        feed_service = FeedService()
+        target_date = date.fromisoformat("2026-08-14")
+
+        first_radar = feed_service.generate_and_save_mock_session(target_date, task_type=TaskType.tech_radar)
+        second_radar = feed_service.generate_and_save_mock_session(target_date, task_type=TaskType.tech_radar)
+        weekly_studio = feed_service.generate_and_save_mock_session(target_date, weekly_studio=True)
+
+        assert first_radar.title == "Signal Radar-2026/08/14-No.1"
+        assert second_radar.title == "Signal Radar-2026/08/14-No.2"
+        assert weekly_studio.title == "Weekly Studio-2026/08/14"
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)
@@ -327,7 +352,7 @@ def test_research_session_title_sequence_counts_archived_duplicates():
         duplicate_archived = feed_service.generate_mock_session(first.date).model_copy(
             update={
                 "id": "duplicate_archived",
-                "title": f"Deep Dive-{title_date}-1",
+                "title": f"Deep Dive-{title_date}-No.1",
                 "status": SessionStatus.archived,
             }
         )
@@ -335,9 +360,9 @@ def test_research_session_title_sequence_counts_archived_duplicates():
 
         next_after_duplicate = feed_service.generate_and_save_mock_session(first.date)
 
-        assert first.title == f"Deep Dive-{title_date}-1"
-        assert second.title == f"Deep Dive-{title_date}-2"
-        assert next_after_duplicate.title == f"Deep Dive-{title_date}-3"
+        assert first.title == f"Deep Dive-{title_date}-No.1"
+        assert second.title == f"Deep Dive-{title_date}-No.2"
+        assert next_after_duplicate.title == f"Deep Dive-{title_date}-No.3"
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)
@@ -366,12 +391,12 @@ def test_archive_session_marks_session_archived_and_creates_checkin():
         assert len(checkins) == 1
         assert checkins[0].status.value == "archived"
         title_date = session.date.strftime("%Y/%m/%d")
-        assert checkins[0].summary == f"已暂存：Deep Dive-{title_date}-1"
+        assert checkins[0].summary == f"已暂存：Deep Dive-{title_date}-No.1"
 
         restored_session = feed_service.restore_session(session.id)
         assert restored_session is not None
         assert restored_session.status.value == "active"
-        assert restored_session.title == f"Deep Dive-{title_date}-1"
+        assert restored_session.title == f"Deep Dive-{title_date}-No.1"
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)
@@ -394,22 +419,22 @@ def test_archive_and_restore_preserve_deep_dive_title():
         second = feed_service.generate_and_save_mock_session(first.date)
         title_date = first.date.strftime("%Y/%m/%d")
 
-        assert first.title == f"Deep Dive-{title_date}-1"
-        assert second.title == f"Deep Dive-{title_date}-2"
+        assert first.title == f"Deep Dive-{title_date}-No.1"
+        assert second.title == f"Deep Dive-{title_date}-No.2"
         assert feed_service.archive_session(second.id) is True
 
         archived_second = feed_service.get_session(second.id)
         assert archived_second is not None
-        assert archived_second.title == f"Deep Dive-{title_date}-2"
+        assert archived_second.title == f"Deep Dive-{title_date}-No.2"
         checkins = checkin_service.list_checkins(second.date.isoformat())
-        assert checkins[0].summary == f"已暂存：Deep Dive-{title_date}-2"
+        assert checkins[0].summary == f"已暂存：Deep Dive-{title_date}-No.2"
 
         third = feed_service.generate_and_save_mock_session(first.date, task_type=TaskType.research_feeder)
-        assert third.title == f"Deep Dive-{title_date}-3"
+        assert third.title == f"Deep Dive-{title_date}-No.3"
 
         restored_second = feed_service.restore_session(second.id)
         assert restored_second is not None
-        assert restored_second.title == f"Deep Dive-{title_date}-2"
+        assert restored_second.title == f"Deep Dive-{title_date}-No.2"
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)
@@ -434,13 +459,13 @@ def test_archiving_legacy_deep_dive_title_normalizes_once_and_counts_sequence():
         assert feed_service.archive_session(legacy.id) is True
         archived_legacy = feed_service.get_session(legacy.id)
         assert archived_legacy is not None
-        assert archived_legacy.title == f"Deep Dive-{title_date}-1"
+        assert archived_legacy.title == f"Deep Dive-{title_date}-No.1"
 
         next_session = feed_service.generate_and_save_mock_session(
             legacy.date,
             task_type=TaskType.research_feeder,
         )
-        assert next_session.title == f"Deep Dive-{title_date}-2"
+        assert next_session.title == f"Deep Dive-{title_date}-No.2"
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)
@@ -473,9 +498,9 @@ def test_new_deep_dive_counts_legacy_active_sessions_after_normalization():
             task_type=TaskType.research_feeder,
         )
 
-        assert feed_service.get_session(legacy_one.id).title == f"Deep Dive-{title_date}-1"
-        assert feed_service.get_session(legacy_two.id).title == f"Deep Dive-{title_date}-2"
-        assert next_session.title == f"Deep Dive-{title_date}-3"
+        assert feed_service.get_session(legacy_one.id).title == f"Deep Dive-{title_date}-No.1"
+        assert feed_service.get_session(legacy_two.id).title == f"Deep Dive-{title_date}-No.2"
+        assert next_session.title == f"Deep Dive-{title_date}-No.3"
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)
@@ -496,11 +521,11 @@ def test_today_generates_next_title_after_terminal_archive_or_completion():
 
         archived = feed_service.generate_and_save_mock_session()
         title_date = archived.date.strftime("%Y/%m/%d")
-        assert archived.title == f"Deep Dive-{title_date}-1"
+        assert archived.title == f"Deep Dive-{title_date}-No.1"
         assert feed_service.archive_session(archived.id) is True
 
         after_archive = feed_service.get_or_create_mock_session(archived.date)
-        assert after_archive.title == f"Deep Dive-{title_date}-2"
+        assert after_archive.title == f"Deep Dive-{title_date}-No.2"
 
         result = checkin_service.confirm_completion(
             after_archive.id,
@@ -515,7 +540,7 @@ def test_today_generates_next_title_after_terminal_archive_or_completion():
         assert result is not None
 
         after_completion = feed_service.get_or_create_mock_session(archived.date)
-        assert after_completion.title == f"Deep Dive-{title_date}-3"
+        assert after_completion.title == f"Deep Dive-{title_date}-No.3"
 
         assert feed_service.delete_session(after_completion.id) is True
         after_delete = feed_service.get_or_create_mock_session(archived.date)
@@ -545,7 +570,7 @@ def test_can_force_deep_dive_for_current_date_independent_of_weekday_schedule():
         title_date = monday.strftime("%Y/%m/%d")
         assert scheduled.task_type == TaskType.tech_radar
         assert forced.task_type == TaskType.research_feeder
-        assert forced.title == f"Deep Dive-{title_date}-1"
+        assert forced.title == f"Deep Dive-{title_date}-No.1"
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)

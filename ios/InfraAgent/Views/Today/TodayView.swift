@@ -180,10 +180,10 @@ struct TodayView: View {
     private func displayTitle(for session: BaseSession) -> String {
         switch session.taskType {
         case .techRadar:
-            return "Signal Radar"
+            return cardTitle(for: session, fallbackName: "Signal Radar")
         case .researchFeeder:
             if isWeeklyStudio(session) {
-                return "Weekly Studio"
+                return "Weekly Studio-\(session.date.replacingOccurrences(of: "-", with: "/"))"
             }
             return deepDiveDisplayTitle(for: session)
         case .jdAnalysis:
@@ -212,7 +212,11 @@ struct TodayView: View {
     }
 
     private func deepDiveDisplayTitle(for session: BaseSession) -> String {
-        let prefix = "Deep Dive-\(session.date.replacingOccurrences(of: "-", with: "/"))-"
+        cardTitle(for: session, fallbackName: "Deep Dive")
+    }
+
+    private func cardTitle(for session: BaseSession, fallbackName: String) -> String {
+        let prefix = "\(fallbackName)-\(session.date.replacingOccurrences(of: "-", with: "/"))-No."
         if session.title.hasPrefix(prefix) {
             return session.title
         }
