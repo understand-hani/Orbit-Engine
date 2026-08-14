@@ -145,7 +145,7 @@ def test_weekly_studio_mock_summary_uses_radar_and_deep_dive_evidence():
                 duration_min=30,
                 status=CheckinStatus.completed,
                 summary="完成了本周 Deep Dive 归档。",
-                key_insight="用条件编码区分可控输入与场景状态。",
+                key_insight="记录一个和当前目标相关的关键收获。",
                 source_summary="An English source abstract that must not appear in the weekly summary.",
             )
         )

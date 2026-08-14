@@ -300,8 +300,11 @@ completed check-ins and their linked Radar or Deep Dive evidence. Output
 Simplified Chinese only, in 2-4 short sentences. Extract the core method,
 evidence, or technical judgment and explain its implication for the current
 plan. Translate and synthesize English source material; never paste an English
-paper title, abstract, reading goal, or raw source passage. Do not say only
-that a paper or task was completed. Do not invent achievements.
+paper title, abstract, reading goal, or raw source passage. Treat the Check-in
+summary as a completion marker only: the summary must be grounded in the linked
+Radar signal or Deep Dive notes/material evidence, not a restatement of the
+Check-in sentence. Do not say only that a paper or task was completed. Do not
+invent achievements.
 
 Then propose at most three next priorities that preserve the user's confirmed
 weekly focus and active tasks. Reorder, narrow, or continue existing work; do

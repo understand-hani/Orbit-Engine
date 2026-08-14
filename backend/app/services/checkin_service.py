@@ -173,10 +173,21 @@ class CheckinService:
                     }
                 )
             elif isinstance(item.payload, ResearchFeederPayload):
+                primary = next(
+                    (paper for paper in item.payload.papers if paper.id == item.payload.reading_pack.primary_paper_id),
+                    item.payload.papers[0] if item.payload.papers else None,
+                )
                 evidence.append(
                     {
                         "type": "deep_dive",
                         "completion": completion,
+                        "material_evidence": {
+                            "summary": primary.summary if primary else "",
+                            "selected_passages": self._reader_payload(
+                                item.payload,
+                                primary.id if primary else "",
+                            ).get("selected_passages", []),
+                        },
                         "notes": {
                             "core_idea": item.payload.notes.core_idea,
                             "evidence": item.payload.notes.evidence,
@@ -194,6 +205,23 @@ class CheckinService:
         checkins: List[Checkin],
         weekly_focus: str,
     ) -> str:
+        completed_by_session = {item.session_id: item for item in checkins}
+        conclusions = []
+        for session in sessions:
+            if session.id not in completed_by_session:
+                continue
+            if isinstance(session.payload, ResearchFeederPayload):
+                conclusion = self._deep_dive_weekly_conclusion(session.payload)
+            elif isinstance(session.payload, TechRadarPayload):
+                conclusion = self._radar_weekly_conclusion(session.payload)
+            else:
+                conclusion = ""
+            if conclusion:
+                conclusions.append(conclusion)
+
+        if conclusions:
+            return "\n\n".join(conclusions[:3])
+
         insights = []
         for item in checkins:
             insight = next(
@@ -212,6 +240,54 @@ class CheckinService:
         if checkins:
             return "本周已有完成归档，但没有记录可供提炼的中文关键洞察；为避免复制英文原文，本次不展示材料摘要。请在归档时补充一句“关键洞察”，再生成周总结。"
         return f"本周尚无完成归档可供总结；下周继续围绕「{weekly_focus}」完成一个可验证的最小学习闭环。"
+
+    def _deep_dive_weekly_conclusion(self, payload: ResearchFeederPayload) -> str:
+        core_idea = self._first_chinese(payload.notes.core_idea, payload.notes.evidence)
+        input_output = self._first_chinese(payload.notes.input_output)
+        relation = self._first_chinese(payload.notes.relation_to_my_plan)
+        if not core_idea:
+            primary = next(
+                (paper for paper in payload.papers if paper.id == payload.reading_pack.primary_paper_id),
+                payload.papers[0] if payload.papers else None,
+            )
+            reader = self._reader_payload(payload, primary.id if primary else "")
+            core_idea = self._first_chinese(
+                *(item.get("text_excerpt", "") for item in reader.get("selected_passages", [])),
+                primary.summary if primary else "",
+            )
+        if not core_idea:
+            return ""
+
+        sentences = [f"Deep Dive：{core_idea.rstrip('。')}。"]
+        if input_output:
+            sentences.append(f"已厘清{input_output.rstrip('。')}。")
+        if relation:
+            sentences.append(f"对当前计划的意义是：{relation.rstrip('。')}。")
+        return "".join(sentences)
+
+    def _radar_weekly_conclusion(self, payload: TechRadarPayload) -> str:
+        signal = next(
+            (
+                item
+                for item in payload.digest.items
+                if self._contains_chinese(item.technical_substance)
+                or self._contains_chinese(item.summary)
+            ),
+            None,
+        )
+        if signal is None:
+            return ""
+        substance = self._first_chinese(signal.technical_substance, signal.summary)
+        implication = self._first_chinese(signal.why_it_matters)
+        if not substance:
+            return ""
+        sentence = f"Radar：{substance.rstrip('。')}。"
+        if implication:
+            sentence += f"这提示：{implication.rstrip('。')}。"
+        return sentence
+
+    def _first_chinese(self, *values: str) -> str:
+        return next((value.strip() for value in values if self._contains_chinese(value)), "")
 
     def _contains_chinese(self, value: str) -> bool:
         return any("\u4e00" <= char <= "\u9fff" for char in value)
