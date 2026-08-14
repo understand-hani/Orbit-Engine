@@ -43,7 +43,7 @@ struct WeeklyStudioView: View {
                     WeeklyStudioLine(title: "下一步", value: context.plan.nextAction)
                 }
 
-                Section("本周计划进度") {
+                Section {
                     ForEach(weekPlanItems) { item in
                         HStack(alignment: .top, spacing: 8) {
                             VStack(alignment: .leading, spacing: 2) {
@@ -63,6 +63,8 @@ struct WeeklyStudioView: View {
                         }
                         .padding(.vertical, 2)
                     }
+                } header: {
+                    Text("本周计划进度")
                 } footer: {
                     Text("本周归档：已完成 \(completedCheckins.count) 条 · 未完成归档 \(partialCheckins.count) 条")
                 }
