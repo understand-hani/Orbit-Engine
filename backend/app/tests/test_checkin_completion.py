@@ -12,6 +12,7 @@ from app.schemas.research_feeder import ConfirmedResearchMaterial
 from app.services.chat_service import ChatService
 from app.services.checkin_service import CheckinService
 from app.services.feed_service import FeedService
+from app.services.user_context_service import UserContextService
 
 
 def test_confirm_completion_updates_session_and_creates_checkin():
@@ -98,6 +99,64 @@ def test_draft_completion_returns_mock_or_llm_backed_fields():
             os.environ.pop("OPENROUTER_API_KEY", None)
         else:
             os.environ["OPENROUTER_API_KEY"] = original_key
+        get_settings.cache_clear()
+
+
+def test_weekly_studio_mock_summary_uses_radar_and_deep_dive_evidence():
+    original_path = os.environ.get("DATABASE_PATH")
+    original_provider = os.environ.get("LLM_PROVIDER")
+    db_path = Path(tempfile.mkdtemp()) / "infra_weekly_studio_draft_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    os.environ["LLM_PROVIDER"] = "mock"
+    get_settings.cache_clear()
+    try:
+        init_db()
+        UserContextService().get_or_create()
+        feed_service = FeedService()
+        monday = date.fromisoformat("2026-08-10")
+        radar = feed_service.generate_mock_session(monday, task_type=TaskType.tech_radar)
+        feed_service.sessions.save(radar)
+
+        deep_dive = feed_service.generate_mock_session(
+            date.fromisoformat("2026-08-13"),
+            task_type=TaskType.research_feeder,
+        )
+        deep_dive = deep_dive.model_copy(
+            update={
+                "payload": deep_dive.payload.model_copy(
+                    update={
+                        "notes": deep_dive.payload.notes.model_copy(
+                            update={
+                                "core_idea": "用条件编码区分可控输入与场景状态。",
+                                "relation_to_my_plan": "下一步应对照当前重建链路检查条件接口。",
+                            }
+                        )
+                    }
+                )
+            }
+        )
+        feed_service.sessions.save(deep_dive)
+
+        weekly_studio = feed_service.generate_and_save_mock_session(
+            date.fromisoformat("2026-08-16"),
+            task_type=TaskType.research_feeder,
+        )
+        draft = CheckinService().draft_weekly_studio(weekly_studio.id)
+
+        assert draft is not None
+        assert "Radar 本周的核心判断" in draft.completion_summary
+        assert "Deep Dive 围绕" in draft.completion_summary
+        assert "用条件编码区分可控输入与场景状态" in draft.completion_summary
+        assert draft.provider == "mock"
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        if original_provider is None:
+            os.environ.pop("LLM_PROVIDER", None)
+        else:
+            os.environ["LLM_PROVIDER"] = original_provider
         get_settings.cache_clear()
 
 

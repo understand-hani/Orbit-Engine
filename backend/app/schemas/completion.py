@@ -70,6 +70,5 @@ class CompletionDraftResponse(BaseModel):
 
 class WeeklyStudioDraftResponse(BaseModel):
     completion_summary: str
-    blockers: str
     suggested_priorities: List[str] = []
     provider: str = "mock"

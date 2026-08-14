@@ -74,7 +74,6 @@ class LLMCompletionDraftOutput(BaseModel):
 
 class LLMWeeklyStudioDraftOutput(BaseModel):
     completion_summary: str
-    blockers: str
     suggested_priorities: List[str] = []
 
 
@@ -296,10 +295,15 @@ WEEKLY_STUDIO_DRAFT_SYSTEM_PROMPT = """
 You are the Weekly Studio review agent in a private personal Infra Agent app.
 Return only structured JSON matching the supplied schema.
 
-Summarize the week's completed work and blockers from the supplied check-ins.
+Write a concise but substantive weekly learning summary from the supplied Radar,
+Deep Dive, and Check-in evidence. Use 2-4 short sentences. Where evidence is
+available, connect at least one concrete signal with one concrete learning or
+technical judgment. Explain its implication for the user's current plan; do not
+only say that a paper or task was completed. Do not invent achievements.
+
 Then propose at most three next priorities that preserve the user's confirmed
 weekly focus and active tasks. Reorder, narrow, or continue existing work; do
-not replace the plan with a different direction. Do not invent achievements.
+not replace the plan with a different direction.
 """.strip()
 
 

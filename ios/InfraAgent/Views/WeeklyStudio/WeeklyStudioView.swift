@@ -10,7 +10,6 @@ struct WeeklyStudioView: View {
     @State private var isSaving = false
     @State private var hasDraft = false
     @State private var completionSummary = ""
-    @State private var blockers = ""
     @State private var firstPriority = ""
     @State private var secondPriority = ""
     @State private var thirdPriority = ""
@@ -76,16 +75,11 @@ struct WeeklyStudioView: View {
                         }
                         .disabled(isGenerating)
                     } footer: {
-                        Text("Agent 基于当前计划与本周 Check-in 总结；优先顺序只在原计划内做小范围调整。")
+                        Text("Agent 基于本周 Radar、Deep Dive 和 Check-in 总结；优先顺序只在原计划内做小范围调整。")
                     }
                 } else {
-                    Section("本周完成") {
+                    Section("本周学习总结") {
                         Text(completionSummary)
-                            .font(.subheadline)
-                    }
-
-                    Section("卡点") {
-                        Text(blockers)
                             .font(.subheadline)
                     }
 
@@ -99,7 +93,9 @@ struct WeeklyStudioView: View {
                     }
 
                     if !draftProvider.isEmpty {
-                        Text("由 \(draftProvider == "openrouter" ? "Agent" : "规则 Agent") 基于本周记录生成；不重写本周重点或任务列表。")
+                        Text(draftProvider == "openrouter"
+                            ? "Agent 已读取本周 Radar、Deep Dive 与 Check-in；不重写本周重点或任务列表。"
+                            : "当前为结构化总结：已读取本周 Radar、Deep Dive 与 Check-in；不重写本周重点或任务列表。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -232,7 +228,6 @@ struct WeeklyStudioView: View {
         do {
             let draft = try await sessionAPI.draftWeeklyStudio(sessionID: session.id)
             completionSummary = draft.completionSummary
-            blockers = draft.blockers
             let priorities = draft.suggestedPriorities
             firstPriority = priorities.indices.contains(0) ? priorities[0] : ""
             secondPriority = priorities.indices.contains(1) ? priorities[1] : ""

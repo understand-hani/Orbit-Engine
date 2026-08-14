@@ -17,6 +17,7 @@ from app.schemas.completion import (
 )
 from app.schemas.research_feeder import ResearchFeederPayload
 from app.schemas.session import BaseSession
+from app.schemas.tech_radar import TechRadarPayload
 from app.config import get_settings
 from app.services.llm_service import (
     DEEP_DIVE_COMPLETION_DRAFT_SYSTEM_PROMPT,
@@ -89,9 +90,11 @@ class CheckinService:
             return None
 
         checkins = self._week_checkins(session.date)
+        weekly_sessions = self._week_sessions(session)
         payload = {
             "plan": context.plan.model_dump(mode="json"),
             "checkins": [item.model_dump(mode="json") for item in checkins],
+            "weekly_evidence": self._weekly_evidence(weekly_sessions),
         }
         if self.settings.llm_provider == "openrouter":
             try:
@@ -103,21 +106,21 @@ class CheckinService:
                 )
                 return WeeklyStudioDraftResponse(
                     completion_summary=output.completion_summary,
-                    blockers=output.blockers,
                     suggested_priorities=output.suggested_priorities[:3],
                     provider="openrouter",
                 )
             except Exception:
                 pass
 
-        completed = [item.summary for item in checkins if item.status == CheckinStatus.completed and item.summary]
-        blocked = [item.next_action or item.summary for item in checkins if item.status in {CheckinStatus.partial, CheckinStatus.archived}]
         priorities = [item for item in context.plan.active_tasks if item][:3]
         if not priorities and context.plan.next_action:
             priorities = [context.plan.next_action]
         return WeeklyStudioDraftResponse(
-            completion_summary="\n".join(completed[:3]) or f"本周围绕「{context.plan.weekly_focus}」推进，尚未形成已完成归档。",
-            blockers="\n".join(blocked[:3]) or "没有已归档的卡点；继续按原计划完成当前最小任务。",
+            completion_summary=self._structured_weekly_summary(
+                weekly_sessions,
+                checkins,
+                context.plan.weekly_focus,
+            ),
             suggested_priorities=priorities,
             provider="mock",
         )
@@ -129,6 +132,102 @@ class CheckinService:
             item for item in self.checkins.list_by_date()
             if week_start <= item.date <= week_end
         ]
+
+    def _week_sessions(self, weekly_studio: BaseSession) -> List[BaseSession]:
+        week_start = weekly_studio.date - timedelta(days=weekly_studio.date.weekday())
+        sessions = []
+        for offset in range(7):
+            sessions.extend(self.sessions.get_by_date((week_start + timedelta(days=offset)).isoformat()))
+        return [item for item in sessions if item.id != weekly_studio.id]
+
+    def _weekly_evidence(self, sessions: List[BaseSession]) -> List[dict]:
+        evidence = []
+        for item in sessions:
+            if isinstance(item.payload, TechRadarPayload):
+                evidence.append(
+                    {
+                        "type": "radar",
+                        "title": item.title,
+                        "digest_summary": item.payload.digest.summary,
+                        "top_signals": item.payload.digest.top_signals[:3],
+                        "signals": [
+                            {
+                                "title": signal.title,
+                                "technical_substance": signal.technical_substance,
+                                "why_it_matters": signal.why_it_matters,
+                                "evidence_status": signal.evidence_status,
+                                "recommended_depth": signal.recommended_depth.value,
+                                "user_mark": signal.user_mark.value,
+                            }
+                            for signal in item.payload.digest.items[:3]
+                        ],
+                    }
+                )
+            elif isinstance(item.payload, ResearchFeederPayload):
+                primary = next(
+                    (paper for paper in item.payload.papers if paper.id == item.payload.reading_pack.primary_paper_id),
+                    item.payload.papers[0] if item.payload.papers else None,
+                )
+                evidence.append(
+                    {
+                        "type": "deep_dive",
+                        "title": item.title,
+                        "current_task": item.payload.research_context.current_task,
+                        "reading_goal": item.payload.reading_pack.reading_goal,
+                        "primary_material": primary.title if primary else "",
+                        "selected_materials": [material.title for material in item.payload.selected_materials[:3]],
+                        "notes": {
+                            "core_idea": item.payload.notes.core_idea,
+                            "evidence": item.payload.notes.evidence,
+                            "limitations": item.payload.notes.limitations,
+                            "relation_to_my_plan": item.payload.notes.relation_to_my_plan,
+                            "next_action": item.payload.notes.next_action,
+                        },
+                    }
+                )
+        return evidence
+
+    def _structured_weekly_summary(
+        self,
+        sessions: List[BaseSession],
+        checkins: List[Checkin],
+        weekly_focus: str,
+    ) -> str:
+        conclusions = []
+        radar = next((item.payload for item in sessions if isinstance(item.payload, TechRadarPayload)), None)
+        if radar:
+            signal = next(
+                (item for item in radar.digest.items if item.technical_substance or item.why_it_matters),
+                None,
+            )
+            if signal:
+                detail = signal.technical_substance or signal.summary
+                conclusions.append(
+                    f"Radar 聚焦「{signal.title}」：{detail}。这对当前方向的意义是 {signal.why_it_matters}。"
+                )
+            elif radar.digest.summary:
+                conclusions.append(f"Radar 本周的核心判断是：{radar.digest.summary}")
+
+        deep_dive = next((item.payload for item in sessions if isinstance(item.payload, ResearchFeederPayload)), None)
+        if deep_dive:
+            primary = next(
+                (paper for paper in deep_dive.papers if paper.id == deep_dive.reading_pack.primary_paper_id),
+                deep_dive.papers[0] if deep_dive.papers else None,
+            )
+            learning = deep_dive.notes.core_idea or deep_dive.notes.evidence or deep_dive.reading_pack.reading_goal
+            implication = deep_dive.notes.relation_to_my_plan or deep_dive.notes.next_action
+            if learning:
+                title = primary.title if primary else "本周 Deep Dive"
+                suffix = f" 对原计划的含义是：{implication}" if implication else ""
+                conclusions.append(f"Deep Dive 围绕「{title}」沉淀：{learning.rstrip('。')}。{suffix}")
+
+        if conclusions:
+            return "\n\n".join(conclusions[:2])
+
+        completed = [item.summary for item in checkins if item.status == CheckinStatus.completed and item.summary]
+        if completed:
+            return f"本周围绕「{weekly_focus}」推进：{'；'.join(completed[:2])}。下一周应继续把这些记录沉淀为可复用的技术判断。"
+        return f"本周尚无足够的 Radar、Deep Dive 或归档记录可供总结；下周继续围绕「{weekly_focus}」完成一个可验证的最小学习闭环。"
 
     def confirm_completion(
         self, session_id: str, request: CompletionConfirmRequest

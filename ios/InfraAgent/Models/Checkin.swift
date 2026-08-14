@@ -120,13 +120,11 @@ struct CompletionDraftResponse: Codable {
 
 struct WeeklyStudioDraftResponse: Codable {
     let completionSummary: String
-    let blockers: String
     let suggestedPriorities: [String]
     let provider: String
 
     enum CodingKeys: String, CodingKey {
         case completionSummary = "completion_summary"
-        case blockers
         case suggestedPriorities = "suggested_priorities"
         case provider
     }
