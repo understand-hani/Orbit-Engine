@@ -6,7 +6,7 @@ from typing import Optional
 from uuid import uuid4
 
 from app.agents.jd_career_agent import MockJDCareerAgent
-from app.agents.research_feeder_agent import MockResearchFeederAgent
+from app.agents.research_feeder_agent import ResearchFeederAgent
 from app.agents.tech_radar_agent import MockTechRadarAgent
 from app.agents.weekly_coordinator import WeeklyCoordinator
 from app.db.repositories import CheckinRepository, SessionRepository
@@ -24,7 +24,7 @@ class FeedService:
         self.coordinator = WeeklyCoordinator()
         self.tech_radar_agent = MockTechRadarAgent()
         self.jd_agent = MockJDCareerAgent()
-        self.research_agent = MockResearchFeederAgent()
+        self.research_agent = ResearchFeederAgent()
         self.sessions = SessionRepository()
         self.checkins = CheckinRepository()
         self.user_contexts = UserContextRepository()
@@ -66,7 +66,10 @@ class FeedService:
             payload = self.jd_agent.generate(session.payload)
             action = SuggestedAction.open_analysis_report
         elif session.task_type == TaskType.research_feeder:
-            payload = self.research_agent.generate(session.payload)
+            payload = self.research_agent.generate(
+                session.payload,
+                user_context=self.user_contexts.get(),
+            )
             action = SuggestedAction.open_paper_reader
 
         session = session.model_copy(update={"payload": payload, "suggested_action": action})
@@ -214,6 +217,27 @@ class FeedService:
         updated_session = session.model_copy(
             update={
                 "payload": updated_payload,
+                "updated_at": datetime.now(timezone.utc),
+            }
+        )
+        return self.sessions.save(updated_session)
+
+    def refresh_research_materials(
+        self,
+        session_id: str,
+        query: str = "",
+    ) -> Optional[BaseSession]:
+        session = self.sessions.get_by_id(session_id)
+        if session is None or session.task_type != TaskType.research_feeder:
+            return None
+        payload = self.research_agent.generate(
+            session.payload,
+            user_context=self.user_contexts.get(),
+            query=query,
+        )
+        updated_session = session.model_copy(
+            update={
+                "payload": payload,
                 "updated_at": datetime.now(timezone.utc),
             }
         )

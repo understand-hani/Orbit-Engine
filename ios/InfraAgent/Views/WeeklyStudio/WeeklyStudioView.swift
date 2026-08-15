@@ -2,12 +2,14 @@ import SwiftUI
 
 struct WeeklyStudioView: View {
     let session: BaseSession
+    var onArchived: ((BaseSession) -> Void)?
     @State private var context: UserContext?
     @State private var checkins: [Checkin] = []
     @State private var weekSessions: [BaseSession] = []
     @State private var isLoading = true
     @State private var isGenerating = false
     @State private var isSaving = false
+    @State private var isArchiving = false
     @State private var hasDraft = false
     @State private var completionSummary = ""
     @State private var firstPriority = ""
@@ -119,6 +121,19 @@ struct WeeklyStudioView: View {
                         Text("只同步首项优先任务为下一步；本周重点和任务列表保持不变。")
                     }
                 }
+            }
+
+            Section("Weekly Studio 去向") {
+                Button {
+                    Task { await archiveWeeklyStudio() }
+                } label: {
+                    Label(isArchiving ? "正在加入暂存" : "加入暂存", systemImage: "archivebox")
+                }
+                .disabled(isArchiving)
+
+                Text("暂存后会以「\(session.title)」整卡进入归档页，可在那里恢复。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Weekly Studio")
@@ -254,6 +269,20 @@ struct WeeklyStudioView: View {
             saveMessage = "下一步已同步到计划；本周重点和任务列表未改动。"
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func archiveWeeklyStudio() async {
+        isArchiving = true
+        errorMessage = nil
+        defer { isArchiving = false }
+
+        do {
+            try await sessionAPI.archive(id: session.id)
+            let archivedSession = try await sessionAPI.session(id: session.id)
+            onArchived?(archivedSession)
+        } catch {
+            errorMessage = "Weekly Studio 暂存失败：\(error.localizedDescription)"
         }
     }
 

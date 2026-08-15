@@ -12,6 +12,8 @@ from app.services.archive_service import ArchiveService
 from app.services.feed_service import FeedService
 from app.services.material_service import MaterialService
 from app.services.resume_service import ResumeService
+from app.agents.research_feeder_agent import ResearchFeederAgent
+from app.tests.research_source_stub import StaticResearchSearchService
 
 
 def test_material_resume_archive_services():
@@ -22,6 +24,7 @@ def test_material_resume_archive_services():
     try:
         init_db()
         feed = FeedService()
+        feed.research_agent = ResearchFeederAgent(search_service=StaticResearchSearchService())
         materials = MaterialService()
         resume = ResumeService()
         archive = ArchiveService()

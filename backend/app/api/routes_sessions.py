@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from app.schemas.common import TaskType
 from app.schemas.session import BaseSession, SessionRenameRequest
 from app.schemas.jd_analysis import JDInputCreate
-from app.schemas.research_feeder import ConfirmedResearchMaterial
+from app.schemas.research_feeder import ConfirmedResearchMaterial, ResearchMaterialSearchRequest
 from app.services.feed_service import FeedService
 
 
@@ -111,6 +111,18 @@ def save_selected_research_materials(
     session = feed_service.save_selected_materials(session_id, materials)
     if session is None:
         raise HTTPException(status_code=404, detail="Research session not found")
+    return session
+
+
+@router.post("/sessions/{session_id}/research/materials/refresh", response_model=BaseSession)
+def refresh_research_materials(
+    session_id: str,
+    request: ResearchMaterialSearchRequest,
+) -> BaseSession:
+    query = " ".join(value for value in [request.query.strip(), request.note.strip()] if value)
+    session = feed_service.refresh_research_materials(session_id, query=query)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Deep Dive session not found")
     return session
 
 

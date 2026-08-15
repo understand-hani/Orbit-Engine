@@ -10,6 +10,8 @@ from app.schemas.common import TaskType
 from app.schemas.source import CombinedSearchResponse, SourceItem, SourceItemType, SourceType
 from app.services.chat_service import ChatService
 from app.services.feed_service import FeedService
+from app.agents.research_feeder_agent import ResearchFeederAgent
+from app.tests.research_source_stub import StaticResearchSearchService
 
 
 def test_create_thread_and_send_mock_message():
@@ -114,18 +116,18 @@ def test_deep_dive_chat_messages_include_real_material_context():
     get_settings.cache_clear()
     try:
         init_db()
-        session = FeedService().generate_and_save_mock_session(task_type=TaskType.research_feeder)
+        feed = FeedService()
+        feed.research_agent = ResearchFeederAgent(search_service=StaticResearchSearchService())
+        session = feed.generate_and_save_mock_session(task_type=TaskType.research_feeder)
         chat_service = ChatService()
         payload = session.payload
         paper = payload.papers[0]
         reader = payload.paper_readers[0]
         section = reader.sections[0]
-        passage = reader.selected_passages[0]
-        figure = reader.key_figures[0]
         thread = chat_service.create_thread(
             AIChatThreadCreate(
                 session_id=session.id,
-                context_refs=[paper.id, section.id, passage.id, figure.id],
+                context_refs=[paper.id, section.id],
             )
         )
         assert thread is not None
@@ -137,8 +139,8 @@ def test_deep_dive_chat_messages_include_real_material_context():
         assert paper.summary in material_context
         assert str(paper.pdf_url) in material_context
         assert section.extracted_text in material_context
-        assert passage.text_excerpt in material_context
-        assert figure.visual.caption in material_context
+        assert reader.selected_passages == []
+        assert reader.key_figures == []
         assert "不要把 paper_id 当成唯一信息" in material_context
     finally:
         if original_path is None:

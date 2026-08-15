@@ -362,7 +362,7 @@ struct SessionDestinationView: View {
                 JDIntelligenceView()
             case .researchFeeder(let payload):
                 if isWeeklyStudio(session) {
-                    WeeklyStudioView(session: session)
+                    WeeklyStudioView(session: session, onArchived: onCompleted)
                 } else {
                     ResearchReaderView(session: session, payload: payload) { mode, context in
                         completionStartMode = mode

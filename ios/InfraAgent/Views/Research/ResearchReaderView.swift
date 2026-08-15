@@ -10,22 +10,23 @@ struct ResearchReaderView: View {
     @State private var confirmedMaterials: [ConfirmedResearchMaterial] = []
     @State private var userNotesByPaperID: [String: UserPaperNote] = [:]
     @State private var didLoadPersistedMaterials = false
+    @State private var refreshedPayload: ResearchFeederPayload?
 
     private let sessionAPI = SessionAPI()
 
     var body: some View {
         List {
             Section("目标") {
-                Text(payload.researchContext.currentTask)
-                Text(payload.readingPack.readingGoal)
+                Text(activePayload.researchContext.currentTask)
+                Text(activePayload.readingPack.readingGoal)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
             Section("计划") {
-                Text(payload.readingPack.selectionReason)
+                Text(activePayload.readingPack.selectionReason)
                     .font(.subheadline)
-                LabeledContent("预计用时", value: payload.readingPack.expectedFinishWindow)
+                LabeledContent("预计用时", value: activePayload.readingPack.expectedFinishWindow)
             }
 
             if confirmedMaterials.isEmpty {
@@ -100,15 +101,22 @@ struct ResearchReaderView: View {
             await loadPersistedMaterialsIfNeeded()
         }
         .sheet(isPresented: $isShowingMaterialSheet) {
-            DeepDiveMaterialSheet(sessionID: session.id, payload: payload) { materials in
+            DeepDiveMaterialSheet(sessionID: session.id, payload: activePayload) { materials, generatedPayload in
+                if let generatedPayload {
+                    refreshedPayload = generatedPayload
+                }
                 confirmedMaterials = materials
                 onSourceContextChanged?(checkinContext(for: materials))
             }
         }
     }
 
+    private var activePayload: ResearchFeederPayload {
+        refreshedPayload ?? payload
+    }
+
     private var primaryPaper: Paper? {
-        payload.papers.first { $0.id == payload.readingPack.primaryPaperID } ?? payload.papers.first
+        activePayload.papers.first { $0.id == activePayload.readingPack.primaryPaperID } ?? activePayload.papers.first
     }
 
     private func loadPersistedMaterialsIfNeeded() async {
@@ -117,7 +125,7 @@ struct ResearchReaderView: View {
         }
         didLoadPersistedMaterials = true
 
-        if let persistedMaterials = payload.selectedMaterials, !persistedMaterials.isEmpty {
+        if let persistedMaterials = activePayload.selectedMaterials, !persistedMaterials.isEmpty {
             confirmedMaterials = persistedMaterials
             onSourceContextChanged?(checkinContext(for: persistedMaterials))
             return
@@ -134,16 +142,16 @@ struct ResearchReaderView: View {
     }
 
     private var candidatePaper: Paper? {
-        guard let candidatePaperID = payload.readingPack.candidatePaperID else {
+        guard let candidatePaperID = activePayload.readingPack.candidatePaperID else {
             return nil
         }
-        return payload.papers.first { $0.id == candidatePaperID }
+        return activePayload.papers.first { $0.id == candidatePaperID }
     }
 
     private var supportingPapers: [Paper] {
-        payload.papers.filter { paper in
-            let isPrimary = paper.id == payload.readingPack.primaryPaperID
-            let isCandidate = payload.readingPack.candidatePaperID.map { paper.id == $0 } ?? false
+        activePayload.papers.filter { paper in
+            let isPrimary = paper.id == activePayload.readingPack.primaryPaperID
+            let isCandidate = activePayload.readingPack.candidatePaperID.map { paper.id == $0 } ?? false
             return !isPrimary && !isCandidate
         }
     }
@@ -152,7 +160,7 @@ struct ResearchReaderView: View {
         guard let paperID = material.paperID else {
             return nil
         }
-        return payload.papers.first { $0.id == paperID }
+        return activePayload.papers.first { $0.id == paperID }
     }
 
     private var completionCriteria: [CompletionCriterion] {
@@ -237,17 +245,17 @@ struct ResearchReaderView: View {
     }
 
     private func reader(for paper: Paper) -> PaperReader? {
-        if let reader = payload.paperReaders?.first(where: { $0.paperID == paper.id }) {
+        if let reader = activePayload.paperReaders?.first(where: { $0.paperID == paper.id }) {
             return reader
         }
-        if payload.paperReader?.paperID == paper.id {
-            return payload.paperReader
+        if activePayload.paperReader?.paperID == paper.id {
+            return activePayload.paperReader
         }
         return nil
     }
 
     private func notes(for paper: Paper) -> PaperNotes? {
-        paper.id == payload.readingPack.primaryPaperID ? payload.notes : nil
+        paper.id == activePayload.readingPack.primaryPaperID ? activePayload.notes : nil
     }
 
     private var primaryCheckinContext: CheckinSourceContext? {
@@ -331,7 +339,7 @@ private struct MaterialCandidate: Identifiable {
 private struct DeepDiveMaterialSheet: View {
     let sessionID: String
     let payload: ResearchFeederPayload
-    let onGenerated: ([ConfirmedResearchMaterial]) -> Void
+    let onGenerated: ([ConfirmedResearchMaterial], ResearchFeederPayload?) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
@@ -344,8 +352,10 @@ private struct DeepDiveMaterialSheet: View {
     @State private var isSaving = false
     @State private var candidates: [MaterialCandidate] = []
     @State private var selectedCandidateID: String?
+    @State private var refreshedPayload: ResearchFeederPayload?
 
     private let api = DeepDiveMaterialAPI()
+    private let sessionAPI = SessionAPI()
 
     var body: some View {
         NavigationStack {
@@ -475,11 +485,34 @@ private struct DeepDiveMaterialSheet: View {
 
         do {
             if candidates.isEmpty {
-                candidates = makeCandidates(
-                    title: trimmedTitle,
-                    summary: trimmedSummary,
-                    url: trimmedURL
-                )
+                if selectedSource == "public_source" {
+                    let refreshedSession = try await sessionAPI.refreshResearchMaterials(
+                        sessionID: sessionID,
+                        query: agentSearchMode == "manual" ? trimmedTitle : "",
+                        note: trimmedSummary
+                    )
+                    guard case .researchFeeder(let refreshedPayload) = refreshedSession.payload else {
+                        message = "后端返回了非 Deep Dive session。"
+                        return
+                    }
+                    self.refreshedPayload = refreshedPayload
+                    candidates = makeCandidates(
+                        title: trimmedTitle,
+                        summary: trimmedSummary,
+                        url: trimmedURL,
+                        publicPapers: refreshedPayload.papers
+                    )
+                } else {
+                    candidates = makeCandidates(
+                        title: trimmedTitle,
+                        summary: trimmedSummary,
+                        url: trimmedURL
+                    )
+                }
+                guard !candidates.isEmpty else {
+                    message = "没有检索到真实候选材料，请稍后重试或输入更具体的主题。"
+                    return
+                }
                 selectedCandidateID = candidates.first?.id
                 message = "请选择一个材料并确认。"
                 return
@@ -500,14 +533,19 @@ private struct DeepDiveMaterialSheet: View {
             )
             let confirmed = [selected.confirmed]
             _ = try await api.saveSelectedMaterials(sessionID: sessionID, materials: confirmed)
-            onGenerated(confirmed)
+            onGenerated(confirmed, refreshedPayload)
             dismiss()
         } catch {
             message = error.localizedDescription
         }
     }
 
-    private func makeCandidates(title: String, summary: String, url: String) -> [MaterialCandidate] {
+    private func makeCandidates(
+        title: String,
+        summary: String,
+        url: String,
+        publicPapers: [Paper]? = nil
+    ) -> [MaterialCandidate] {
         if selectedSource == "url" {
             return [
                 MaterialCandidate(
@@ -534,29 +572,23 @@ private struct DeepDiveMaterialSheet: View {
             ]
         }
 
-        let generated = payload.papers.prefix(3).map { paper in
-            MaterialCandidate(
-                id: paper.id,
-                paperID: paper.id,
-                title: paper.title,
-                summary: summary.isEmpty ? paper.summary : summary,
-                url: paper.url?.absoluteString,
-                sourceType: selectedSource
-            )
-        }
+        let generated = (publicPapers ?? payload.papers)
+            .filter { !$0.id.hasPrefix("mock_") }
+            .prefix(3)
+            .map { paper in
+                MaterialCandidate(
+                    id: paper.id,
+                    paperID: paper.id,
+                    title: paper.title,
+                    summary: summary.isEmpty ? paper.summary : summary,
+                    url: paper.url?.absoluteString,
+                    sourceType: selectedSource
+                )
+            }
         if !generated.isEmpty {
             return Array(generated)
         }
-        return [
-            MaterialCandidate(
-                id: "agent_candidate",
-                paperID: nil,
-                title: title.isEmpty ? "Agent 推荐材料" : title,
-                summary: summary.isEmpty ? payload.readingPack.readingGoal : summary,
-                url: nil,
-                sourceType: selectedSource
-            )
-        ]
+        return []
     }
 }
 

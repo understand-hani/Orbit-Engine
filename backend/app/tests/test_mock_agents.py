@@ -2,9 +2,10 @@ from datetime import date
 from datetime import datetime, timezone
 
 from app.agents.tech_radar_agent import MockTechRadarAgent
+from app.agents.research_feeder_agent import ResearchFeederAgent
 from app.schemas.common import SuggestedAction, TaskType
 from app.schemas.research_feeder import ResearchDayRole
-from app.schemas.source import CombinedSearchResponse, SourceItem, SourceItemType, SourceType
+from app.schemas.source import CombinedSearchResponse, SourceItem, SourceItemType, SourceSearchResponse, SourceType
 from app.schemas.tech_radar import RadarDigest, RadarScope, RadarType, TechRadarPayload
 from app.services.feed_service import FeedService
 
@@ -76,7 +77,32 @@ def test_mock_jd_session_has_analysis_and_resume_suggestion():
 
 
 def test_mock_research_session_has_primary_and_candidate_papers():
-    session = FeedService().generate_mock_session(date(2026, 7, 16))
+    class FakeResearchSearchService:
+        def search_arxiv(self, query: str, max_results: int = 5) -> SourceSearchResponse:
+            return SourceSearchResponse(
+                query=query,
+                source=SourceType.arxiv,
+                items=[
+                    SourceItem(
+                        id=f"2608.0000{index}",
+                        source=SourceType.arxiv,
+                        item_type=SourceItemType.paper,
+                        title=f"Real Public Research Result {index}",
+                        url=f"https://arxiv.org/abs/2608.0000{index}",
+                        summary=f"Public arXiv abstract for current direction {index}.",
+                        authors=[f"Author {index}"],
+                        published_at=datetime(2026, 8, index, tzinfo=timezone.utc),
+                        tags=["cs.CV"],
+                        extra={"pdf_url": f"https://arxiv.org/pdf/2608.0000{index}"},
+                    )
+                    for index in range(1, 3)
+                ],
+                fetched_at=datetime.now(timezone.utc),
+            )
+
+    feed = FeedService()
+    feed.research_agent = ResearchFeederAgent(search_service=FakeResearchSearchService())
+    session = feed.generate_mock_session(date(2026, 7, 16))
     assert session.task_type == TaskType.research_feeder
     assert session.suggested_action == SuggestedAction.open_paper_reader
     assert session.payload.research_day_role == ResearchDayRole.select_and_start
@@ -86,6 +112,8 @@ def test_mock_research_session_has_primary_and_candidate_papers():
     assert session.payload.paper_reader.pdf_url is not None
     assert len(session.payload.paper_readers) == 2
     assert session.payload.paper_readers[1].pdf_url is not None
-    assert len(session.payload.paper_reader.selected_passages) >= 1
+    assert session.payload.papers[0].id.startswith("real_arxiv_")
+    assert session.payload.paper_reader.selected_passages == []
+    assert session.payload.paper_reader.key_figures == []
     assert session.payload.paper_reader.sections[0].extracted_text
-    assert len(session.payload.paper_reader.sections[0].knowledge_points) >= 1
+    assert session.payload.paper_reader.sections[0].knowledge_points == []

@@ -251,3 +251,8 @@ struct ArchivePlan: Codable {
         case summaryMD = "summary_md"
     }
 }
+
+struct ResearchMaterialSearchRequest: Codable {
+    let query: String
+    let note: String
+}

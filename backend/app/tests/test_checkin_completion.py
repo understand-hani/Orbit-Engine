@@ -14,6 +14,8 @@ from app.services.chat_service import ChatService
 from app.services.checkin_service import CheckinService
 from app.services.feed_service import FeedService
 from app.services.user_context_service import UserContextService
+from app.agents.research_feeder_agent import ResearchFeederAgent
+from app.tests.research_source_stub import StaticResearchSearchService
 
 
 def test_confirm_completion_updates_session_and_creates_checkin():
@@ -181,6 +183,7 @@ def test_deep_dive_draft_payload_includes_material_reader_and_discussion_context
     try:
         init_db()
         feed = FeedService()
+        feed.research_agent = ResearchFeederAgent(search_service=StaticResearchSearchService())
         session = feed.generate_and_save_mock_session(task_type=TaskType.research_feeder)
         paper = session.payload.papers[0]
         session = feed.save_selected_materials(
@@ -212,8 +215,8 @@ def test_deep_dive_draft_payload_includes_material_reader_and_discussion_context
         deep_dive = payload["deep_dive"]
         assert deep_dive["selected_materials"][0]["title"] == paper.title
         assert deep_dive["paper_reader"]["sections"]
-        assert deep_dive["paper_reader"]["selected_passages"]
-        assert deep_dive["paper_reader"]["key_figures"]
+        assert deep_dive["paper_reader"]["selected_passages"] == []
+        assert deep_dive["paper_reader"]["key_figures"] == []
         assert deep_dive["agent_discussions"][0]["messages"]
         assert "用户补充了一条归档笔记" in payload["source"]["user_notes"]
     finally:
@@ -423,6 +426,36 @@ def test_archive_session_marks_session_archived_and_creates_checkin():
         assert restored_session is not None
         assert restored_session.status.value == "active"
         assert restored_session.title == f"Deep Dive-{title_date}-No.1"
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
+def test_weekly_studio_can_be_archived_with_its_original_title():
+    original_path = os.environ.get("DATABASE_PATH")
+    db_path = Path(tempfile.mkdtemp()) / "infra_weekly_studio_archive_test.db"
+    os.environ["DATABASE_PATH"] = str(db_path)
+    get_settings.cache_clear()
+    try:
+        init_db()
+        feed_service = FeedService()
+        checkin_service = CheckinService()
+        studio = feed_service.generate_and_save_mock_session(
+            date.fromisoformat("2026-08-16"),
+            weekly_studio=True,
+        )
+
+        assert studio.title == "Weekly Studio-2026/08/16"
+        assert feed_service.archive_session(studio.id) is True
+        archived = feed_service.get_session(studio.id)
+        assert archived is not None
+        assert archived.status == SessionStatus.archived
+        assert archived.title == studio.title
+        marker = checkin_service.list_checkins(studio.date.isoformat())[0]
+        assert marker.session_title == studio.title
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)

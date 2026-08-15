@@ -175,6 +175,11 @@ class ConfirmedResearchMaterial(BaseModel):
     source_type: str = ""
 
 
+class ResearchMaterialSearchRequest(BaseModel):
+    query: str = ""
+    note: str = ""
+
+
 class ResearchFeederPayload(BaseModel):
     research_day_role: ResearchDayRole
     research_context: ResearchContext

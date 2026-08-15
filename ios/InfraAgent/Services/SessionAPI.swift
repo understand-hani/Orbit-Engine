@@ -61,6 +61,17 @@ struct SessionAPI {
         )
     }
 
+    func refreshResearchMaterials(
+        sessionID: String,
+        query: String,
+        note: String
+    ) async throws -> BaseSession {
+        try await resolvedClient.post(
+            "/api/sessions/\(sessionID)/research/materials/refresh",
+            body: ResearchMaterialSearchRequest(query: query, note: note)
+        )
+    }
+
     func draftWeeklyStudio(sessionID: String) async throws -> WeeklyStudioDraftResponse {
         try await resolvedClient.post("/api/sessions/\(sessionID)/weekly-studio/draft")
     }
