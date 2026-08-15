@@ -220,6 +220,21 @@ def test_radar_relevance_uses_generic_fallback_only_without_user_context():
     assert agent._is_relevant_source(source_item, [])
 
 
+def test_radar_rejects_calls_for_papers_and_journal_homepages_before_selection():
+    agent = MockTechRadarAgent()
+    call_for_papers = SourceItem(
+        id="web_005",
+        source=SourceType.web,
+        item_type=SourceItemType.article,
+        title="Foundation Models for Intelligent Control 征稿通知",
+        url="https://example.com/cfp",
+        summary="学术期刊征稿，欢迎投稿。",
+        tags=["public_web"],
+    )
+
+    assert agent._is_obvious_radar_noise(call_for_papers)
+
+
 def test_radar_source_passages_separate_excerpt_and_agent_analysis():
     agent = MockTechRadarAgent(search_service=StaticSearchService())
     source_item = SourceItem(

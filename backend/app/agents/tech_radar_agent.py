@@ -49,6 +49,10 @@ class RadarSearchPlan(BaseModel):
     excluded_terms: List[str] = Field(default_factory=list)
 
 
+class RadarCandidateSelection(BaseModel):
+    selected_ids: List[str] = Field(default_factory=list)
+
+
 RADAR_SEARCH_PLANNER_PROMPT = """
 You plan current-news searches for a personal Signal Radar.
 
@@ -59,6 +63,21 @@ not papers or code repositories. Do not substitute generic AI-agent content for
 the user's actual domain. Do not invent a new career direction. Include a term
 such as 4DGS, StreetGaussian, SLAM, world model, autonomous driving, or another
 term that is explicitly present in the provided context when applicable.
+""".strip()
+
+
+RADAR_RESULT_SELECTOR_PROMPT = """
+You are the final relevance gate for a personal Signal Radar.
+
+Select at most 3 candidate IDs that directly advance the user's current
+technical direction. A weak shared category such as AI, autonomous driving,
+university, product, or research is insufficient on its own. Prefer concrete
+progress on the user's stated methods, systems, applications, or organisations.
+
+Always reject journal homepages, calls for papers, conference notices, generic
+university announcements, generic AI-agent news, and generic industry news.
+Return an empty list rather than filling the quota with weakly related results.
+Return only JSON matching the supplied schema.
 """.strip()
 
 
@@ -80,6 +99,7 @@ class MockTechRadarAgent:
             search_plan.queries,
             search_plan.required_terms,
             search_plan.excluded_terms,
+            user_context,
         )
         if items:
             summary = "本轮 Signal Radar 已基于公开网页、新闻/RSS、开源与论文 metadata 生成行业动态信号。"
@@ -112,8 +132,9 @@ class MockTechRadarAgent:
         queries: List[str],
         required_terms: List[str],
         excluded_terms: List[str],
+        user_context: Optional[UserContext],
     ) -> List[RadarItem]:
-        collected: List[SourceItem] = []
+        candidates: List[SourceItem] = []
         seen_urls = set()
         for query in queries:
             try:
@@ -126,6 +147,8 @@ class MockTechRadarAgent:
             for source_item in response.items:
                 if source_item.id.endswith("_search_error") or "error" in source_item.tags:
                     continue
+                if self._is_obvious_radar_noise(source_item):
+                    continue
                 if not self._is_relevant_source(source_item, required_terms, excluded_terms):
                     continue
                 dedupe_key = self._source_key(source_item)
@@ -134,11 +157,12 @@ class MockTechRadarAgent:
                 if dedupe_key in seen_urls:
                     continue
                 seen_urls.add(dedupe_key)
-                collected.append(source_item)
-                if len(collected) >= RADAR_ITEM_LIMIT:
+                candidates.append(source_item)
+                if len(candidates) >= 18:
                     break
-            if len(collected) >= RADAR_ITEM_LIMIT:
+            if len(candidates) >= 18:
                 break
+        collected = self._select_radar_candidates(candidates, user_context)
         return [
             self._radar_item_from_source(payload, item, index, required_terms)
             for index, item in enumerate(collected[:RADAR_ITEM_LIMIT], start=1)
@@ -171,6 +195,66 @@ class MockTechRadarAgent:
         if meaningful_context:
             return any(term in haystack for term in meaningful_context)
         return any(term in haystack for term in GENERIC_INDUSTRY_TERMS)
+
+    def _is_obvious_radar_noise(self, source_item: SourceItem) -> bool:
+        text = " ".join([source_item.title, source_item.summary]).lower()
+        noise_markers = [
+            "征稿",
+            "征文",
+            "call for papers",
+            "cfp",
+            "期刊目录",
+            "journal homepage",
+            "期刊主页",
+        ]
+        return any(marker in text for marker in noise_markers)
+
+    def _select_radar_candidates(
+        self,
+        candidates: List[SourceItem],
+        user_context: Optional[UserContext],
+    ) -> List[SourceItem]:
+        if not candidates:
+            return []
+        settings = get_settings()
+        if user_context is None or settings.llm_provider.lower() != "openrouter" or not settings.openrouter_api_key:
+            return candidates[:RADAR_ITEM_LIMIT]
+
+        candidate_by_id = {item.id: item for item in candidates}
+        try:
+            selection = OpenRouterChatService().generate_json(
+                system_prompt=RADAR_RESULT_SELECTOR_PROMPT,
+                user_payload={
+                    "user_direction": {
+                        "goal": user_context.profile.goal,
+                        "current_stage": user_context.profile.current_stage,
+                        "weekly_focus": user_context.plan.weekly_focus,
+                        "tracking_keywords": user_context.plan.tracking_keywords,
+                        "fields": user_context.preferences.fields,
+                    },
+                    "candidates": [
+                        {
+                            "id": item.id,
+                            "title": item.title,
+                            "summary": item.summary[:800],
+                            "publisher": item.extra.get("publisher", ""),
+                            "published_at": item.published_at.isoformat() if item.published_at else "",
+                        }
+                        for item in candidates
+                    ],
+                },
+                output_model=RadarCandidateSelection,
+                schema_name="radar_candidate_selection",
+            )
+            return [
+                candidate_by_id[item_id]
+                for item_id in selection.selected_ids
+                if item_id in candidate_by_id
+            ][:RADAR_ITEM_LIMIT]
+        except Exception:
+            # Network/model failure should preserve a useful deterministic
+            # result rather than breaking the whole Radar session.
+            return candidates[:RADAR_ITEM_LIMIT]
 
     def _build_search_plan(
         self,
