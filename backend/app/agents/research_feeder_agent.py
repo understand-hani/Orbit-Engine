@@ -25,10 +25,11 @@ from app.services.search_service import SearchService
 
 RESEARCH_ITEM_LIMIT = 3
 RESEARCH_SEARCH_FETCH_LIMIT = 8
-RESEARCH_CANDIDATE_POOL_TARGET = 6
+RESEARCH_MIN_CANDIDATE_COUNT = 2
 RESEARCH_FRESHNESS_DAYS = 366
 RESEARCH_MIN_SCORE = 3
 RESEARCH_PRIMARY_SCORE = 5
+RESEARCH_LLM_TIMEOUT_SEC = 8.0
 RESEARCH_BROAD_TERMS = {
     "ai",
     "artificial intelligence",
@@ -181,7 +182,9 @@ class ResearchFeederAgent:
     ) -> List[tuple[SourceItem, int]]:
         candidates: List[SourceItem] = []
         seen_ids = set()
-        for query in plan.queries[:3]:
+        # One precise query keeps the synchronous mobile request bounded. The
+        # planner has already ranked its queries, so the first is the best route.
+        for query in plan.queries[:1]:
             try:
                 items = self.search_service.search_arxiv(
                     f'all:"{query}"',
@@ -190,13 +193,13 @@ class ResearchFeederAgent:
             except Exception:
                 items = []
             self._append_research_candidates(candidates, seen_ids, items, plan.required_terms)
-            if len(candidates) >= RESEARCH_CANDIDATE_POOL_TARGET:
+            if len(candidates) >= RESEARCH_MIN_CANDIDATE_COUNT:
                 break
 
         # Bocha is only a transport fallback when direct arXiv access yields too
         # few candidates. The accepted content contract remains arXiv /abs pages.
-        if len(candidates) < RESEARCH_ITEM_LIMIT:
-            for query in plan.queries[:3]:
+        if len(candidates) < RESEARCH_MIN_CANDIDATE_COUNT:
+            for query in plan.queries[:1]:
                 try:
                     items = self.search_service.search_public_web(
                         f"site:arxiv.org/abs {query}",
@@ -206,7 +209,7 @@ class ResearchFeederAgent:
                 except Exception:
                     items = []
                 self._append_research_candidates(candidates, seen_ids, items, plan.required_terms)
-                if len(candidates) >= RESEARCH_ITEM_LIMIT:
+                if len(candidates) >= RESEARCH_MIN_CANDIDATE_COUNT:
                     break
 
         return self._select_research_candidates(candidates, payload, user_context, plan.required_terms)
@@ -309,6 +312,7 @@ class ResearchFeederAgent:
                     },
                     output_model=ResearchCandidateSelection,
                     schema_name="research_candidate_selection",
+                    timeout_sec=RESEARCH_LLM_TIMEOUT_SEC,
                 )
                 rated = [
                     (candidate_by_id[result.id], result.relevance_score)
@@ -388,6 +392,7 @@ class ResearchFeederAgent:
                 },
                 output_model=ResearchSearchPlan,
                 schema_name="research_search_plan",
+                timeout_sec=RESEARCH_LLM_TIMEOUT_SEC,
             )
             queries = self._dedupe_terms([value.strip() for value in planned.queries if value.strip()])[:3]
             required_terms = self._meaningful_terms(planned.required_terms)[:8]

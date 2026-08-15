@@ -68,6 +68,7 @@ struct SessionAPI {
     ) async throws -> BaseSession {
         try await resolvedClient.post(
             "/api/sessions/\(sessionID)/research/materials/refresh",
+            timeoutInterval: 75,
             body: ResearchMaterialSearchRequest(query: query, note: note)
         )
     }

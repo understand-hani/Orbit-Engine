@@ -88,6 +88,7 @@ class OpenRouterChatService:
         user_payload: Dict[str, Any],
         output_model: Type[BaseModel],
         schema_name: str,
+        timeout_sec: Optional[float] = None,
     ) -> BaseModel:
         if not self.settings.openrouter_api_key:
             raise RuntimeError("OPENROUTER_API_KEY is not configured")
@@ -126,7 +127,8 @@ class OpenRouterChatService:
         if self.settings.openrouter_site_url:
             headers["HTTP-Referer"] = self.settings.openrouter_site_url
 
-        with httpx.Client(timeout=self.settings.openrouter_timeout_sec, trust_env=False) as client:
+        timeout = timeout_sec if timeout_sec is not None else self.settings.openrouter_timeout_sec
+        with httpx.Client(timeout=timeout, trust_env=False) as client:
             response = client.post(url, headers=headers, json=body)
             response.raise_for_status()
         raw = response.json()

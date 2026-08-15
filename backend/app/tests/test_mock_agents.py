@@ -201,7 +201,11 @@ def test_deep_dive_uses_personal_direction_and_rejects_old_or_unrelated_papers(m
     )
 
     class PersonalDirectionSearchService:
+        def __init__(self) -> None:
+            self.arxiv_calls = 0
+
         def search_arxiv(self, query: str, max_results: int = 5) -> SourceSearchResponse:
+            self.arxiv_calls += 1
             return SourceSearchResponse(
                 query=query,
                 source=SourceType.arxiv,
@@ -255,11 +259,13 @@ def test_deep_dive_uses_personal_direction_and_rejects_old_or_unrelated_papers(m
         date(2026, 8, 15),
         task_type=TaskType.research_feeder,
     ).payload
-    generated = ResearchFeederAgent(search_service=PersonalDirectionSearchService()).generate(
+    search_service = PersonalDirectionSearchService()
+    generated = ResearchFeederAgent(search_service=search_service).generate(
         payload,
         user_context=context,
     )
 
+    assert search_service.arxiv_calls == 1
     assert len(generated.papers) == 2
     assert [paper.relevance_score for paper in generated.papers] == [5, 4]
     assert generated.reading_pack.primary_paper_id == generated.papers[0].id
