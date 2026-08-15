@@ -271,3 +271,40 @@ def test_deep_dive_uses_personal_direction_and_rejects_old_or_unrelated_papers(m
     assert generated.reading_pack.primary_paper_id == generated.papers[0].id
     assert all(paper.published_at and paper.published_at >= now - timedelta(days=366) for paper in generated.papers)
     assert all("Language Agent" not in paper.title for paper in generated.papers)
+
+
+def test_missing_manual_deep_dive_is_recovered_without_duplicate_material_generation():
+    class MemorySessionRepository:
+        def __init__(self) -> None:
+            self.saved = None
+
+        def get_by_id(self, session_id: str):
+            return self.saved if self.saved and self.saved.id == session_id else None
+
+        def get_by_date_and_task(self, date_value: str, task_type: str):
+            return []
+
+        def save(self, session):
+            self.saved = session
+            return session
+
+    class CountingResearchAgent:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def generate(self, payload, user_context=None, query: str = ""):
+            self.calls += 1
+            return payload
+
+    feed = FeedService()
+    feed.sessions = MemorySessionRepository()
+    feed.research_agent = CountingResearchAgent()
+
+    session = feed.refresh_research_materials(
+        "session_2026-08-16_research_feeder",
+        query="StreetGaussian 4DGS",
+    )
+
+    assert session is not None
+    assert session.id == "session_2026-08-16_research_feeder"
+    assert feed.research_agent.calls == 1

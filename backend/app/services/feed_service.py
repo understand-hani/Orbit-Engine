@@ -227,7 +227,7 @@ class FeedService:
         session_id: str,
         query: str = "",
     ) -> Optional[BaseSession]:
-        session = self.sessions.get_by_id(session_id)
+        session = self.sessions.get_by_id(session_id) or self._recover_missing_research_session(session_id)
         if session is None or session.task_type != TaskType.research_feeder:
             return None
         payload = self.research_agent.generate(
@@ -282,7 +282,10 @@ class FeedService:
         except ValueError:
             return None
 
-        session = self.generate_mock_session(target_date, task_type=TaskType.research_feeder)
+        # A recovered Manual preview is only a workspace shell. The caller
+        # decides whether to refresh materials or merely persist a selection;
+        # generating here would duplicate the external research pipeline.
+        session = self.preview_session(target_date, task_type=TaskType.research_feeder)
         session = session.model_copy(update={"id": session_id})
         session = self._apply_default_title(session, exclude_self=False)
         return self.sessions.save(session)

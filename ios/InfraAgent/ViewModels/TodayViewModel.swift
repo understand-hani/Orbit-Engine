@@ -53,11 +53,20 @@ final class TodayViewModel: ObservableObject {
         state = .loading
         await refreshContext()
         do {
-            session = try await sessionAPI.mock(
-                date: entry.date,
-                taskType: entry.taskTypeOverride,
-                weeklyStudio: entry.isWeeklyStudio,
-            )
+            if entry.id == "deep_dive" {
+                // Opening the Manual workspace must be instant. Real arXiv
+                // discovery starts only after the user taps “生成候选”.
+                session = try await sessionAPI.preview(
+                    date: entry.date,
+                    taskType: entry.taskTypeOverride
+                )
+            } else {
+                session = try await sessionAPI.mock(
+                    date: entry.date,
+                    taskType: entry.taskTypeOverride,
+                    weeklyStudio: entry.isWeeklyStudio,
+                )
+            }
             state = .loaded
         } catch {
             state = .failed(error.localizedDescription)
