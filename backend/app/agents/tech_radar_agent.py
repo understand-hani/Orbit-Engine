@@ -79,7 +79,7 @@ class RadarSearchPlan(BaseModel):
 class RadarCandidateRating(BaseModel):
     id: str
     relevance_score: int = Field(ge=1, le=5)
-    agent_observation: str = ""
+    agent_observation: str = Field(default="", max_length=220)
 
 
 class RadarCandidateSelection(BaseModel):
@@ -130,10 +130,11 @@ For each selected candidate, assign relevance_score using this exact rubric:
 - 1-2: broad-field or weakly related; do not select these.
 Rate candidates comparatively. Do not assign 5 to every selected result; use
 5 sparingly, normally for no more than one result in a run.
-For every selected candidate, write agent_observation in concise Chinese,
-roughly 100-300 Chinese characters: state the concrete signal, explain its
-relationship to the current goal/weekly plan, and name one verification caveat.
-Do not repeat the title, use generic filler, or write a long research summary.
+For every selected candidate, write agent_observation as one complete concise
+Chinese paragraph, roughly 80-160 Chinese characters: state the concrete
+signal, explain its relationship to the current goal/weekly plan, and name one
+verification caveat. End the paragraph naturally. Do not repeat the title, use
+generic filler, or write a long research summary.
 Return only JSON matching the supplied schema.
 """.strip()
 
@@ -435,15 +436,15 @@ class MockTechRadarAgent:
     def _normalize_agent_observation(self, value: str, source_item: SourceItem) -> str:
         compacted = re.sub(r"\s+", " ", value).strip()
         if len(compacted) >= 40:
-            return compacted[:300].rstrip()
+            return compacted
         fallback = re.sub(r"\s+", " ", source_item.summary).strip() or source_item.title.strip()
-        return fallback[:300].rstrip()
+        return fallback
 
     def _normalize_agent_text(self, value: str, fallback: str) -> str:
         compacted = re.sub(r"\s+", " ", value).strip()
         if compacted:
-            return compacted[:140].rstrip()
-        return re.sub(r"\s+", " ", fallback).strip()[:140].rstrip()
+            return compacted
+        return re.sub(r"\s+", " ", fallback).strip()
 
     def _build_search_plan(
         self,

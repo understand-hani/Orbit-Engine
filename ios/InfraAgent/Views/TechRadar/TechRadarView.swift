@@ -238,7 +238,6 @@ struct TechRadarView: View {
                 route: route(for: item, index: index),
                 introduction: introduction(for: item, input: input),
                 observation: observation(for: item),
-                validationQuestions: validationQuestions(for: item),
                 sourceReference: sourceReference(for: item, input: input),
                 keyPassages: keyPassages(for: item),
                 evidenceStatus: evidenceStatusText(for: item),
@@ -339,15 +338,6 @@ struct TechRadarView: View {
             return relevance
         }
         return "这条信号需要继续确认：它是否只是信息热度，还是已经对学习路线、项目选择或本周任务产生实际影响。"
-    }
-
-    private func validationQuestions(for item: RadarItem) -> [String] {
-        [
-            "这条信号是否会改变当前计划中的优先级或本周重点？",
-            "是否存在可验证的一手来源、数据、代码、论文、产品发布或真实案例？",
-            "如果转入 Deep Dive，最小验证问题是什么：机制、应用场景、风险，还是行动机会？",
-            "如果暂不深入，下一次复查应该看什么触发条件？"
-        ]
     }
 
     private func sourceReference(for item: RadarItem, input: RadarInput) -> RadarSourceReference {
@@ -611,7 +601,6 @@ private struct RadarDecision: Identifiable {
     let route: String
     let introduction: String
     let observation: String
-    let validationQuestions: [String]
     let sourceReference: RadarSourceReference
     let keyPassages: [RadarKeyPassage]
     let evidenceStatus: String
@@ -916,16 +905,6 @@ private struct RadarDecisionDetailView: View {
             Section("具体观察") {
                 Text(decision.observation)
                     .font(.subheadline)
-                ForEach(Array(decision.validationQuestions.enumerated()), id: \.offset) { index, question in
-                    HStack(alignment: .top, spacing: 8) {
-                        Text("\(index + 1).")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 20, alignment: .leading)
-                        Text(question)
-                            .font(.subheadline)
-                    }
-                }
             }
 
             Section("路由动作") {
