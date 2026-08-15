@@ -45,3 +45,24 @@ def test_parse_github_repositories():
     assert len(items) == 1
     assert items[0].item_type == "repo"
     assert items[0].extra["stars"] == 100
+
+
+def test_parse_baidu_news_keeps_broad_news_result_metadata():
+    html_text = """
+    <html><body>
+      <a class="news-title-font_1xS-F" href="https://news.example.com/product-launch">
+        某企业发布新一代世界模型产品
+      </a>
+      <a href="https://news.example.com/lab-progress">高校研究团队公布具身智能新进展</a>
+    </body></html>
+    """
+
+    items = SearchService()._parse_baidu_news(html_text, max_results=5)
+
+    assert [item.title for item in items] == [
+        "某企业发布新一代世界模型产品",
+        "高校研究团队公布具身智能新进展",
+    ]
+    assert all(item.source.value == "web" for item in items)
+    assert all(item.item_type.value == "article" for item in items)
+    assert all("baidu_news" in item.tags for item in items)

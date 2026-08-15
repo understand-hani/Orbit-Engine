@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from typing import List
-from urllib.parse import quote_plus, urlencode
+from urllib.parse import urlencode
 from xml.etree import ElementTree as ET
 
 import httpx
@@ -72,6 +72,47 @@ class _ReadableHTMLParser(HTMLParser):
         if text:
             self.paragraphs.append(text)
         self._current = []
+
+
+class _BaiduNewsParser(HTMLParser):
+    """Extract article links from Baidu News result pages without a browser dependency."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._active_link: str | None = None
+        self._active_classes = ""
+        self._active_text: List[str] = []
+        self.links: List[tuple[str, str, str]] = []
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        if tag.lower() != "a" or self._active_link is not None:
+            return
+        attributes = dict(attrs)
+        href = attributes.get("href", "").strip()
+        if not href.startswith(("http://", "https://")):
+            return
+        self._active_link = href
+        self._active_classes = attributes.get("class", "")
+        self._active_text = []
+
+    def handle_data(self, data: str) -> None:
+        if self._active_link is not None:
+            cleaned = " ".join(data.split())
+            if cleaned:
+                self._active_text.append(cleaned)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() != "a" or self._active_link is None:
+            return
+        title = " ".join(self._active_text).strip()
+        # Baidu's result-title classes change periodically; retaining the class
+        # check plus a useful-title fallback keeps the parser resilient.
+        is_result_link = "title" in self._active_classes.lower() or len(title) >= 12
+        if is_result_link and title:
+            self.links.append((title, self._active_link, "baidu_news"))
+        self._active_link = None
+        self._active_classes = ""
+        self._active_text = []
 
 
 class SearchService:
@@ -151,22 +192,36 @@ class SearchService:
         )
 
     def search_public_web(self, query: str, max_results: int = 5) -> SourceSearchResponse:
-        url = (
-            "https://news.google.com/rss/search?q="
-            + quote_plus(query)
-            + "&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
-        )
+        """Search broad, current news using a source reachable from China.
+
+        Signal Radar intentionally searches news and organisation/product updates,
+        rather than papers or code repositories.  Query construction and
+        relevance filtering live in ``MockTechRadarAgent``; this method only
+        supplies that agent's public-news source.
+        """
         response = httpx.get(
-            url,
-            timeout=self.settings.source_timeout_sec,
+            "https://news.baidu.com/ns",
+            params={
+                "word": query,
+                "tn": "news",
+                "from": "news",
+                "cl": "2",
+                "rn": max(1, min(max_results, 20)),
+            },
+            # A Radar request may try several broad query variants.  Keep an
+            # unavailable news provider from consuming the iOS request budget.
+            timeout=min(self.settings.source_timeout_sec, 4.0),
             trust_env=False,
-            headers={"User-Agent": "OrbitEngineRadar/0.1"},
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; OrbitEngineRadar/0.1)",
+                "Accept-Language": "zh-CN,zh;q=0.9",
+            },
         )
         response.raise_for_status()
         return SourceSearchResponse(
             query=query,
             source=SourceType.web,
-            items=self._parse_rss(response.text, max_results),
+            items=self._parse_baidu_news(response.text, max_results),
             fetched_at=datetime.now(timezone.utc),
         )
 
@@ -303,6 +358,37 @@ class SearchService:
                     },
                 )
             )
+        return items
+
+    def _parse_baidu_news(self, html_text: str, max_results: int) -> List[SourceItem]:
+        parser = _BaiduNewsParser()
+        parser.feed(html_text)
+        parser.close()
+
+        items: List[SourceItem] = []
+        seen_urls = set()
+        for title, link, publisher in parser.links:
+            if link in seen_urls:
+                continue
+            seen_urls.add(link)
+            cleaned_title = self._clean_html(title)
+            if len(cleaned_title) < 8:
+                continue
+            item_id = hashlib.sha1((link or cleaned_title).encode("utf-8")).hexdigest()[:16]
+            items.append(
+                SourceItem(
+                    id=item_id,
+                    source=SourceType.web,
+                    item_type=SourceItemType.article,
+                    title=cleaned_title,
+                    url=link,
+                    summary=cleaned_title,
+                    tags=["public_web", publisher],
+                    extra={"publisher": publisher},
+                )
+            )
+            if len(items) >= max(1, max_results):
+                break
         return items
 
     def _error_item(self, source: SourceType, query: str, exc: Exception) -> SourceItem:
