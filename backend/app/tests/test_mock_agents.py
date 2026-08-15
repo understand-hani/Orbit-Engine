@@ -1,5 +1,5 @@
 from datetime import date
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.agents.tech_radar_agent import MockTechRadarAgent
 from app.agents.research_feeder_agent import ResearchFeederAgent
@@ -7,6 +7,7 @@ from app.schemas.common import SuggestedAction, TaskType
 from app.schemas.research_feeder import ResearchDayRole
 from app.schemas.source import CombinedSearchResponse, SourceItem, SourceItemType, SourceSearchResponse, SourceType
 from app.schemas.tech_radar import RadarDigest, RadarScope, RadarType, TechRadarPayload
+from app.schemas.user_context import PersonalProfile, UserContext, UserPreference, WorkLearningPlan
 from app.services.feed_service import FeedService
 
 
@@ -87,15 +88,19 @@ def test_mock_research_session_has_primary_and_candidate_papers():
                         id=f"2608.0000{index}",
                         source=SourceType.arxiv,
                         item_type=SourceItemType.paper,
-                        title=f"Real Public Research Result {index}",
+                        title=f"3DGS World Model for Driving Research {index}",
                         url=f"https://arxiv.org/abs/2608.0000{index}",
-                        summary=f"Public arXiv abstract for current direction {index}.",
+                        summary=(
+                            f"Public arXiv abstract about 3DGS, world models, driving video generation, "
+                            f"and dynamic scene reconstruction {index}."
+                        ),
                         authors=[f"Author {index}"],
-                        published_at=datetime(2026, 8, index, tzinfo=timezone.utc),
+                        published_at=datetime.now(timezone.utc)
+                        - timedelta(days=400 if index == 3 else index),
                         tags=["cs.CV"],
                         extra={"pdf_url": f"https://arxiv.org/pdf/2608.0000{index}"},
                     )
-                    for index in range(1, 3)
+                    for index in range(1, 4)
                 ],
                 fetched_at=datetime.now(timezone.utc),
             )
@@ -113,6 +118,12 @@ def test_mock_research_session_has_primary_and_candidate_papers():
     assert len(session.payload.paper_readers) == 2
     assert session.payload.paper_readers[1].pdf_url is not None
     assert session.payload.papers[0].id.startswith("real_arxiv_")
+    assert session.payload.papers[0].relevance_score == 5
+    assert session.payload.papers[0].published_at is not None
+    assert all(paper.relevance_score >= 3 for paper in session.payload.papers)
+    assert all(paper.relevance_score <= 4 for paper in session.payload.papers[1:])
+    cutoff = datetime.now(timezone.utc) - timedelta(days=366)
+    assert all(paper.published_at >= cutoff for paper in session.payload.papers)
     assert session.payload.paper_reader.selected_passages == []
     assert session.payload.paper_reader.key_figures == []
     assert session.payload.paper_reader.sections[0].extracted_text
@@ -165,3 +176,92 @@ def test_deep_dive_web_fallback_accepts_only_arxiv_paper_pages():
     assert validated[0].extra["pdf_url"] == "https://arxiv.org/pdf/2608.12345v1"
     assert validated[1].id == "hep-th/9901001"
     assert str(validated[1].url) == "https://arxiv.org/abs/hep-th/9901001"
+
+
+def test_deep_dive_uses_personal_direction_and_rejects_old_or_unrelated_papers(monkeypatch):
+    now = datetime.now(timezone.utc)
+    context = UserContext(
+        profile=PersonalProfile(
+            goal="用 StreetGaussian 和 4DGS 做自动驾驶动态场景重建",
+            current_stage="验证动态场景重建技术路线",
+            updated_at=now,
+        ),
+        plan=WorkLearningPlan(
+            long_term_goal="建立可用于自动驾驶仿真的动态场景重建系统",
+            weekly_focus="比较 StreetGaussian 与 4DGS 的动态建模路线",
+            active_tasks=["确认动态高斯表示和时序一致性方案"],
+            next_action="精读一篇直接支持当前路线的论文",
+            tracking_keywords=["StreetGaussian", "4DGS", "dynamic scene reconstruction"],
+            updated_at=now,
+        ),
+        preferences=UserPreference(
+            fields=["3D Gaussian Splatting", "autonomous driving reconstruction"],
+            updated_at=now,
+        ),
+    )
+
+    class PersonalDirectionSearchService:
+        def search_arxiv(self, query: str, max_results: int = 5) -> SourceSearchResponse:
+            return SourceSearchResponse(
+                query=query,
+                source=SourceType.arxiv,
+                items=[
+                    SourceItem(
+                        id="2608.01001",
+                        source=SourceType.arxiv,
+                        item_type=SourceItemType.paper,
+                        title="StreetGaussian and 4DGS for Dynamic Driving Scenes",
+                        url="https://arxiv.org/abs/2608.01001",
+                        summary="Dynamic scene reconstruction for autonomous driving.",
+                        published_at=now - timedelta(days=10),
+                    ),
+                    SourceItem(
+                        id="2607.01002",
+                        source=SourceType.arxiv,
+                        item_type=SourceItemType.paper,
+                        title="4DGS Dynamic Scene Reconstruction with Temporal Consistency",
+                        url="https://arxiv.org/abs/2607.01002",
+                        summary="A secondary route for driving reconstruction.",
+                        published_at=now - timedelta(days=30),
+                    ),
+                    SourceItem(
+                        id="2608.01003",
+                        source=SourceType.arxiv,
+                        item_type=SourceItemType.paper,
+                        title="General Language Agent Benchmark",
+                        url="https://arxiv.org/abs/2608.01003",
+                        summary="A benchmark for language agents.",
+                        published_at=now - timedelta(days=5),
+                    ),
+                    SourceItem(
+                        id="2501.01004",
+                        source=SourceType.arxiv,
+                        item_type=SourceItemType.paper,
+                        title="StreetGaussian and 4DGS for Dynamic Driving Scenes",
+                        url="https://arxiv.org/abs/2501.01004",
+                        summary="An old but relevant dynamic reconstruction paper.",
+                        published_at=now - timedelta(days=400),
+                    ),
+                ],
+                fetched_at=now,
+            )
+
+    class MockSettings:
+        llm_provider = "mock"
+        openrouter_api_key = None
+
+    monkeypatch.setattr("app.agents.research_feeder_agent.get_settings", lambda: MockSettings())
+    payload = FeedService().preview_session(
+        date(2026, 8, 15),
+        task_type=TaskType.research_feeder,
+    ).payload
+    generated = ResearchFeederAgent(search_service=PersonalDirectionSearchService()).generate(
+        payload,
+        user_context=context,
+    )
+
+    assert len(generated.papers) == 2
+    assert [paper.relevance_score for paper in generated.papers] == [5, 4]
+    assert generated.reading_pack.primary_paper_id == generated.papers[0].id
+    assert all(paper.published_at and paper.published_at >= now - timedelta(days=366) for paper in generated.papers)
+    assert all("Language Agent" not in paper.title for paper in generated.papers)

@@ -150,7 +150,12 @@ class SearchService:
             fetched_at=datetime.now(timezone.utc),
         )
 
-    def search_public_web(self, query: str, max_results: int = 5) -> SourceSearchResponse:
+    def search_public_web(
+        self,
+        query: str,
+        max_results: int = 5,
+        freshness: str = "oneMonth",
+    ) -> SourceSearchResponse:
         """Search broad, current news through Bocha's China-accessible API.
 
         Signal Radar intentionally searches news and organisation/product updates,
@@ -164,7 +169,7 @@ class SearchService:
             "https://api.bochaai.com/v1/web-search",
             json={
                 "query": query,
-                "freshness": "oneMonth",
+                "freshness": freshness,
                 "summary": True,
                 "count": max(1, min(max_results, 20)),
             },

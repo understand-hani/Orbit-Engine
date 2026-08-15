@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 
 from app.schemas.common import VisualAsset
 
@@ -80,6 +80,8 @@ class Paper(BaseModel):
     authors: List[str] = []
     venue: str = ""
     year: Optional[int] = None
+    published_at: Optional[datetime] = None
+    relevance_score: int = Field(default=3, ge=1, le=5)
     url: Optional[HttpUrl] = None
     pdf_url: Optional[HttpUrl] = None
     repo_url: Optional[HttpUrl] = None

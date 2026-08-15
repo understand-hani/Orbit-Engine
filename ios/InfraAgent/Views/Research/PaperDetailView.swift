@@ -28,8 +28,23 @@ struct PaperDetailView: View {
                         .foregroundStyle(.secondary)
                 }
                 LabeledContent("会议/期刊", value: paper.venue)
-                if let year = paper.year {
+                if let publishedAt = paper.publishedAt {
+                    LabeledContent(
+                        "发布日期",
+                        value: publishedAt.formatted(date: .numeric, time: .omitted)
+                    )
+                } else if let year = paper.year {
                     LabeledContent("年份", value: "\(year)")
+                }
+                if let score = paper.relevanceScore {
+                    LabeledContent("与当前目标和计划的关联度") {
+                        HStack(spacing: 2) {
+                            ForEach(1...5, id: \.self) { index in
+                                Image(systemName: index <= max(1, min(score, 5)) ? "star.fill" : "star")
+                                    .foregroundStyle(index <= max(1, min(score, 5)) ? .orange : .secondary)
+                            }
+                        }
+                    }
                 }
                 TagRow(tags: paper.tags)
             }

@@ -1,7 +1,11 @@
 import re
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from urllib.parse import urlparse
 
+from pydantic import BaseModel, Field
+
+from app.config import get_settings
 from app.schemas.research_feeder import (
     ArchivePlan,
     Paper,
@@ -15,7 +19,84 @@ from app.schemas.research_feeder import (
 )
 from app.schemas.source import SourceItem, SourceItemType, SourceType
 from app.schemas.user_context import UserContext
+from app.services.llm_service import OpenRouterChatService
 from app.services.search_service import SearchService
+
+
+RESEARCH_ITEM_LIMIT = 3
+RESEARCH_SEARCH_FETCH_LIMIT = 8
+RESEARCH_CANDIDATE_POOL_TARGET = 6
+RESEARCH_FRESHNESS_DAYS = 366
+RESEARCH_MIN_SCORE = 3
+RESEARCH_PRIMARY_SCORE = 5
+RESEARCH_BROAD_TERMS = {
+    "ai",
+    "artificial intelligence",
+    "model",
+    "research",
+    "paper",
+    "人工智能",
+    "大模型",
+    "模型",
+    "研究",
+    "论文",
+    "计算机视觉",
+    "机器学习",
+    "深度学习",
+}
+
+
+class ResearchSearchPlan(BaseModel):
+    queries: List[str] = Field(default_factory=list)
+    required_terms: List[str] = Field(default_factory=list)
+
+
+class ResearchCandidateRating(BaseModel):
+    id: str
+    relevance_score: int = Field(ge=1, le=5)
+
+
+class ResearchCandidateSelection(BaseModel):
+    selections: List[ResearchCandidateRating] = Field(default_factory=list)
+
+
+RESEARCH_SEARCH_PLANNER_PROMPT = """
+You plan arXiv searches for a personal Deep Dive reading session.
+
+Use the supplied user profile, personal field preferences, long-term goal,
+current stage, full-cycle plan, weekly focus, active tasks, next action, tracking
+keywords, and the current Deep Dive task. Return 2 or 3 concise English search
+queries suitable for arXiv plus 2 to 8 distinctive English technical terms or
+aliases that a paper title/abstract should contain. Translate Chinese technical
+directions into standard English research terminology when needed.
+
+The queries must target the user's actual method, system, application, or
+research question. Do not replace a specific direction with generic AI, model,
+agent, computer vision, or machine learning papers. Return only JSON matching
+the supplied schema.
+""".strip()
+
+
+RESEARCH_RESULT_SELECTOR_PROMPT = """
+You are the final relevance gate for a personal arXiv Deep Dive.
+
+Use the complete user direction and active plan, not merely a shared broad field.
+Consider only papers published within the supplied one-year window. Select up to
+3 papers and assign relevance_score using this exact rubric:
+- 5: directly supports, challenges, or changes the user's core technical route
+  or current-week task; its title/abstract contains concrete core method,
+  system, application, or evaluation anchors from the user's plan.
+- 4: directly concerns a primary target direction, but is not immediate evidence
+  for the current task or technical decision.
+- 3: a clearly useful enabling or secondary connection.
+- 1-2: broad-field similarity or weak connection; do not select it.
+
+Do not manufacture a 5-star paper just to fill the primary slot. A paper sharing
+only AI, model, agent, autonomous driving, computer vision, or another broad
+category is not enough. Return an empty selection when none qualifies. If a
+genuine 5-star paper exists, place it first. Return only candidate IDs and scores
+as JSON matching the supplied schema.
+""".strip()
 
 
 class ResearchFeederAgent:
@@ -37,17 +118,23 @@ class ResearchFeederAgent:
         if payload.research_day_role == ResearchDayRole.manual_deep_dive:
             return payload
 
-        terms = self._search_terms(payload, user_context, query)
-        sources = self._search_sources(terms)
-        papers = [self._paper_from_source(item, terms) for item in sources[:3]]
-        if not papers:
+        search_plan = self._build_search_plan(payload, user_context, query)
+        rated_sources = self._search_sources(search_plan, payload, user_context)
+        papers = [
+            self._paper_from_source(item, search_plan.required_terms, score)
+            for item, score in rated_sources[:RESEARCH_ITEM_LIMIT]
+        ]
+        if not papers or papers[0].relevance_score != RESEARCH_PRIMARY_SCORE:
             return payload.model_copy(
                 update={
                     "reading_pack": payload.reading_pack.model_copy(
                         update={
                             "primary_paper_id": "pending_primary_paper",
                             "candidate_paper_id": None,
-                            "selection_reason": "未检索到符合当前方向的 arXiv 论文，请稍后重试或输入更具体的检索主题。",
+                            "selection_reason": (
+                                "近一年内未检索到与当前个人方向和计划达到 5 星关联度的 arXiv 主论文；"
+                                "未使用宽泛领域论文凑数，请稍后重试或输入更具体的技术主题。"
+                            ),
                         }
                     ),
                     "papers": [],
@@ -58,7 +145,10 @@ class ResearchFeederAgent:
                 }
             )
 
-        readers = [self._reader_from_source(paper, source) for paper, source in zip(papers, sources)]
+        readers = [
+            self._reader_from_source(paper, source)
+            for paper, (source, _) in zip(papers, rated_sources)
+        ]
         primary = papers[0]
         candidate = papers[1] if len(papers) > 1 else None
         return payload.model_copy(
@@ -67,8 +157,8 @@ class ResearchFeederAgent:
                     primary_paper_id=primary.id,
                     candidate_paper_id=candidate.id if candidate else None,
                     selection_reason=(
-                        "候选来自实时公开检索，并按与当前目标、周计划和跟踪关键词的匹配程度排序；"
-                        "确认前请核对原始页面与发布时间。"
+                        "主论文与当前目标、领域偏好和本周计划达到 5 星关联度；"
+                        "其余候选按同一标准排序，且均为近一年 arXiv 论文。"
                     ),
                     reading_goal=payload.reading_pack.reading_goal,
                 ),
@@ -78,30 +168,63 @@ class ResearchFeederAgent:
                 "notes": PaperNotes(),
                 "archive_plan": ArchivePlan(
                     target_archive=["research_note"],
-                    tags=terms[:6],
+                    tags=search_plan.required_terms[:6],
                 ),
             }
         )
 
-    def _search_sources(self, terms: List[str]) -> List[SourceItem]:
-        arxiv_query = " OR ".join(f'all:"{term}"' for term in terms[:4])
-        try:
-            arxiv_items = self.search_service.search_arxiv(arxiv_query, max_results=8).items
-        except Exception:
-            arxiv_items = []
-        usable = self._rank_sources(self._validated_arxiv_sources(arxiv_items), terms)
-        if usable:
-            return usable
+    def _search_sources(
+        self,
+        plan: ResearchSearchPlan,
+        payload: ResearchFeederPayload,
+        user_context: Optional[UserContext],
+    ) -> List[tuple[SourceItem, int]]:
+        candidates: List[SourceItem] = []
+        seen_ids = set()
+        for query in plan.queries[:3]:
+            try:
+                items = self.search_service.search_arxiv(
+                    f'all:"{query}"',
+                    max_results=RESEARCH_SEARCH_FETCH_LIMIT,
+                ).items
+            except Exception:
+                items = []
+            self._append_research_candidates(candidates, seen_ids, items, plan.required_terms)
+            if len(candidates) >= RESEARCH_CANDIDATE_POOL_TARGET:
+                break
 
-        # Bocha is only a transport fallback. The content contract remains
-        # arXiv-only, so journal homepages, news and generic web pages can never
-        # enter a Deep Dive pack.
-        web_query = "site:arxiv.org/abs " + " ".join(terms[:4])
-        try:
-            web_items = self.search_service.search_public_web(web_query, max_results=10).items
-        except Exception:
-            web_items = []
-        return self._rank_sources(self._validated_arxiv_sources(web_items), terms)
+        # Bocha is only a transport fallback when direct arXiv access yields too
+        # few candidates. The accepted content contract remains arXiv /abs pages.
+        if len(candidates) < RESEARCH_ITEM_LIMIT:
+            for query in plan.queries[:3]:
+                try:
+                    items = self.search_service.search_public_web(
+                        f"site:arxiv.org/abs {query}",
+                        max_results=RESEARCH_SEARCH_FETCH_LIMIT,
+                        freshness="oneYear",
+                    ).items
+                except Exception:
+                    items = []
+                self._append_research_candidates(candidates, seen_ids, items, plan.required_terms)
+                if len(candidates) >= RESEARCH_ITEM_LIMIT:
+                    break
+
+        return self._select_research_candidates(candidates, payload, user_context, plan.required_terms)
+
+    def _append_research_candidates(
+        self,
+        candidates: List[SourceItem],
+        seen_ids: set,
+        items: List[SourceItem],
+        required_terms: List[str],
+    ) -> None:
+        for item in self._validated_arxiv_sources(items):
+            if item.id in seen_ids or not self._is_recent(item):
+                continue
+            if self._deterministic_relevance_score(item, required_terms) < RESEARCH_MIN_SCORE:
+                continue
+            seen_ids.add(item.id)
+            candidates.append(item)
 
     def _validated_arxiv_sources(self, items: List[SourceItem]) -> List[SourceItem]:
         validated: List[SourceItem] = []
@@ -140,22 +263,188 @@ class ResearchFeederAgent:
             return ""
         return parsed.path[len(prefix) :].strip("/")
 
-    def _rank_sources(self, items: List[SourceItem], terms: List[str]) -> List[SourceItem]:
-        usable = [item for item in items if not item.id.endswith("_search_error") and item.title.strip()]
-        return sorted(
-            usable,
-            key=lambda item: (
-                self._match_count(item, terms),
-                (item.published_at or item.updated_at).isoformat()
-                if (item.published_at or item.updated_at)
-                else "",
+    def _is_recent(self, item: SourceItem) -> bool:
+        published = item.published_at or item.updated_at
+        if published is None:
+            return False
+        if published.tzinfo is None:
+            published = published.replace(tzinfo=timezone.utc)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=RESEARCH_FRESHNESS_DAYS)
+        return published >= cutoff
+
+    def _select_research_candidates(
+        self,
+        candidates: List[SourceItem],
+        payload: ResearchFeederPayload,
+        user_context: Optional[UserContext],
+        required_terms: List[str],
+    ) -> List[tuple[SourceItem, int]]:
+        if not candidates:
+            return []
+        settings = get_settings()
+        if user_context is None or settings.llm_provider.lower() != "openrouter" or not settings.openrouter_api_key:
+            rated = [
+                (item, self._deterministic_relevance_score(item, required_terms))
+                for item in candidates
+            ]
+        else:
+            candidate_by_id = {item.id: item for item in candidates}
+            try:
+                selection = OpenRouterChatService().generate_json(
+                    system_prompt=RESEARCH_RESULT_SELECTOR_PROMPT,
+                    user_payload={
+                        "user_direction": self._user_direction_payload(payload, user_context),
+                        "freshness_window": "published within the last 366 days",
+                        "required_terms": required_terms,
+                        "candidates": [
+                            {
+                                "id": item.id,
+                                "title": item.title,
+                                "abstract": item.summary[:1600],
+                                "categories": item.tags,
+                                "published_at": (item.published_at or item.updated_at).isoformat(),
+                            }
+                            for item in candidates
+                        ],
+                    },
+                    output_model=ResearchCandidateSelection,
+                    schema_name="research_candidate_selection",
+                )
+                rated = [
+                    (candidate_by_id[result.id], result.relevance_score)
+                    for result in selection.selections
+                    if result.id in candidate_by_id and result.relevance_score >= RESEARCH_MIN_SCORE
+                ]
+            except Exception:
+                rated = [
+                    (item, self._deterministic_relevance_score(item, required_terms))
+                    for item in candidates
+                ]
+
+        deduped: List[tuple[SourceItem, int]] = []
+        seen_ids = set()
+        has_five_star = False
+        for item, score in sorted(
+            rated,
+            key=lambda pair: (
+                pair[1],
+                (pair[0].published_at or pair[0].updated_at).isoformat(),
             ),
             reverse=True,
-        )
+        ):
+            if item.id in seen_ids or score < RESEARCH_MIN_SCORE:
+                continue
+            seen_ids.add(item.id)
+            normalized_score = min(score, RESEARCH_PRIMARY_SCORE)
+            if normalized_score == RESEARCH_PRIMARY_SCORE:
+                if has_five_star:
+                    normalized_score = 4
+                else:
+                    has_five_star = True
+            deduped.append((item, normalized_score))
+        # A primary paper is never created by promoting a weaker candidate.
+        if not deduped or deduped[0][1] != RESEARCH_PRIMARY_SCORE:
+            return []
+        return deduped[:RESEARCH_ITEM_LIMIT]
 
-    def _match_count(self, item: SourceItem, terms: List[str]) -> int:
-        haystack = f"{item.title} {item.summary} {' '.join(item.tags)}".lower()
-        return sum(term.lower() in haystack for term in terms)
+    def _deterministic_relevance_score(self, item: SourceItem, required_terms: List[str]) -> int:
+        title = item.title.lower()
+        abstract = item.summary.lower()
+        meaningful = self._meaningful_terms(required_terms)
+        title_matches = {term for term in meaningful if term in title}
+        all_matches = {term for term in meaningful if term in f"{title} {abstract}"}
+        if len(all_matches) >= 2 and title_matches:
+            return 5
+        if title_matches or len(all_matches) >= 2:
+            return 4
+        if all_matches:
+            return 3
+        return 1
+
+    def _build_search_plan(
+        self,
+        payload: ResearchFeederPayload,
+        user_context: Optional[UserContext],
+        query: str,
+    ) -> ResearchSearchPlan:
+        fallback_terms = self._search_terms(payload, user_context, query)
+        fallback_queries = self._dedupe_terms(
+            [query.strip(), *fallback_terms]
+        )[:3]
+        fallback = ResearchSearchPlan(
+            queries=fallback_queries or ["computer vision"],
+            required_terms=self._meaningful_terms(fallback_terms)[:8],
+        )
+        settings = get_settings()
+        if user_context is None or settings.llm_provider.lower() != "openrouter" or not settings.openrouter_api_key:
+            return fallback
+        try:
+            planned = OpenRouterChatService().generate_json(
+                system_prompt=RESEARCH_SEARCH_PLANNER_PROMPT,
+                user_payload={
+                    "user_direction": self._user_direction_payload(payload, user_context),
+                    "manual_query": query.strip(),
+                    "source_contract": "arXiv papers published within the last 366 days",
+                },
+                output_model=ResearchSearchPlan,
+                schema_name="research_search_plan",
+            )
+            queries = self._dedupe_terms([value.strip() for value in planned.queries if value.strip()])[:3]
+            required_terms = self._meaningful_terms(planned.required_terms)[:8]
+            if queries and required_terms:
+                return ResearchSearchPlan(queries=queries, required_terms=required_terms)
+        except Exception:
+            pass
+        return fallback
+
+    def _user_direction_payload(
+        self,
+        payload: ResearchFeederPayload,
+        user_context: UserContext,
+    ) -> dict:
+        return {
+            "goal": user_context.profile.goal,
+            "current_stage": user_context.profile.current_stage,
+            "background_summary": user_context.profile.background_summary,
+            "long_term_goal": user_context.plan.long_term_goal,
+            "full_cycle_plan": user_context.plan.full_cycle_plan,
+            "weekly_focus": user_context.plan.weekly_focus,
+            "active_tasks": user_context.plan.active_tasks,
+            "next_action": user_context.plan.next_action,
+            "tracking_keywords": user_context.plan.tracking_keywords,
+            "field_preferences": user_context.preferences.fields,
+            "source_preferences": [value.value for value in user_context.preferences.source_preferences],
+            "deep_dive": {
+                "current_direction": payload.research_context.current_direction,
+                "current_task": payload.research_context.current_task,
+                "week_goal": payload.research_context.week_goal,
+                "related_project": payload.research_context.related_project,
+            },
+        }
+
+    def _meaningful_terms(self, terms: List[str]) -> List[str]:
+        cleaned = self._dedupe_terms(
+            [re.sub(r"\s+", " ", term).strip().lower() for term in terms if term.strip()]
+        )
+        distinctive = [
+            term
+            for term in cleaned
+            if len(term) >= 3 and term not in RESEARCH_BROAD_TERMS
+        ]
+        # As with Signal Radar, a broad term remains legitimate when it is the
+        # user's only declared direction; it just cannot override stronger anchors.
+        return distinctive or [term for term in cleaned if len(term) >= 2]
+
+    def _dedupe_terms(self, terms: List[str]) -> List[str]:
+        deduped: List[str] = []
+        seen = set()
+        for term in terms:
+            key = term.lower()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            deduped.append(term)
+        return deduped
 
     def _search_terms(
         self,
@@ -169,14 +458,19 @@ class ResearchFeederAgent:
                 [
                     *user_context.plan.tracking_keywords,
                     *user_context.preferences.fields,
+                    *user_context.plan.active_tasks,
+                    *user_context.plan.full_cycle_plan,
                     user_context.plan.weekly_focus,
                     user_context.plan.next_action,
                     user_context.profile.goal,
+                    user_context.plan.long_term_goal,
+                    user_context.profile.current_stage,
                 ]
             )
         values.extend(
             [
                 payload.research_context.current_direction,
+                payload.research_context.current_task,
                 payload.research_context.related_project,
                 payload.research_context.week_goal,
             ]
@@ -206,7 +500,7 @@ class ResearchFeederAgent:
         terms.extend(re.findall(r"[\u4e00-\u9fff]{3,12}", cleaned))
         return terms
 
-    def _paper_from_source(self, source: SourceItem, terms: List[str]) -> Paper:
+    def _paper_from_source(self, source: SourceItem, terms: List[str], relevance_score: int) -> Paper:
         matched = [term for term in terms if term.lower() in f"{source.title} {source.summary}".lower()]
         published = source.published_at or source.updated_at
         venue = "arXiv"
@@ -217,13 +511,17 @@ class ResearchFeederAgent:
             authors=source.authors,
             venue=venue,
             year=published.year if published else None,
+            published_at=published,
+            relevance_score=relevance_score,
             url=source.url,
             pdf_url=pdf_url or None,
             summary=source.summary.strip() or "公开来源未提供摘要，请打开原始页面核对。",
             why_selected=(
-                "与当前方向中的「" + "、".join(matched[:4]) + "」直接匹配。"
+                f"相关度 {relevance_score} / 5；与当前方向和计划中的「"
+                + "、".join(matched[:4])
+                + "」匹配。"
                 if matched
-                else "来自当前检索式的近期公开结果，需要打开原始页面复核相关性。"
+                else f"相关度 {relevance_score} / 5；由 Agent 根据当前目标和计划综合评定。"
             ),
             visuals=[],
             tags=[source.source.value, *source.tags[:5]],

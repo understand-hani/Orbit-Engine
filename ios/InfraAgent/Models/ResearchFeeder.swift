@@ -60,6 +60,8 @@ struct Paper: Codable, Identifiable {
     let authors: [String]
     let venue: String
     let year: Int?
+    let publishedAt: Date?
+    let relevanceScore: Int?
     let url: URL?
     let pdfURL: URL?
     let repoURL: URL?
@@ -75,6 +77,8 @@ struct Paper: Codable, Identifiable {
         case authors
         case venue
         case year
+        case publishedAt = "published_at"
+        case relevanceScore = "relevance_score"
         case url
         case pdfURL = "pdf_url"
         case repoURL = "repo_url"

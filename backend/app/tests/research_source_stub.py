@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.schemas.source import SourceItem, SourceItemType, SourceSearchResponse, SourceType
 
@@ -13,11 +13,14 @@ class StaticResearchSearchService:
                     id=f"2608.1000{index}",
                     source=SourceType.arxiv,
                     item_type=SourceItemType.paper,
-                    title=f"Public Research Material {index}",
+                    title=f"3DGS World Model for Driving Research {index}",
                     url=f"https://arxiv.org/abs/2608.1000{index}",
-                    summary=f"A real-source metadata test abstract for material {index}.",
+                    summary=(
+                        f"A real-source abstract about 3DGS, world models, driving video generation, "
+                        f"and dynamic scene reconstruction for material {index}."
+                    ),
                     authors=[f"Researcher {index}"],
-                    published_at=datetime(2026, 8, index, tzinfo=timezone.utc),
+                    published_at=datetime.now(timezone.utc) - timedelta(days=index),
                     tags=["cs.CV"],
                     extra={"pdf_url": f"https://arxiv.org/pdf/2608.1000{index}"},
                 )

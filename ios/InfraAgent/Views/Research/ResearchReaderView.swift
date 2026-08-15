@@ -243,8 +243,14 @@ struct ResearchReaderView: View {
             if !paper.venue.isEmpty {
                 Text(paper.venue)
             }
-            if let year = paper.year {
+            if let publishedAt = paper.publishedAt {
+                Text(publishedAt.formatted(date: .numeric, time: .omitted))
+            } else if let year = paper.year {
                 Text("\(year)")
+            }
+            if let score = paper.relevanceScore {
+                Text(relevanceStars(score))
+                    .foregroundStyle(.orange)
             }
             if reader(for: paper) != nil {
                 Label("可读 PDF", systemImage: "doc.richtext")
@@ -252,6 +258,12 @@ struct ResearchReaderView: View {
         }
         .font(.caption)
         .foregroundStyle(.secondary)
+    }
+
+    private func relevanceStars(_ score: Int) -> String {
+        let normalized = max(1, min(score, 5))
+        return String(repeating: "★", count: normalized)
+            + String(repeating: "☆", count: 5 - normalized)
     }
 
     private func reader(for paper: Paper) -> PaperReader? {
@@ -333,6 +345,9 @@ private struct MaterialCandidate: Identifiable {
     let summary: String
     let url: String?
     let sourceType: String
+    let publishedAt: Date?
+    let relevanceScore: Int?
+    let isPrimary: Bool
 
     var confirmed: ConfirmedResearchMaterial {
         ConfirmedResearchMaterial(
@@ -430,10 +445,28 @@ private struct DeepDiveMaterialSheet: View {
                                         Text(candidate.title)
                                             .font(.headline)
                                             .foregroundStyle(.primary)
+                                        if candidate.isPrimary {
+                                            Label("5 星主论文", systemImage: "star.circle.fill")
+                                                .font(.caption)
+                                                .foregroundStyle(.orange)
+                                        }
                                         Text(candidate.summary)
                                             .font(.subheadline)
                                             .foregroundStyle(.secondary)
                                             .lineLimit(3)
+                                        HStack(spacing: 8) {
+                                            if let publishedAt = candidate.publishedAt {
+                                                Text(publishedAt.formatted(date: .numeric, time: .omitted))
+                                            }
+                                            if let score = candidate.relevanceScore {
+                                                Text(
+                                                    String(repeating: "★", count: max(1, min(score, 5)))
+                                                        + String(repeating: "☆", count: 5 - max(1, min(score, 5)))
+                                                )
+                                                .foregroundStyle(.orange)
+                                            }
+                                        }
+                                        .font(.caption)
                                         if let url = candidate.url {
                                             Text(url)
                                                 .font(.caption)
@@ -510,7 +543,8 @@ private struct DeepDiveMaterialSheet: View {
                         title: trimmedTitle,
                         summary: trimmedSummary,
                         url: trimmedURL,
-                        publicPapers: refreshedPayload.papers
+                        publicPapers: refreshedPayload.papers,
+                        primaryPaperID: refreshedPayload.readingPack.primaryPaperID
                     )
                 } else {
                     candidates = makeCandidates(
@@ -554,7 +588,8 @@ private struct DeepDiveMaterialSheet: View {
         title: String,
         summary: String,
         url: String,
-        publicPapers: [Paper]? = nil
+        publicPapers: [Paper]? = nil,
+        primaryPaperID: String? = nil
     ) -> [MaterialCandidate] {
         if selectedSource == "url" {
             return [
@@ -564,7 +599,10 @@ private struct DeepDiveMaterialSheet: View {
                     title: title,
                     summary: summary.isEmpty ? "用户提供的网址材料，等待阅读后补全主旨。" : summary,
                     url: url.isEmpty ? nil : url,
-                    sourceType: selectedSource
+                    sourceType: selectedSource,
+                    publishedAt: nil,
+                    relevanceScore: nil,
+                    isPrimary: false
                 )
             ]
         }
@@ -577,7 +615,10 @@ private struct DeepDiveMaterialSheet: View {
                     title: title,
                     summary: summary.isEmpty ? "用户提供的 PDF 材料，等待阅读后补全主旨。" : summary,
                     url: nil,
-                    sourceType: selectedSource
+                    sourceType: selectedSource,
+                    publishedAt: nil,
+                    relevanceScore: nil,
+                    isPrimary: false
                 )
             ]
         }
@@ -592,7 +633,10 @@ private struct DeepDiveMaterialSheet: View {
                     title: paper.title,
                     summary: summary.isEmpty ? paper.summary : summary,
                     url: paper.url?.absoluteString,
-                    sourceType: selectedSource
+                    sourceType: selectedSource,
+                    publishedAt: paper.publishedAt,
+                    relevanceScore: paper.relevanceScore,
+                    isPrimary: paper.id == primaryPaperID
                 )
             }
         if !generated.isEmpty {
