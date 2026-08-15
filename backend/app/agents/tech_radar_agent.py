@@ -49,8 +49,13 @@ class RadarSearchPlan(BaseModel):
     excluded_terms: List[str] = Field(default_factory=list)
 
 
+class RadarCandidateRating(BaseModel):
+    id: str
+    relevance_score: int = Field(ge=1, le=5)
+
+
 class RadarCandidateSelection(BaseModel):
-    selected_ids: List[str] = Field(default_factory=list)
+    selections: List[RadarCandidateRating] = Field(default_factory=list)
 
 
 RADAR_SEARCH_PLANNER_PROMPT = """
@@ -77,6 +82,9 @@ progress on the user's stated methods, systems, applications, or organisations.
 Always reject journal homepages, calls for papers, conference notices, generic
 university announcements, generic AI-agent news, and generic industry news.
 Return an empty list rather than filling the quota with weakly related results.
+For each selected candidate, assign relevance_score from 1 to 5: 5 means a
+direct match to the current technical line with concrete progress; 3 means a
+clear but secondary connection. Do not select 1-2 star candidates.
 Return only JSON matching the supplied schema.
 """.strip()
 
@@ -162,10 +170,10 @@ class MockTechRadarAgent:
                     break
             if len(candidates) >= 18:
                 break
-        collected = self._select_radar_candidates(candidates, user_context)
+        collected = self._select_radar_candidates(candidates, user_context, required_terms)
         return [
-            self._radar_item_from_source(payload, item, index, required_terms)
-            for index, item in enumerate(collected[:RADAR_ITEM_LIMIT], start=1)
+            self._radar_item_from_source(payload, item, index, required_terms, relevance_score)
+            for index, (item, relevance_score) in enumerate(collected[:RADAR_ITEM_LIMIT], start=1)
         ]
 
     def _source_key(self, source_item: SourceItem) -> str:
@@ -213,12 +221,16 @@ class MockTechRadarAgent:
         self,
         candidates: List[SourceItem],
         user_context: Optional[UserContext],
-    ) -> List[SourceItem]:
+        required_terms: List[str],
+    ) -> List[tuple[SourceItem, int]]:
         if not candidates:
             return []
         settings = get_settings()
         if user_context is None or settings.llm_provider.lower() != "openrouter" or not settings.openrouter_api_key:
-            return candidates[:RADAR_ITEM_LIMIT]
+            return [
+                (item, self._deterministic_relevance_score(item, required_terms))
+                for item in candidates[:RADAR_ITEM_LIMIT]
+            ]
 
         candidate_by_id = {item.id: item for item in candidates}
         try:
@@ -247,14 +259,22 @@ class MockTechRadarAgent:
                 schema_name="radar_candidate_selection",
             )
             return [
-                candidate_by_id[item_id]
-                for item_id in selection.selected_ids
-                if item_id in candidate_by_id
+                (candidate_by_id[item.id], item.relevance_score)
+                for item in selection.selections
+                if item.id in candidate_by_id and item.relevance_score >= 3
             ][:RADAR_ITEM_LIMIT]
         except Exception:
             # Network/model failure should preserve a useful deterministic
             # result rather than breaking the whole Radar session.
-            return candidates[:RADAR_ITEM_LIMIT]
+            return [
+                (item, self._deterministic_relevance_score(item, required_terms))
+                for item in candidates[:RADAR_ITEM_LIMIT]
+            ]
+
+    def _deterministic_relevance_score(self, source_item: SourceItem, required_terms: List[str]) -> int:
+        haystack = " ".join([source_item.title, source_item.summary]).lower()
+        matches = sum(term in haystack for term in self._context_match_terms(required_terms))
+        return 5 if matches >= 3 else 4 if matches >= 2 else 3
 
     def _build_search_plan(
         self,
@@ -424,6 +444,7 @@ class MockTechRadarAgent:
         source_item: SourceItem,
         index: int,
         radar_context: List[str],
+        relevance_score: int = 3,
     ) -> RadarItem:
         source_label = source_item.source.value
         summary = source_item.summary.strip() or "该来源缺少摘要，需要打开原文确认核心内容。"
@@ -443,6 +464,8 @@ class MockTechRadarAgent:
             url=source_item.url,
             signal_type=signal_type,
             summary=self._summary_for_source(source_item),
+            published_at=source_item.published_at,
+            relevance_score=max(1, min(relevance_score, 5)),
             technical_substance=summary,
             marketing_noise=self._noise_for_source(source_item),
             why_it_matters=self._why_source_matters(source_item),

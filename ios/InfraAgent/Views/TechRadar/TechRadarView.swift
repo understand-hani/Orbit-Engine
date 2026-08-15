@@ -244,6 +244,8 @@ struct TechRadarView: View {
                 evidenceStatus: evidenceStatusText(for: item),
                 sourceType: input.sourceLabel,
                 sourceDetail: input.sourceDetail,
+                publishedAt: item.publishedAt,
+                relevanceScore: item.relevanceScore,
                 userMark: item.userMark,
                 sourceURL: item.url?.absoluteString
             )
@@ -611,6 +613,8 @@ private struct RadarDecision: Identifiable {
     let evidenceStatus: String
     let sourceType: String
     let sourceDetail: String
+    let publishedAt: Date?
+    let relevanceScore: Int
     let userMark: String
     let sourceURL: String?
 }
@@ -804,6 +808,12 @@ private struct RadarDecisionCardView: View {
                     .foregroundStyle(.tertiary)
             }
             RadarSummaryLine(title: "摘要", value: decision.whatChanged)
+            HStack(spacing: 10) {
+                Label(radarPublishedDate(decision.publishedAt), systemImage: "calendar")
+                RadarRelevanceStars(score: decision.relevanceScore)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
             RadarSummaryLine(title: "路由动作", value: decision.route)
             TagRow(tags: [decision.sourceType, "可点开详情"])
         }
@@ -839,6 +849,8 @@ private struct RadarDecisionDetailView: View {
             Section("信号判断") {
                 RadarSummaryLine(title: "来源方式", value: decision.sourceType)
                 RadarSummaryLine(title: "来源详情", value: decision.sourceDetail)
+                RadarSummaryLine(title: "发布日期", value: radarPublishedDate(decision.publishedAt))
+                RadarSummaryLine(title: "Agent 相关度", value: "\(decision.relevanceScore) / 5")
                 RadarSummaryLine(title: "摘要", value: decision.whatChanged)
                 RadarSummaryLine(title: "为什么和我有关", value: decision.whyRelevant)
                 RadarSummaryLine(title: "噪音 / 可信度判断", value: decision.noiseJudgement)
@@ -975,6 +987,25 @@ private struct RadarDecisionDetailView: View {
             return "已完成"
         default:
             return mark.isEmpty ? "未设置" : mark
+        }
+    }
+}
+
+private func radarPublishedDate(_ date: Date?) -> String {
+    guard let date else { return "发布日期未知" }
+    return date.formatted(.dateTime.year().month().day())
+}
+
+private struct RadarRelevanceStars: View {
+    let score: Int
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(1...5, id: \.self) { index in
+                Image(systemName: index <= max(1, min(score, 5)) ? "star.fill" : "star")
+                    .foregroundStyle(index <= max(1, min(score, 5)) ? .orange : .tertiary)
+            }
+            Text("相关度")
         }
     }
 }

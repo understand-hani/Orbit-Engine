@@ -67,6 +67,8 @@ struct RadarItem: Codable, Identifiable {
     let url: URL?
     let signalType: String
     let summary: String
+    let publishedAt: Date?
+    let relevanceScore: Int
     let technicalSubstance: String
     let marketingNoise: String
     let whyItMatters: String
@@ -87,6 +89,8 @@ struct RadarItem: Codable, Identifiable {
         case url
         case signalType = "signal_type"
         case summary
+        case publishedAt = "published_at"
+        case relevanceScore = "relevance_score"
         case technicalSubstance = "technical_substance"
         case marketingNoise = "marketing_noise"
         case whyItMatters = "why_it_matters"
@@ -108,6 +112,8 @@ struct RadarItem: Codable, Identifiable {
         url: URL?,
         signalType: String,
         summary: String,
+        publishedAt: Date? = nil,
+        relevanceScore: Int = 3,
         technicalSubstance: String,
         marketingNoise: String,
         whyItMatters: String,
@@ -127,6 +133,8 @@ struct RadarItem: Codable, Identifiable {
         self.url = url
         self.signalType = signalType
         self.summary = summary
+        self.publishedAt = publishedAt
+        self.relevanceScore = relevanceScore
         self.technicalSubstance = technicalSubstance
         self.marketingNoise = marketingNoise
         self.whyItMatters = whyItMatters
@@ -149,6 +157,8 @@ struct RadarItem: Codable, Identifiable {
         url = try container.decodeIfPresent(URL.self, forKey: .url)
         signalType = try container.decode(String.self, forKey: .signalType)
         summary = try container.decode(String.self, forKey: .summary)
+        publishedAt = try container.decodeIfPresent(Date.self, forKey: .publishedAt)
+        relevanceScore = try container.decodeIfPresent(Int.self, forKey: .relevanceScore) ?? 3
         technicalSubstance = try container.decodeIfPresent(String.self, forKey: .technicalSubstance) ?? ""
         marketingNoise = try container.decodeIfPresent(String.self, forKey: .marketingNoise) ?? ""
         whyItMatters = try container.decodeIfPresent(String.self, forKey: .whyItMatters) ?? ""

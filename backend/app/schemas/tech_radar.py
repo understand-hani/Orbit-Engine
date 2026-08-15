@@ -59,6 +59,8 @@ class RadarItem(BaseModel):
     url: Optional[HttpUrl] = None
     signal_type: str
     summary: str
+    published_at: Optional[datetime] = None
+    relevance_score: int = 3
     technical_substance: str = ""
     marketing_noise: str = ""
     why_it_matters: str

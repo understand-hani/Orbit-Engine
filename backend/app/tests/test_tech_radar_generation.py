@@ -314,6 +314,8 @@ def test_radar_item_marks_metadata_only_when_page_unreadable():
 
     assert item.source_passages == []
     assert item.evidence_status == "metadata_only"
+    assert item.published_at == source_item.published_at
+    assert item.relevance_score == 3
 
 
 def test_tech_radar_refresh_does_not_fallback_to_mock_items():
