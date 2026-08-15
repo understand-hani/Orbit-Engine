@@ -68,9 +68,14 @@ final class APIClient {
         return try await send(request)
     }
 
-    func post<T: Decodable>(_ path: String, queryItems: [URLQueryItem] = []) async throws -> T {
+    func post<T: Decodable>(
+        _ path: String,
+        queryItems: [URLQueryItem] = [],
+        timeoutInterval: TimeInterval = AppConfig.apiTimeoutInterval
+    ) async throws -> T {
         var request = try makeRequest(path: path, queryItems: queryItems)
         request.httpMethod = "POST"
+        request.timeoutInterval = timeoutInterval
         return try await send(request)
     }
 

@@ -903,7 +903,7 @@ private struct RadarDecisionDetailView: View {
             }
 
             Section("具体观察") {
-                Text(decision.observation)
+                Text(enrichedItem?.agentObservation ?? decision.observation)
                     .font(.subheadline)
             }
 

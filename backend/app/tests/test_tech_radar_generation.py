@@ -9,7 +9,7 @@ from app.schemas.common import TaskType
 from app.schemas.source import CombinedSearchResponse, SourceItem, SourceItemType, SourceType
 from app.schemas.tech_radar import RadarDigest, RadarScope, RadarType, TechRadarPayload
 from app.schemas.user_context import PersonalProfile, UserContext, UserPreference, WorkLearningPlan
-from app.agents.tech_radar_agent import MockTechRadarAgent
+from app.agents.tech_radar_agent import MockTechRadarAgent, RadarDetailJudgement
 from app.services.feed_service import FeedService
 from app.services.user_context_service import UserContextService
 
@@ -93,6 +93,8 @@ def test_saved_tech_radar_sessions_exclude_previous_source_urls():
         assert len(first_urls) == 3
         assert len(second_urls) == 3
         assert first_urls.isdisjoint(second_urls)
+        assert max(item.relevance_score for item in first.payload.digest.items) == 5
+        assert max(item.relevance_score for item in second.payload.digest.items) == 5
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)
@@ -404,10 +406,44 @@ def test_radar_item_marks_metadata_only_when_page_unreadable():
     assert item.evidence_status == "metadata_only"
     assert item.published_at == source_item.published_at
     assert item.relevance_score == 3
-    assert item.agent_observation == source_item.summary
+    assert item.agent_observation == ""
     assert item.summary == agent._summary_for_source(source_item)
     assert item.why_it_matters == agent._why_source_matters(source_item)
     assert item.marketing_noise == agent._noise_for_source(source_item)
+
+
+def test_radar_promotes_one_selected_material_to_five_stars():
+    agent = MockTechRadarAgent()
+    candidates = [
+        SourceItem(
+            id=f"candidate_{index}",
+            source=SourceType.web,
+            item_type=SourceItemType.article,
+            title=f"Candidate {index}",
+            summary="A relevant update.",
+        )
+        for index in range(3)
+    ]
+
+    rated = agent._ensure_five_star_candidate(
+        [(candidates[0], 4), (candidates[1], 3), (candidates[2], 4)]
+    )
+
+    assert sum(score == 5 for _, score in rated) == 1
+    assert rated[0][1] == 5
+
+
+def test_radar_detail_observation_is_complete_and_within_requested_length():
+    observation = "这是一段基于原文事实进行提炼的完整观察，包含事件变化、实质内容、适用边界与需要继续核验的证据。" * 5
+    judgement = RadarDetailJudgement(
+        observation=observation,
+        summary="该来源报告了一项与当前方向直接相关的具体产品或研发进展。",
+        why_it_matters="该变化可用于校准当前目标和本周计划中的技术路线优先级。",
+        noise_judgement="目前仍需核对一手来源、适用范围和实际验证数据，避免仅凭报道下结论。",
+    )
+
+    assert judgement.observation == observation
+    assert 200 <= len(judgement.observation) <= 500
 
 
 def test_tech_radar_refresh_does_not_fallback_to_mock_items():

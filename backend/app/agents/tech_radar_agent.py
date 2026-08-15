@@ -79,7 +79,6 @@ class RadarSearchPlan(BaseModel):
 class RadarCandidateRating(BaseModel):
     id: str
     relevance_score: int = Field(ge=1, le=5)
-    agent_observation: str = Field(default="", max_length=220)
 
 
 class RadarCandidateSelection(BaseModel):
@@ -87,9 +86,10 @@ class RadarCandidateSelection(BaseModel):
 
 
 class RadarDetailJudgement(BaseModel):
-    summary: str = ""
-    why_it_matters: str = ""
-    noise_judgement: str = ""
+    observation: str = Field(min_length=200, max_length=500)
+    summary: str = Field(min_length=20, max_length=160)
+    why_it_matters: str = Field(min_length=20, max_length=160)
+    noise_judgement: str = Field(min_length=20, max_length=160)
 
 
 RADAR_SEARCH_PLANNER_PROMPT = """
@@ -129,21 +129,24 @@ For each selected candidate, assign relevance_score using this exact rubric:
 - 3: a clearly useful secondary or enabling connection.
 - 1-2: broad-field or weakly related; do not select these.
 Rate candidates comparatively. Do not assign 5 to every selected result; use
-5 sparingly, normally for no more than one result in a run.
-For every selected candidate, write agent_observation as one complete concise
-Chinese paragraph, roughly 80-160 Chinese characters: state the concrete
-signal, explain its relationship to the current goal/weekly plan, and name one
-verification caveat. End the paragraph naturally. Do not repeat the title, use
-generic filler, or write a long research summary.
+5 sparingly, normally for one result in a run. When selecting any candidates,
+at least one must receive relevance_score 5 as the strongest material in this
+Radar run. Return only candidate IDs and relevance scores; do not write summaries,
+observations, explanations, or other prose on this selection path.
 Return only JSON matching the supplied schema.
 """.strip()
 
 
 RADAR_DETAIL_JUDGEMENT_PROMPT = """
-You write three concise, evidence-bound Chinese judgments for one Signal Radar
-detail page. Use only the supplied signal and user direction. Do not invent
-facts, experiments, product capabilities, or source verification.
+You write four evidence-bound Chinese fields for one Signal Radar detail page.
+Use only the supplied original passages, search metadata, and user direction.
+Do not invent facts, experiments, product capabilities, or source verification.
 
+- observation: synthesize the original passages into one coherent, complete
+  Chinese paragraph of 200-500 Chinese characters. Capture the concrete event,
+  technical/product substance, and important boundary. Do not cut off mid-sentence.
+  When no original passage is available, explicitly say the judgment is based
+  only on search metadata rather than pretending the original article was read.
 - summary: objectively state what changed or was reported, 60-120 Chinese characters.
 - why_it_matters: explain the specific connection to the user's current goal
   and weekly plan, 60-120 Chinese characters; do not give a generic Radar explanation.
@@ -208,6 +211,15 @@ class MockTechRadarAgent:
         settings = get_settings()
         if user_context is None or settings.llm_provider.lower() != "openrouter" or not settings.openrouter_api_key:
             return item
+        original_passages = [passage.excerpt for passage in item.source_passages[:5]]
+        if not original_passages and item.url:
+            try:
+                original_passages = self.search_service.fetch_web_passages(
+                    str(item.url),
+                    max_passages=5,
+                )
+            except Exception:
+                original_passages = []
         try:
             judgement = OpenRouterChatService().generate_json(
                 system_prompt=RADAR_DETAIL_JUDGEMENT_PROMPT,
@@ -224,7 +236,8 @@ class MockTechRadarAgent:
                         "source": item.source,
                         "summary": item.summary,
                         "technical_substance": item.technical_substance,
-                        "source_passages": [passage.excerpt[:500] for passage in item.source_passages[:3]],
+                        "original_passages": original_passages,
+                        "source_basis": "original_passages" if original_passages else "search_metadata_only",
                         "evidence_status": item.evidence_status,
                         "published_at": item.published_at.isoformat() if item.published_at else "",
                     },
@@ -239,6 +252,10 @@ class MockTechRadarAgent:
 
         return item.model_copy(
             update={
+                "agent_observation": self._normalize_agent_text(
+                    judgement.observation,
+                    item.agent_observation,
+                ),
                 "summary": self._normalize_agent_text(judgement.summary, item.summary),
                 "why_it_matters": self._normalize_agent_text(judgement.why_it_matters, item.why_it_matters),
                 "marketing_noise": self._normalize_agent_text(judgement.noise_judgement, item.marketing_noise),
@@ -339,10 +356,10 @@ class MockTechRadarAgent:
             return []
         settings = get_settings()
         if user_context is None or settings.llm_provider.lower() != "openrouter" or not settings.openrouter_api_key:
-            return [
+            return self._ensure_five_star_candidate([
                 (item, self._deterministic_relevance_score(item, required_terms))
                 for item in candidates[:RADAR_ITEM_LIMIT]
-            ]
+            ])
 
         candidate_by_id = {item.id: item for item in candidates}
         try:
@@ -375,21 +392,27 @@ class MockTechRadarAgent:
                 for item in selection.selections
                 if item.id in candidate_by_id and item.relevance_score >= 3
             ]
-            for item in selection.selections:
-                source_item = candidate_by_id.get(item.id)
-                if source_item is not None and item.relevance_score >= 3:
-                    source_item.extra["agent_observation"] = self._normalize_agent_observation(
-                        item.agent_observation,
-                        source_item,
-                    )
-            return self._fill_minimum_radar_candidates(selected, candidates, required_terms)
+            filled = self._fill_minimum_radar_candidates(selected, candidates, required_terms)
+            return self._ensure_five_star_candidate(filled)
         except Exception:
             # Network/model failure should preserve a useful deterministic
             # result rather than breaking the whole Radar session.
-            return [
+            return self._ensure_five_star_candidate([
                 (item, self._deterministic_relevance_score(item, required_terms))
                 for item in candidates[:RADAR_ITEM_LIMIT]
-            ]
+            ])
+
+    def _ensure_five_star_candidate(
+        self,
+        selected: List[tuple[SourceItem, int]],
+    ) -> List[tuple[SourceItem, int]]:
+        if not selected or any(score == 5 for _, score in selected):
+            return selected
+        strongest_index = max(range(len(selected)), key=lambda index: selected[index][1])
+        return [
+            (item, 5 if index == strongest_index else score)
+            for index, (item, score) in enumerate(selected)
+        ]
 
     def _fill_minimum_radar_candidates(
         self,
@@ -655,10 +678,7 @@ class MockTechRadarAgent:
             summary=self._summary_for_source(source_item),
             published_at=source_item.published_at,
             relevance_score=max(1, min(relevance_score, 5)),
-            agent_observation=self._normalize_agent_observation(
-                str(source_item.extra.get("agent_observation", "")),
-                source_item,
-            ),
+            agent_observation="",
             technical_substance=summary,
             marketing_noise=self._noise_for_source(source_item),
             why_it_matters=self._why_source_matters(source_item),
