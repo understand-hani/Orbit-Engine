@@ -80,6 +80,9 @@ class RadarCandidateRating(BaseModel):
     id: str
     relevance_score: int = Field(ge=1, le=5)
     agent_observation: str = ""
+    agent_summary: str = ""
+    agent_why_it_matters: str = ""
+    agent_noise_judgement: str = ""
 
 
 class RadarCandidateSelection(BaseModel):
@@ -128,6 +131,13 @@ For every selected candidate, write agent_observation in concise Chinese,
 roughly 100-300 Chinese characters: state the concrete signal, explain its
 relationship to the current goal/weekly plan, and name one verification caveat.
 Do not repeat the title, use generic filler, or write a long research summary.
+Also write these three concise Chinese fields, each roughly 60-120 characters
+and grounded only in the supplied candidate and user direction:
+- agent_summary: what objectively changed or was reported.
+- agent_why_it_matters: the specific connection to this user's current goal
+  and weekly plan; do not use a generic Radar explanation.
+- agent_noise_judgement: source/claim limits and the one most important thing
+  to verify. Do not claim the item is verified when only metadata is present.
 Return only JSON matching the supplied schema.
 """.strip()
 
@@ -314,6 +324,18 @@ class MockTechRadarAgent:
                         item.agent_observation,
                         source_item,
                     )
+                    source_item.extra["agent_summary"] = self._normalize_agent_text(
+                        item.agent_summary,
+                        source_item.summary,
+                    )
+                    source_item.extra["agent_why_it_matters"] = self._normalize_agent_text(
+                        item.agent_why_it_matters,
+                        "",
+                    )
+                    source_item.extra["agent_noise_judgement"] = self._normalize_agent_text(
+                        item.agent_noise_judgement,
+                        "",
+                    )
             return self._fill_minimum_radar_candidates(selected, candidates, required_terms)
         except Exception:
             # Network/model failure should preserve a useful deterministic
@@ -371,6 +393,12 @@ class MockTechRadarAgent:
             return compacted[:300].rstrip()
         fallback = re.sub(r"\s+", " ", source_item.summary).strip() or source_item.title.strip()
         return fallback[:300].rstrip()
+
+    def _normalize_agent_text(self, value: str, fallback: str) -> str:
+        compacted = re.sub(r"\s+", " ", value).strip()
+        if compacted:
+            return compacted[:140].rstrip()
+        return re.sub(r"\s+", " ", fallback).strip()[:140].rstrip()
 
     def _build_search_plan(
         self,
@@ -578,7 +606,7 @@ class MockTechRadarAgent:
             source=source_label,
             url=source_item.url,
             signal_type=signal_type,
-            summary=self._summary_for_source(source_item),
+            summary=source_item.extra.get("agent_summary") or self._summary_for_source(source_item),
             published_at=source_item.published_at,
             relevance_score=max(1, min(relevance_score, 5)),
             agent_observation=self._normalize_agent_observation(
@@ -586,8 +614,8 @@ class MockTechRadarAgent:
                 source_item,
             ),
             technical_substance=summary,
-            marketing_noise=self._noise_for_source(source_item),
-            why_it_matters=self._why_source_matters(source_item),
+            marketing_noise=source_item.extra.get("agent_noise_judgement") or self._noise_for_source(source_item),
+            why_it_matters=source_item.extra.get("agent_why_it_matters") or self._why_source_matters(source_item),
             evidence_status=self._evidence_status(source_item, source_passages),
             source_passages=source_passages,
             visuals=[],

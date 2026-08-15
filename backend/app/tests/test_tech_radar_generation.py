@@ -316,7 +316,13 @@ def test_radar_source_passages_separate_excerpt_and_agent_analysis():
         summary="该产品面向证券机构，提供平台化风险管理能力。",
         published_at=datetime(2026, 8, 12, tzinfo=timezone.utc),
         tags=["public_web", "金融科技日报"],
-        extra={"publisher": "金融科技日报", "publisher_url": "https://example.com"},
+        extra={
+            "publisher": "金融科技日报",
+            "publisher_url": "https://example.com",
+            "agent_summary": "该公司公布了面向证券机构的风控产品更新，当前仅有来源摘要可核对。",
+            "agent_why_it_matters": "它与量化交易风控平台方向直接相连，可用于判断产品能力是否覆盖当前计划的风险管理环节。",
+            "agent_noise_judgement": "需要核对官网功能说明和真实客户案例，不能仅凭媒体摘要判断产品效果。",
+        },
     )
 
     passages = agent._source_passages(source_item, source_item.summary, ["量化交易风控平台"])
@@ -345,7 +351,13 @@ def test_radar_source_passages_empty_when_page_unreadable():
         summary="该产品面向证券机构，提供平台化风险管理能力。",
         published_at=datetime(2026, 8, 12, tzinfo=timezone.utc),
         tags=["public_web", "金融科技日报"],
-        extra={"publisher": "金融科技日报", "publisher_url": "https://example.com"},
+        extra={
+            "publisher": "金融科技日报",
+            "publisher_url": "https://example.com",
+            "agent_summary": "该公司公布了面向证券机构的风控产品更新，当前仅有来源摘要可核对。",
+            "agent_why_it_matters": "它与量化交易风控平台方向直接相连，可用于判断产品能力是否覆盖当前计划的风险管理环节。",
+            "agent_noise_judgement": "需要核对官网功能说明和真实客户案例，不能仅凭媒体摘要判断产品效果。",
+        },
     )
 
     passages = agent._source_passages(source_item, source_item.summary, ["量化交易风控平台"])
@@ -364,7 +376,13 @@ def test_radar_item_marks_metadata_only_when_page_unreadable():
         summary="该产品面向证券机构，提供平台化风险管理能力。",
         published_at=datetime(2026, 8, 12, tzinfo=timezone.utc),
         tags=["public_web", "金融科技日报"],
-        extra={"publisher": "金融科技日报", "publisher_url": "https://example.com"},
+        extra={
+            "publisher": "金融科技日报",
+            "publisher_url": "https://example.com",
+            "agent_summary": "该公司公布了面向证券机构的风控产品更新，当前仅有来源摘要可核对。",
+            "agent_why_it_matters": "它与量化交易风控平台方向直接相连，可用于判断产品能力是否覆盖当前计划的风险管理环节。",
+            "agent_noise_judgement": "需要核对官网功能说明和真实客户案例，不能仅凭媒体摘要判断产品效果。",
+        },
     )
 
     item = agent._radar_item_from_source(
@@ -387,6 +405,9 @@ def test_radar_item_marks_metadata_only_when_page_unreadable():
     assert item.published_at == source_item.published_at
     assert item.relevance_score == 3
     assert item.agent_observation == source_item.summary
+    assert item.summary == source_item.extra["agent_summary"]
+    assert item.why_it_matters == source_item.extra["agent_why_it_matters"]
+    assert item.marketing_noise == source_item.extra["agent_noise_judgement"]
 
 
 def test_tech_radar_refresh_does_not_fallback_to_mock_items():
