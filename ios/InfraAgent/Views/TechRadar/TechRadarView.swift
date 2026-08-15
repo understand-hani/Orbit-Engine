@@ -4,6 +4,7 @@ import SwiftUI
 struct TechRadarView: View {
     let session: BaseSession
     let payload: TechRadarPayload
+    let onCompleted: ((BaseSession) -> Void)?
 
     @State private var currentSession: BaseSession
     @State private var currentPayload: TechRadarPayload
@@ -16,9 +17,14 @@ struct TechRadarView: View {
     private let contextAPI = UserContextAPI()
     private let sessionAPI = SessionAPI()
 
-    init(session: BaseSession, payload: TechRadarPayload) {
+    init(
+        session: BaseSession,
+        payload: TechRadarPayload,
+        onCompleted: ((BaseSession) -> Void)? = nil
+    ) {
         self.session = session
         self.payload = payload
+        self.onCompleted = onCompleted
         _currentSession = State(initialValue: session)
         _currentPayload = State(initialValue: payload)
     }
@@ -149,6 +155,32 @@ struct TechRadarView: View {
                     }
                 }
             }
+
+            if radarRun != nil {
+                if currentSession.status == .completed || currentSession.status == .archived {
+                    Section("Signal Radar 归档") {
+                        Label("该 Signal Radar 已作为完整卡片保存到归档", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    PartRecordFormView(
+                        session: currentSession,
+                        defaultSummary: "完成了 \(currentSession.title)：筛选并判断了本轮外部信号。",
+                        defaultKeyInsight: radarArchiveKeyInsight,
+                        sourceTitle: currentSession.title,
+                        sourceSummary: currentPayload.digest.summary,
+                        userNotes: radarArchiveNotes,
+                        sectionTitle: "Signal Radar 归档",
+                        status: "completed",
+                        completesSession: true,
+                        onSessionCompleted: { completedSession in
+                            currentSession = completedSession
+                            message = "已按 \(completedSession.title) 保存到归档"
+                            onCompleted?(completedSession)
+                        }
+                    )
+                }
+            }
         }
         .navigationTitle("技术雷达")
         .onAppear {
@@ -180,6 +212,21 @@ struct TechRadarView: View {
             return "当前 Signal Radar 引用 payload 中的 scope、top signals 和外部信号；用户上下文加载后会补充计划关键词、领域偏好和材料源偏好。"
         }
         return "引用字段：UserContext.plan.weekly_focus、next_action、tracking_keywords，UserContext.preferences.fields、source_preferences，以及当前 Signal Radar payload 的 top_signals、items 和 noise_filtered。"
+    }
+
+    private var radarArchiveKeyInsight: String {
+        if let topSignal = currentPayload.digest.topSignals.first,
+           !topSignal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return topSignal
+        }
+        return "本轮 Signal Radar 已完成材料筛选、相关度判断和后续路由。"
+    }
+
+    private var radarArchiveNotes: String {
+        let items = currentPayload.digest.items.prefix(3).map {
+            "\($0.title)（相关度 \($0.relevanceScore) / 5）"
+        }
+        return items.isEmpty ? "本轮没有可归档的外部信号。" : items.joined(separator: "\n")
     }
 
     private func loadContext() async {
@@ -929,17 +976,6 @@ private struct RadarDecisionDetailView: View {
                 }
             }
 
-            PartRecordFormView(
-                session: session,
-                defaultSummary: "Signal Radar 判断：\(decision.title)。\(decision.whatChanged)",
-                defaultKeyInsight: decision.whyRelevant,
-                sourceTitle: decision.title,
-                sourceURL: decision.sourceURL,
-                sourceSummary: decision.introduction,
-                userNotes: "来源方式：\(decision.sourceType)\n来源详情：\(decision.sourceDetail)\n噪音判断：\(decision.noiseJudgement)\n路由动作：\(decision.route)",
-                sectionTitle: "Signal Radar Check-in",
-                status: "completed"
-            )
         }
         .navigationTitle("Signal Radar 详情")
         .task {
@@ -1134,18 +1170,6 @@ struct TechRadarItemDetailView: View {
                     Label("和 Agent 讨论", systemImage: "bubble.left.and.bubble.right")
                 }
             }
-
-            PartRecordFormView(
-                session: session,
-                defaultSummary: item.summary,
-                defaultKeyInsight: item.whyItMatters.isEmpty ? item.technicalSubstance : item.whyItMatters,
-                sourceTitle: item.title,
-                sourceURL: item.url?.absoluteString,
-                sourceSummary: item.summary,
-                userNotes: "来源：\(item.source)\n噪音判断：\(item.marketingNoise)",
-                sectionTitle: "Signal Radar Check-in",
-                status: "completed"
-            )
 
             Section("视觉材料") {
                 ForEach(item.visuals) { visual in

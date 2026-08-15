@@ -17,6 +17,7 @@ class CheckinStatus(str, Enum):
 class Checkin(BaseModel):
     id: str
     session_id: str
+    session_title: str = ""
     date: date
     task_type: TaskType
     duration_min: int

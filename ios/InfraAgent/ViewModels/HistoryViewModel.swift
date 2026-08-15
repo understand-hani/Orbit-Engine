@@ -22,7 +22,7 @@ final class HistoryViewModel: ObservableObject {
         do {
             let loadedCheckins = try await checkinAPI.list()
             checkins = loadedCheckins
-            archivedSessionsByID = await loadArchivedSessions(for: loadedCheckins)
+            archivedSessionsByID = await loadSessions(for: loadedCheckins)
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -72,17 +72,20 @@ final class HistoryViewModel: ObservableObject {
     }
 
     func archivedSessionTitle(for checkin: Checkin) -> String? {
-        archivedSessionsByID[checkin.sessionID]?.title
+        if let storedTitle = checkin.sessionTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !storedTitle.isEmpty {
+            return storedTitle
+        }
+        return archivedSessionsByID[checkin.sessionID]?.title
     }
 
     private var timelineCheckins: [Checkin] {
         checkins.filter { $0.status == "completed" }
     }
 
-    private func loadArchivedSessions(for checkins: [Checkin]) async -> [String: BaseSession] {
-        let archivedCheckins = checkins.filter { $0.status == "archived" }
+    private func loadSessions(for checkins: [Checkin]) async -> [String: BaseSession] {
         var sessionsByID: [String: BaseSession] = [:]
-        for checkin in archivedCheckins {
+        for checkin in checkins {
             guard sessionsByID[checkin.sessionID] == nil else {
                 continue
             }

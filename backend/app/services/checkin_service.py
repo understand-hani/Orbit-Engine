@@ -38,9 +38,11 @@ class CheckinService:
         self.llm = OpenRouterChatService()
 
     def create_checkin(self, request: CheckinCreate) -> Checkin:
+        session = self.sessions.get_by_id(request.session_id)
         checkin = Checkin(
             id=f"checkin_{uuid4().hex[:12]}",
             created_at=datetime.now(timezone.utc),
+            session_title=session.title if session is not None else "",
             **request.model_dump(),
         )
         return self.checkins.save(checkin)

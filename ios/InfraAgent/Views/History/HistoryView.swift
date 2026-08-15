@@ -18,7 +18,11 @@ struct HistoryView: View {
                     ForEach(viewModel.groupedDates, id: \.self) { date in
                         let dayCheckins = viewModel.checkins(on: date)
                         NavigationLink {
-                            DailyHistoryView(date: date, checkins: dayCheckins)
+                            DailyHistoryView(
+                                date: date,
+                                checkins: dayCheckins,
+                                sessionTitlesByID: viewModel.archivedSessionsByID.mapValues { $0.title }
+                            )
                         } label: {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(date)
@@ -41,7 +45,10 @@ struct HistoryView: View {
                     } else {
                         ForEach(viewModel.archivedCheckins) { checkin in
                             NavigationLink {
-                                CheckinDetailView(checkin: checkin)
+                                CheckinDetailView(
+                                    checkin: checkin,
+                                    sessionTitle: viewModel.archivedSessionTitle(for: checkin)
+                                )
                             } label: {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(archivedTitle(for: checkin))
@@ -77,24 +84,15 @@ struct HistoryView: View {
     }
 
     private func archivedTitle(for checkin: Checkin) -> String {
-        if checkin.taskType == .techRadar {
-            if let sourceTitle = nonEmpty(checkin.sourceTitle) {
-                return "Signal Radar：\(sourceTitle)"
-            }
-            return nonEmpty(checkin.summary) ?? "Signal Radar 暂存信号"
+        if let sessionTitle = nonEmpty(viewModel.archivedSessionTitle(for: checkin)) {
+            return sessionTitle
         }
 
         let displayDate = checkin.date.replacingOccurrences(of: "-", with: "/")
-        let prefix = "Deep Dive-\(displayDate)-"
-        if let sessionTitle = viewModel.archivedSessionTitle(for: checkin),
-           sessionTitle.hasPrefix(prefix) {
-            return sessionTitle
-        }
+        let prefix = checkin.taskType == .techRadar
+            ? "Signal Radar-\(displayDate)-No."
+            : "Deep Dive-\(displayDate)-No."
         let legacySessionPrefix = "Deep Dive-\(checkin.date)-"
-        if let sessionTitle = viewModel.archivedSessionTitle(for: checkin),
-           sessionTitle.hasPrefix(legacySessionPrefix) {
-            return sessionTitle.replacingOccurrences(of: legacySessionPrefix, with: prefix)
-        }
         if checkin.summary.contains(prefix),
            let range = checkin.summary.range(of: prefix) {
             return String(checkin.summary[range.lowerBound...])
@@ -104,7 +102,7 @@ struct HistoryView: View {
             return String(checkin.summary[range.lowerBound...])
                 .replacingOccurrences(of: legacySessionPrefix, with: prefix)
         }
-        return "\(prefix)1"
+        return nonEmpty(checkin.sourceTitle) ?? "\(prefix)1"
     }
 
     private func nonEmpty(_ value: String?) -> String? {

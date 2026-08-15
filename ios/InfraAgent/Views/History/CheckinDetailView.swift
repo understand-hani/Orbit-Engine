@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CheckinDetailView: View {
     let checkin: Checkin
+    let sessionTitle: String?
 
     @State private var loadedSourceContext: CheckinSourceContext?
     @State private var sourceLoadMessage: String?
@@ -51,7 +52,7 @@ struct CheckinDetailView: View {
                 }
             }
         }
-        .navigationTitle("归档记录")
+        .navigationTitle(nonEmpty(sessionTitle) ?? "归档记录")
         .task {
             await loadSourceContextIfNeeded()
         }

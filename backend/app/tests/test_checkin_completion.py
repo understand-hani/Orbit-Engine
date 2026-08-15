@@ -47,6 +47,7 @@ def test_confirm_completion_updates_session_and_creates_checkin():
         checkin = result["checkin"]
         assert updated_session.completion.user_confirmed_status == CompletionSuggestion.partial
         assert checkin.session_id == session.id
+        assert checkin.session_title == session.title
         assert checkin.source_title == "Boundless Agents"
         assert checkin.source_url == "https://example.com/paper"
         assert checkin.source_summary == "论文主旨摘要。"
@@ -416,6 +417,7 @@ def test_archive_session_marks_session_archived_and_creates_checkin():
         assert checkins[0].status.value == "archived"
         title_date = session.date.strftime("%Y/%m/%d")
         assert checkins[0].summary == f"已暂存：Deep Dive-{title_date}-No.1"
+        assert checkins[0].session_title == f"Deep Dive-{title_date}-No.1"
 
         restored_session = feed_service.restore_session(session.id)
         assert restored_session is not None
@@ -452,6 +454,7 @@ def test_archive_and_restore_preserve_deep_dive_title():
         assert archived_second.title == f"Deep Dive-{title_date}-No.2"
         checkins = checkin_service.list_checkins(second.date.isoformat())
         assert checkins[0].summary == f"已暂存：Deep Dive-{title_date}-No.2"
+        assert checkins[0].session_title == f"Deep Dive-{title_date}-No.2"
 
         third = feed_service.generate_and_save_mock_session(first.date, task_type=TaskType.research_feeder)
         assert third.title == f"Deep Dive-{title_date}-No.3"

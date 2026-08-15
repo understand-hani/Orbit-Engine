@@ -440,6 +440,7 @@ class FeedService:
             Checkin(
                 id=f"checkin_{uuid4().hex[:12]}",
                 session_id=session.id,
+                session_title=session.title,
                 date=session.date,
                 task_type=session.task_type,
                 duration_min=0,

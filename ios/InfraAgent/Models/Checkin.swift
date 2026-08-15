@@ -3,6 +3,7 @@ import Foundation
 struct Checkin: Codable, Identifiable {
     let id: String
     let sessionID: String
+    let sessionTitle: String?
     let date: String
     let taskType: TaskType
     let durationMin: Int
@@ -19,6 +20,7 @@ struct Checkin: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id
         case sessionID = "session_id"
+        case sessionTitle = "session_title"
         case date
         case taskType = "task_type"
         case durationMin = "duration_min"

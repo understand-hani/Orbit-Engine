@@ -3,6 +3,7 @@ import SwiftUI
 struct DailyHistoryView: View {
     let date: String
     let checkins: [Checkin]
+    let sessionTitlesByID: [String: String]
 
     private var totalDuration: Int {
         checkins.reduce(0) { $0 + $1.durationMin }
@@ -19,17 +20,18 @@ struct DailyHistoryView: View {
             Section("归档记录") {
                 ForEach(checkins) { checkin in
                     NavigationLink {
-                        CheckinDetailView(checkin: checkin)
+                        CheckinDetailView(
+                            checkin: checkin,
+                            sessionTitle: cardTitle(for: checkin)
+                        )
                     } label: {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(checkin.summary)
+                            Text(cardTitle(for: checkin))
                                 .font(.headline)
-                            if let sourceTitle = nonEmpty(checkin.sourceTitle) {
-                                Text(sourceTitle)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                            }
+                            Text(checkin.summary)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
                             Text("\(checkin.taskType.rawValue) · \(statusLabel(checkin.status)) · \(checkin.durationMin) 分钟")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -39,6 +41,16 @@ struct DailyHistoryView: View {
             }
         }
         .navigationTitle(date)
+    }
+
+    private func cardTitle(for checkin: Checkin) -> String {
+        if let title = nonEmpty(checkin.sessionTitle) {
+            return title
+        }
+        if let title = nonEmpty(sessionTitlesByID[checkin.sessionID]) {
+            return title
+        }
+        return nonEmpty(checkin.sourceTitle) ?? checkin.summary
     }
 
     private func nonEmpty(_ value: String?) -> String? {

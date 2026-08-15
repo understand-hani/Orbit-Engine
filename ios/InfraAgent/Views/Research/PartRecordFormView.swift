@@ -10,6 +10,8 @@ struct PartRecordFormView: View {
     let userNotes: String?
     let sectionTitle: String
     let status: String
+    let completesSession: Bool
+    let onSessionCompleted: ((BaseSession) -> Void)?
 
     @State private var summary: String
     @State private var keyInsight: String
@@ -29,7 +31,9 @@ struct PartRecordFormView: View {
         sourceSummary: String? = nil,
         userNotes: String? = nil,
         sectionTitle: String = "记录",
-        status: String = "partial"
+        status: String = "partial",
+        completesSession: Bool = false,
+        onSessionCompleted: ((BaseSession) -> Void)? = nil
     ) {
         self.session = session
         self.defaultSummary = defaultSummary
@@ -40,6 +44,8 @@ struct PartRecordFormView: View {
         self.userNotes = userNotes
         self.sectionTitle = sectionTitle
         self.status = status
+        self.completesSession = completesSession
+        self.onSessionCompleted = onSessionCompleted
         _summary = State(initialValue: defaultSummary)
         _keyInsight = State(initialValue: defaultKeyInsight)
     }
@@ -74,22 +80,40 @@ struct PartRecordFormView: View {
         defer { isSaving = false }
 
         do {
-            _ = try await checkinAPI.create(
-                CheckinCreate(
+            if completesSession {
+                let response = try await checkinAPI.confirmCompletion(
                     sessionID: session.id,
-                    date: session.date,
-                    taskType: session.taskType,
-                    durationMin: durationMin,
-                    status: status,
-                    summary: summary,
-                    keyInsight: keyInsight,
-                    nextAction: nextAction,
-                    sourceTitle: sourceTitle,
-                    sourceURL: sourceURL,
-                    sourceSummary: sourceSummary,
-                    userNotes: userNotes
+                    request: CompletionConfirmRequest(
+                        durationMin: durationMin,
+                        status: status,
+                        summary: summary,
+                        keyInsight: keyInsight,
+                        nextAction: nextAction,
+                        sourceTitle: sourceTitle,
+                        sourceURL: sourceURL,
+                        sourceSummary: sourceSummary,
+                        userNotes: userNotes
+                    )
                 )
-            )
+                onSessionCompleted?(response.session)
+            } else {
+                _ = try await checkinAPI.create(
+                    CheckinCreate(
+                        sessionID: session.id,
+                        date: session.date,
+                        taskType: session.taskType,
+                        durationMin: durationMin,
+                        status: status,
+                        summary: summary,
+                        keyInsight: keyInsight,
+                        nextAction: nextAction,
+                        sourceTitle: sourceTitle,
+                        sourceURL: sourceURL,
+                        sourceSummary: sourceSummary,
+                        userNotes: userNotes
+                    )
+                )
+            }
             message = "已保存到归档"
         } catch {
             message = error.localizedDescription

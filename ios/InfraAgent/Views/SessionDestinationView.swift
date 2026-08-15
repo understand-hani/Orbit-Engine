@@ -357,7 +357,7 @@ struct SessionDestinationView: View {
         Group {
             switch session.payload {
             case .techRadar(let payload):
-                TechRadarView(session: session, payload: payload)
+                TechRadarView(session: session, payload: payload, onCompleted: onCompleted)
             case .jdAnalysis:
                 JDIntelligenceView()
             case .researchFeeder(let payload):
