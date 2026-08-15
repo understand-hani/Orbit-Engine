@@ -326,6 +326,10 @@ struct TechRadarView: View {
     }
 
     private func observation(for item: RadarItem) -> String {
+        let agentObservation = item.agentObservation.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !agentObservation.isEmpty {
+            return agentObservation
+        }
         let substance = item.technicalSubstance.trimmingCharacters(in: .whitespacesAndNewlines)
         if !substance.isEmpty, substance != item.summary {
             return substance

@@ -52,6 +52,7 @@ class RadarSearchPlan(BaseModel):
 class RadarCandidateRating(BaseModel):
     id: str
     relevance_score: int = Field(ge=1, le=5)
+    agent_observation: str = ""
 
 
 class RadarCandidateSelection(BaseModel):
@@ -93,6 +94,10 @@ For each selected candidate, assign relevance_score using this exact rubric:
 - 1-2: broad-field or weakly related; do not select these.
 Rate candidates comparatively. Do not assign 5 to every selected result; use
 5 sparingly, normally for no more than one result in a run.
+For every selected candidate, write agent_observation in concise Chinese,
+roughly 100-300 Chinese characters: state the concrete signal, explain its
+relationship to the current goal/weekly plan, and name one verification caveat.
+Do not repeat the title, use generic filler, or write a long research summary.
 Return only JSON matching the supplied schema.
 """.strip()
 
@@ -271,6 +276,13 @@ class MockTechRadarAgent:
                 for item in selection.selections
                 if item.id in candidate_by_id and item.relevance_score >= 3
             ]
+            for item in selection.selections:
+                source_item = candidate_by_id.get(item.id)
+                if source_item is not None and item.relevance_score >= 3:
+                    source_item.extra["agent_observation"] = self._normalize_agent_observation(
+                        item.agent_observation,
+                        source_item,
+                    )
             return self._fill_minimum_radar_candidates(selected, candidates, required_terms)
         except Exception:
             # Network/model failure should preserve a useful deterministic
@@ -321,6 +333,13 @@ class MockTechRadarAgent:
         ]
         matches = sum(term in haystack for term in self._dedupe_terms(direct_terms))
         return 4 if matches >= 2 else 3
+
+    def _normalize_agent_observation(self, value: str, source_item: SourceItem) -> str:
+        compacted = re.sub(r"\s+", " ", value).strip()
+        if len(compacted) >= 40:
+            return compacted[:300].rstrip()
+        fallback = re.sub(r"\s+", " ", source_item.summary).strip() or source_item.title.strip()
+        return fallback[:300].rstrip()
 
     def _build_search_plan(
         self,
@@ -512,6 +531,10 @@ class MockTechRadarAgent:
             summary=self._summary_for_source(source_item),
             published_at=source_item.published_at,
             relevance_score=max(1, min(relevance_score, 5)),
+            agent_observation=self._normalize_agent_observation(
+                str(source_item.extra.get("agent_observation", "")),
+                source_item,
+            ),
             technical_substance=summary,
             marketing_noise=self._noise_for_source(source_item),
             why_it_matters=self._why_source_matters(source_item),

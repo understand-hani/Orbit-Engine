@@ -69,6 +69,7 @@ struct RadarItem: Codable, Identifiable {
     let summary: String
     let publishedAt: Date?
     let relevanceScore: Int
+    let agentObservation: String
     let technicalSubstance: String
     let marketingNoise: String
     let whyItMatters: String
@@ -91,6 +92,7 @@ struct RadarItem: Codable, Identifiable {
         case summary
         case publishedAt = "published_at"
         case relevanceScore = "relevance_score"
+        case agentObservation = "agent_observation"
         case technicalSubstance = "technical_substance"
         case marketingNoise = "marketing_noise"
         case whyItMatters = "why_it_matters"
@@ -114,6 +116,7 @@ struct RadarItem: Codable, Identifiable {
         summary: String,
         publishedAt: Date? = nil,
         relevanceScore: Int = 3,
+        agentObservation: String = "",
         technicalSubstance: String,
         marketingNoise: String,
         whyItMatters: String,
@@ -135,6 +138,7 @@ struct RadarItem: Codable, Identifiable {
         self.summary = summary
         self.publishedAt = publishedAt
         self.relevanceScore = relevanceScore
+        self.agentObservation = agentObservation
         self.technicalSubstance = technicalSubstance
         self.marketingNoise = marketingNoise
         self.whyItMatters = whyItMatters
@@ -159,6 +163,7 @@ struct RadarItem: Codable, Identifiable {
         summary = try container.decode(String.self, forKey: .summary)
         publishedAt = try container.decodeIfPresent(Date.self, forKey: .publishedAt)
         relevanceScore = try container.decodeIfPresent(Int.self, forKey: .relevanceScore) ?? 3
+        agentObservation = try container.decodeIfPresent(String.self, forKey: .agentObservation) ?? ""
         technicalSubstance = try container.decodeIfPresent(String.self, forKey: .technicalSubstance) ?? ""
         marketingNoise = try container.decodeIfPresent(String.self, forKey: .marketingNoise) ?? ""
         whyItMatters = try container.decodeIfPresent(String.self, forKey: .whyItMatters) ?? ""

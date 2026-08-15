@@ -61,6 +61,7 @@ class RadarItem(BaseModel):
     summary: str
     published_at: Optional[datetime] = None
     relevance_score: int = 3
+    agent_observation: str = ""
     technical_substance: str = ""
     marketing_noise: str = ""
     why_it_matters: str
