@@ -1003,7 +1003,7 @@ private struct RadarRelevanceStars: View {
         HStack(spacing: 2) {
             ForEach(1...5, id: \.self) { index in
                 Image(systemName: index <= max(1, min(score, 5)) ? "star.fill" : "star")
-                    .foregroundStyle(index <= max(1, min(score, 5)) ? .orange : .tertiary)
+                    .foregroundStyle(index <= max(1, min(score, 5)) ? Color.orange : Color.secondary.opacity(0.35))
             }
             Text("相关度")
         }
