@@ -66,6 +66,16 @@ struct ResearchReaderView: View {
                 }
 
                 Section {
+                    Button {
+                        isShowingMaterialSheet = true
+                    } label: {
+                        Label("重新检索 arXiv 材料", systemImage: "arrow.clockwise")
+                    }
+                } footer: {
+                    Text("会重新按当前方向和计划检索，并替换本次 Deep Dive 的已确认材料。")
+                }
+
+                Section {
                     ForEach(completionCriteria) { criterion in
                         Label {
                             VStack(alignment: .leading, spacing: 4) {

@@ -117,3 +117,51 @@ def test_mock_research_session_has_primary_and_candidate_papers():
     assert session.payload.paper_reader.key_figures == []
     assert session.payload.paper_reader.sections[0].extracted_text
     assert session.payload.paper_reader.sections[0].knowledge_points == []
+
+
+def test_deep_dive_web_fallback_accepts_only_arxiv_paper_pages():
+    agent = ResearchFeederAgent()
+    sources = [
+        SourceItem(
+            id="journal_home",
+            source=SourceType.web,
+            item_type=SourceItemType.article,
+            title="Journal of Zhejiang University",
+            url="https://www.zju.edu.cn/journal",
+            summary="Journal introduction.",
+        ),
+        SourceItem(
+            id="news_page",
+            source=SourceType.web,
+            item_type=SourceItemType.article,
+            title="A news report about a paper",
+            url="https://news.example.com/paper-report",
+            summary="News article.",
+        ),
+        SourceItem(
+            id="bocha_result",
+            source=SourceType.web,
+            item_type=SourceItemType.article,
+            title="A valid arXiv research paper",
+            url="https://arxiv.org/abs/2608.12345v1",
+            summary="Paper abstract returned by the search fallback.",
+        ),
+        SourceItem(
+            id="classic_arxiv_result",
+            source=SourceType.web,
+            item_type=SourceItemType.article,
+            title="A classic arXiv research paper",
+            url="https://arxiv.org/abs/hep-th/9901001",
+            summary="Classic paper metadata returned by the search fallback.",
+        ),
+    ]
+
+    validated = agent._validated_arxiv_sources(sources)
+
+    assert len(validated) == 2
+    assert validated[0].source == SourceType.arxiv
+    assert validated[0].item_type == SourceItemType.paper
+    assert str(validated[0].url) == "https://arxiv.org/abs/2608.12345v1"
+    assert validated[0].extra["pdf_url"] == "https://arxiv.org/pdf/2608.12345v1"
+    assert validated[1].id == "hep-th/9901001"
+    assert str(validated[1].url) == "https://arxiv.org/abs/hep-th/9901001"

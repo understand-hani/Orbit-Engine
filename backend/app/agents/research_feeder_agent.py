@@ -1,5 +1,6 @@
 import re
 from typing import List, Optional
+from urllib.parse import urlparse
 
 from app.schemas.research_feeder import (
     ArchivePlan,
@@ -12,7 +13,7 @@ from app.schemas.research_feeder import (
     ResearchDayRole,
     ResearchFeederPayload,
 )
-from app.schemas.source import SourceItem, SourceType
+from app.schemas.source import SourceItem, SourceItemType, SourceType
 from app.schemas.user_context import UserContext
 from app.services.search_service import SearchService
 
@@ -46,7 +47,7 @@ class ResearchFeederAgent:
                         update={
                             "primary_paper_id": "pending_primary_paper",
                             "candidate_paper_id": None,
-                            "selection_reason": "未从公开源检索到真实材料，请稍后重试或输入更具体的检索主题。",
+                            "selection_reason": "未检索到符合当前方向的 arXiv 论文，请稍后重试或输入更具体的检索主题。",
                         }
                     ),
                     "papers": [],
@@ -88,19 +89,56 @@ class ResearchFeederAgent:
             arxiv_items = self.search_service.search_arxiv(arxiv_query, max_results=8).items
         except Exception:
             arxiv_items = []
-        usable = self._rank_sources(arxiv_items, terms)
+        usable = self._rank_sources(self._validated_arxiv_sources(arxiv_items), terms)
         if usable:
             return usable
 
-        # Bocha is the China-accessible fallback when arXiv's API cannot be
-        # reached from the remote Mac. Results remain visibly labelled as web
-        # metadata rather than being presented as parsed papers.
-        web_query = " ".join(terms[:4]) + " research paper arXiv"
+        # Bocha is only a transport fallback. The content contract remains
+        # arXiv-only, so journal homepages, news and generic web pages can never
+        # enter a Deep Dive pack.
+        web_query = "site:arxiv.org/abs " + " ".join(terms[:4])
         try:
             web_items = self.search_service.search_public_web(web_query, max_results=10).items
         except Exception:
             web_items = []
-        return self._rank_sources(web_items, terms)
+        return self._rank_sources(self._validated_arxiv_sources(web_items), terms)
+
+    def _validated_arxiv_sources(self, items: List[SourceItem]) -> List[SourceItem]:
+        validated: List[SourceItem] = []
+        seen_ids = set()
+        for item in items:
+            arxiv_id = self._arxiv_id(item)
+            if not arxiv_id or arxiv_id in seen_ids:
+                continue
+            seen_ids.add(arxiv_id)
+            canonical_url = f"https://arxiv.org/abs/{arxiv_id}"
+            extra = dict(item.extra)
+            extra["pdf_url"] = f"https://arxiv.org/pdf/{arxiv_id}"
+            validated.append(
+                item.model_copy(
+                    update={
+                        "id": arxiv_id,
+                        "source": SourceType.arxiv,
+                        "item_type": SourceItemType.paper,
+                        "url": canonical_url,
+                        "extra": extra,
+                        "tags": ["arxiv", *[tag for tag in item.tags if tag != "public_web"]],
+                    }
+                )
+            )
+        return validated
+
+    def _arxiv_id(self, item: SourceItem) -> str:
+        if not item.url:
+            return ""
+        parsed = urlparse(str(item.url))
+        host = (parsed.hostname or "").lower()
+        if host not in {"arxiv.org", "www.arxiv.org", "export.arxiv.org"}:
+            return ""
+        prefix = "/abs/"
+        if not parsed.path.startswith(prefix):
+            return ""
+        return parsed.path[len(prefix) :].strip("/")
 
     def _rank_sources(self, items: List[SourceItem], terms: List[str]) -> List[SourceItem]:
         usable = [item for item in items if not item.id.endswith("_search_error") and item.title.strip()]
@@ -171,9 +209,8 @@ class ResearchFeederAgent:
     def _paper_from_source(self, source: SourceItem, terms: List[str]) -> Paper:
         matched = [term for term in terms if term.lower() in f"{source.title} {source.summary}".lower()]
         published = source.published_at or source.updated_at
-        publisher = str(source.extra.get("publisher", "")).strip()
-        venue = "arXiv" if source.source == SourceType.arxiv else (publisher or "公开网页")
-        pdf_url = source.extra.get("pdf_url") if source.source == SourceType.arxiv else None
+        venue = "arXiv"
+        pdf_url = source.extra.get("pdf_url")
         return Paper(
             id=f"real_{source.source.value}_{source.id}".replace("/", "_"),
             title=source.title.strip(),
