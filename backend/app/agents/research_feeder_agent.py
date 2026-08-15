@@ -24,7 +24,7 @@ from app.services.search_service import SearchService
 
 
 RESEARCH_ITEM_LIMIT = 3
-RESEARCH_SEARCH_FETCH_LIMIT = 8
+RESEARCH_SEARCH_FETCH_LIMIT = 16
 RESEARCH_MIN_CANDIDATE_COUNT = 2
 RESEARCH_FRESHNESS_DAYS = 366
 RESEARCH_MIN_SCORE = 3
@@ -33,9 +33,19 @@ RESEARCH_LLM_TIMEOUT_SEC = 8.0
 RESEARCH_BROAD_TERMS = {
     "ai",
     "artificial intelligence",
+    "agent",
+    "agents",
     "model",
+    "models",
+    "world",
     "research",
     "paper",
+    "auto",
+    "autonomous",
+    "driving",
+    "video",
+    "generation",
+    "scene",
     "人工智能",
     "大模型",
     "模型",
@@ -182,37 +192,45 @@ class ResearchFeederAgent:
     ) -> List[tuple[SourceItem, int]]:
         candidates: List[SourceItem] = []
         seen_ids = set()
-        # One precise query keeps the synchronous mobile request bounded. The
-        # planner has already ranked its queries, so the first is the best route.
-        for query in plan.queries[:1]:
-            try:
-                items = self.search_service.search_arxiv(
-                    f'all:"{query}"',
-                    max_results=RESEARCH_SEARCH_FETCH_LIMIT,
-                ).items
-            except Exception:
-                items = []
-            self._append_research_candidates(candidates, seen_ids, items, plan.required_terms)
-            if len(candidates) >= RESEARCH_MIN_CANDIDATE_COUNT:
-                break
+        # Keep one network call, but search several distinctive anchors with OR.
+        # Wrapping an entire planner sentence as one quoted arXiv phrase makes
+        # recall collapse because the abstract must contain that exact sentence.
+        arxiv_query = self._combined_arxiv_query(plan)
+        try:
+            items = self.search_service.search_arxiv(
+                arxiv_query,
+                max_results=RESEARCH_SEARCH_FETCH_LIMIT,
+            ).items
+        except Exception:
+            items = []
+        self._append_research_candidates(candidates, seen_ids, items, plan.required_terms)
 
         # Bocha is only a transport fallback when direct arXiv access yields too
         # few candidates. The accepted content contract remains arXiv /abs pages.
         if len(candidates) < RESEARCH_MIN_CANDIDATE_COUNT:
-            for query in plan.queries[:1]:
-                try:
-                    items = self.search_service.search_public_web(
-                        f"site:arxiv.org/abs {query}",
-                        max_results=RESEARCH_SEARCH_FETCH_LIMIT,
-                        freshness="oneYear",
-                    ).items
-                except Exception:
-                    items = []
-                self._append_research_candidates(candidates, seen_ids, items, plan.required_terms)
-                if len(candidates) >= RESEARCH_MIN_CANDIDATE_COUNT:
-                    break
+            try:
+                items = self.search_service.search_public_web(
+                    self._combined_web_query(plan),
+                    max_results=RESEARCH_SEARCH_FETCH_LIMIT,
+                    freshness="oneYear",
+                ).items
+            except Exception:
+                items = []
+            self._append_research_candidates(candidates, seen_ids, items, plan.required_terms)
 
         return self._select_research_candidates(candidates, payload, user_context, plan.required_terms)
+
+    def _combined_arxiv_query(self, plan: ResearchSearchPlan) -> str:
+        anchors = plan.required_terms[:6] or plan.queries[:3]
+        escaped = [term.replace('"', "").strip() for term in anchors if term.strip()]
+        return " OR ".join(f'all:"{term}"' for term in escaped) or 'all:"computer vision"'
+
+    def _combined_web_query(self, plan: ResearchSearchPlan) -> str:
+        queries = [query.replace('"', "").strip() for query in plan.queries[:3] if query.strip()]
+        if not queries:
+            queries = plan.required_terms[:4]
+        joined = " OR ".join(f'"{query}"' for query in queries)
+        return f"site:arxiv.org/abs ({joined})"
 
     def _append_research_candidates(
         self,
@@ -475,9 +493,9 @@ class ResearchFeederAgent:
         values.extend(
             [
                 payload.research_context.current_direction,
-                payload.research_context.current_task,
                 payload.research_context.related_project,
                 payload.research_context.week_goal,
+                payload.research_context.current_task,
             ]
         )
 
@@ -490,7 +508,10 @@ class ResearchFeederAgent:
                     continue
                 seen.add(key)
                 terms.append(term)
-        return terms[:8] or ["computer vision"]
+        # Keep a wider raw pool because generic fragments are removed later.
+        # Truncating here let tokens such as world/model/driving crowd out
+        # distinctive project anchors such as 4DGS, SLAM or StreetGaussian.
+        return terms[:24] or ["computer vision"]
 
     def _terms_from_value(self, value: str) -> List[str]:
         cleaned = " ".join(value.split()).strip()

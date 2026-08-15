@@ -107,6 +107,7 @@ def test_mock_research_session_has_primary_and_candidate_papers():
 
     feed = FeedService()
     feed.research_agent = ResearchFeederAgent(search_service=FakeResearchSearchService())
+    feed.user_contexts = type("NoUserContextRepository", (), {"get": lambda self: None})()
     session = feed.generate_mock_session(date(2026, 7, 16))
     assert session.task_type == TaskType.research_feeder
     assert session.suggested_action == SuggestedAction.open_paper_reader
@@ -203,9 +204,11 @@ def test_deep_dive_uses_personal_direction_and_rejects_old_or_unrelated_papers(m
     class PersonalDirectionSearchService:
         def __init__(self) -> None:
             self.arxiv_calls = 0
+            self.queries = []
 
         def search_arxiv(self, query: str, max_results: int = 5) -> SourceSearchResponse:
             self.arxiv_calls += 1
+            self.queries.append(query)
             return SourceSearchResponse(
                 query=query,
                 source=SourceType.arxiv,
@@ -266,6 +269,8 @@ def test_deep_dive_uses_personal_direction_and_rejects_old_or_unrelated_papers(m
     )
 
     assert search_service.arxiv_calls == 1
+    assert " OR " in search_service.queries[0]
+    assert search_service.queries[0].count('all:"') >= 2
     assert len(generated.papers) == 2
     assert [paper.relevance_score for paper in generated.papers] == [5, 4]
     assert generated.reading_pack.primary_paper_id == generated.papers[0].id
@@ -308,3 +313,13 @@ def test_missing_manual_deep_dive_is_recovered_without_duplicate_material_genera
     assert session is not None
     assert session.id == "session_2026-08-16_research_feeder"
     assert feed.research_agent.calls == 1
+
+
+def test_deep_dive_search_anchors_keep_phrases_and_drop_generic_fragments():
+    agent = ResearchFeederAgent()
+
+    anchors = agent._meaningful_terms(
+        ["World Models", "World", "Models", "Autonomous Driving", "Driving"]
+    )
+
+    assert anchors == ["world models", "autonomous driving"]

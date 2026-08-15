@@ -554,7 +554,12 @@ private struct DeepDiveMaterialSheet: View {
                     )
                 }
                 guard !candidates.isEmpty else {
-                    message = "没有检索到真实候选材料，请稍后重试或输入更具体的主题。"
+                    let reason = refreshedPayload.map {
+                        $0.readingPack.selectionReason.trimmingCharacters(in: .whitespacesAndNewlines)
+                    } ?? ""
+                    message = reason.isEmpty
+                        ? "没有检索到真实候选材料，请稍后重试或输入更具体的主题。"
+                        : reason
                     return
                 }
                 selectedCandidateID = candidates.first?.id
