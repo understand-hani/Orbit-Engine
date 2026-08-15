@@ -265,6 +265,46 @@ def test_radar_selection_fills_to_two_related_candidates_without_inflating_score
     assert selected[1][1] == 3
 
 
+def test_radar_uses_distinctive_user_anchors_instead_of_bare_model_terms():
+    agent = MockTechRadarAgent()
+    anchors = agent._relevance_anchor_terms(["4DGS / World Model", "人工智能"])
+    unrelated_llm = SourceItem(
+        id="web_008",
+        source=SourceType.web,
+        item_type=SourceItemType.article,
+        title="新一代大模型发布",
+        url="https://example.com/llm-release",
+        summary="通用人工智能助手能力升级。",
+    )
+    related_world_model = SourceItem(
+        id="web_009",
+        source=SourceType.web,
+        item_type=SourceItemType.article,
+        title="Driving world model uses 4DGS scene representation",
+        url="https://example.com/driving-world-model",
+        summary="A concrete 4DGS update for driving-world-model reconstruction.",
+    )
+
+    assert "model" not in anchors
+    assert not agent._is_relevant_source(unrelated_llm, anchors)
+    assert agent._is_relevant_source(related_world_model, anchors)
+
+
+def test_radar_keeps_llm_material_for_a_user_with_ai_agent_as_direction():
+    agent = MockTechRadarAgent()
+    anchors = agent._relevance_anchor_terms(["AI Agent workflow"])
+    agent_source = SourceItem(
+        id="web_010",
+        source=SourceType.web,
+        item_type=SourceItemType.article,
+        title="AI Agent workflow product update",
+        url="https://example.com/agent-workflow",
+        summary="A concrete agent workflow release.",
+    )
+
+    assert agent._is_relevant_source(agent_source, anchors)
+
+
 def test_radar_source_passages_separate_excerpt_and_agent_analysis():
     agent = MockTechRadarAgent(search_service=StaticSearchService())
     source_item = SourceItem(

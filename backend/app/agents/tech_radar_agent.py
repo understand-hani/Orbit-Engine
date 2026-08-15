@@ -40,6 +40,33 @@ GENERIC_INDUSTRY_TERMS = [
     "成果",
 ]
 
+# These are valid user directions, but are too broad to establish relevance
+# when the same user has supplied more distinctive method or plan anchors.
+BROAD_DOMAIN_TERMS = {
+    "ai",
+    "model",
+    "world",
+    "research",
+    "product",
+    "platform",
+    "company",
+    "university",
+    "人工智能",
+    "大模型",
+    "自动驾驶",
+    "具身智能",
+    "计算机视觉",
+    "深度学习",
+    "机器学习",
+    "研究",
+    "产品",
+    "平台",
+    "公司",
+    "大学",
+    "研究院",
+    "实验室",
+}
+
 
 class RadarSearchPlan(BaseModel):
     """Small, user-grounded search contract produced before a Radar run."""
@@ -83,7 +110,10 @@ university, product, or research is insufficient on its own. Prefer concrete
 progress on the user's stated methods, systems, applications, or organisations.
 
 Always reject journal homepages, calls for papers, conference notices, generic
-university announcements, generic AI-agent news, and generic industry news.
+university announcements, and generic industry news. Do not globally reject a
+topic category such as LLM, large models, or AI agents: it is relevant when it
+is explicitly part of this user's current goal or plan, and irrelevant when it
+only shares a broad category with the user's direction.
 Return an empty list rather than filling the quota with weakly related results.
 For each selected candidate, assign relevance_score using this exact rubric:
 - 5: directly changes or validates the current week's technical route, with
@@ -114,11 +144,12 @@ class MockTechRadarAgent:
     ) -> TechRadarPayload:
         radar_context = self._radar_context_terms(payload, user_context)
         search_plan = self._build_search_plan(user_context, radar_context)
+        relevance_anchors = self._relevance_anchor_terms(radar_context)
         items = self._industry_items_from_search(
             payload,
             excluded_source_keys or set(),
             search_plan.queries,
-            search_plan.required_terms,
+            relevance_anchors,
             search_plan.excluded_terms,
             user_context,
         )
@@ -401,9 +432,20 @@ class MockTechRadarAgent:
             if not lowered:
                 continue
             terms.append(lowered)
-            terms.extend(re.findall(r"[a-z0-9][a-z0-9\-/+.]{2,}", lowered))
+            english_terms = re.findall(r"[a-z0-9][a-z0-9\-/+.]{1,}", lowered)
+            terms.extend(term for term in english_terms if term not in BROAD_DOMAIN_TERMS)
+            word_tokens = re.findall(r"[a-z0-9]+", lowered)
+            # Keep meaningful multi-word directions intact: “world model” and
+            # “AI agent” are directions; a bare “model” is not.
+            for width in (3, 2):
+                terms.extend(
+                    " ".join(word_tokens[index : index + width])
+                    for index in range(0, len(word_tokens) - width + 1)
+                )
             for chunk in re.findall(r"[\u4e00-\u9fff]{2,}", lowered):
                 terms.append(chunk)
+                if chunk in BROAD_DOMAIN_TERMS:
+                    continue
                 # Preserve the full user phrase and add domain-sized segments
                 # so “量化交易风控平台” can match a related “量化交易风控产品”.
                 for size in (4, 3):
@@ -412,6 +454,14 @@ class MockTechRadarAgent:
         return self._dedupe_terms(
             [term for term in terms if len(term) >= 2 and term not in stop_terms]
         )
+
+    def _relevance_anchor_terms(self, radar_context: List[str]) -> List[str]:
+        terms = self._context_match_terms(radar_context)
+        distinctive = [term for term in terms if term.lower() not in BROAD_DOMAIN_TERMS]
+        # A user whose entire declared direction is “LLM” or “AI” must still
+        # receive that material. Broad terms become usable only when no more
+        # distinctive user-provided anchor exists.
+        return distinctive or terms
 
     def _industry_queries(self, payload: TechRadarPayload, radar_context: List[str]) -> List[str]:
         topics = [topic.strip() for topic in payload.scope.topics if topic.strip()]
