@@ -35,16 +35,17 @@ final class HistoryViewModel: ObservableObject {
             .sorted { $0.createdAt > $1.createdAt }
     }
 
-    var groupedDates: [String] {
-        Dictionary(grouping: timelineCheckins, by: \.date)
-            .keys
-            .sorted(by: >)
-    }
-
-    func checkins(on date: String) -> [Checkin] {
-        timelineCheckins
-            .filter { $0.date == date }
+    var completedCheckins: [Checkin] {
+        var seenRadarSessions = Set<String>()
+        return checkins
+            .filter { $0.status == "completed" }
             .sorted { $0.createdAt > $1.createdAt }
+            .filter { checkin in
+                guard checkin.taskType == .techRadar else {
+                    return true
+                }
+                return seenRadarSessions.insert(checkin.sessionID).inserted
+            }
     }
 
     func deleteArchivedCheckin(_ checkin: Checkin) async {
@@ -77,10 +78,6 @@ final class HistoryViewModel: ObservableObject {
             return storedTitle
         }
         return archivedSessionsByID[checkin.sessionID]?.title
-    }
-
-    private var timelineCheckins: [Checkin] {
-        checkins.filter { $0.status == "completed" }
     }
 
     private func loadSessions(for checkins: [Checkin]) async -> [String: BaseSession] {

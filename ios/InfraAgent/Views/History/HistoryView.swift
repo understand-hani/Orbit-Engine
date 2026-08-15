@@ -15,21 +15,28 @@ struct HistoryView: View {
                 }
 
                 Section("归档记录") {
-                    ForEach(viewModel.groupedDates, id: \.self) { date in
-                        let dayCheckins = viewModel.checkins(on: date)
-                        NavigationLink {
-                            DailyHistoryView(
-                                date: date,
-                                checkins: dayCheckins,
-                                sessionTitlesByID: viewModel.archivedSessionsByID.mapValues { $0.title }
-                            )
-                        } label: {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(date)
-                                    .font(.headline)
-                                Text("\(dayCheckins.count) 条归档 · \(dayCheckins.reduce(0) { $0 + $1.durationMin }) 分钟")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                    if viewModel.completedCheckins.isEmpty {
+                        EmptyStateView(
+                            title: "暂无归档记录",
+                            systemImage: "archivebox",
+                            message: "完成并保存的 session 会以原卡片名称显示在这里。"
+                        )
+                    } else {
+                        ForEach(viewModel.completedCheckins) { checkin in
+                            let title = archivedTitle(for: checkin)
+                            NavigationLink {
+                                CheckinDetailView(
+                                    checkin: checkin,
+                                    sessionTitle: title
+                                )
+                            } label: {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(title)
+                                        .font(.headline)
+                                    Text("\(checkin.date) · \(checkin.durationMin) 分钟")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
