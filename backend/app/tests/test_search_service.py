@@ -47,17 +47,28 @@ def test_parse_github_repositories():
     assert items[0].extra["stars"] == 100
 
 
-def test_parse_baidu_news_keeps_broad_news_result_metadata():
-    html_text = """
-    <html><body>
-      <a class="news-title-font_1xS-F" href="https://news.example.com/product-launch">
-        某企业发布新一代世界模型产品
-      </a>
-      <a href="https://news.example.com/lab-progress">高校研究团队公布具身智能新进展</a>
-    </body></html>
-    """
+def test_parse_bocha_web_pages_keeps_broad_news_result_metadata():
+    payload = {
+        "data": {
+            "webPages": {
+                "value": [
+                    {
+                        "name": "某企业发布新一代世界模型产品",
+                        "url": "https://news.example.com/product-launch",
+                        "summary": "企业发布了面向开发者的新产品。",
+                        "siteName": "示例科技媒体",
+                        "datePublished": "2026-08-15T10:00:00Z",
+                    },
+                    {
+                        "name": "高校研究团队公布具身智能新进展",
+                        "url": "https://news.example.com/lab-progress",
+                    },
+                ]
+            }
+        }
+    }
 
-    items = SearchService()._parse_baidu_news(html_text, max_results=5)
+    items = SearchService()._parse_bocha_web_pages(payload, max_results=5)
 
     assert [item.title for item in items] == [
         "某企业发布新一代世界模型产品",
@@ -65,4 +76,6 @@ def test_parse_baidu_news_keeps_broad_news_result_metadata():
     ]
     assert all(item.source.value == "web" for item in items)
     assert all(item.item_type.value == "article" for item in items)
-    assert all("baidu_news" in item.tags for item in items)
+    assert all("bocha_web" in item.tags for item in items)
+    assert items[0].summary == "企业发布了面向开发者的新产品。"
+    assert items[0].extra["publisher"] == "示例科技媒体"

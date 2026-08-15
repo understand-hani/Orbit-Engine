@@ -52,3 +52,15 @@ back to the existing mock JD analysis so the iOS flow remains usable.
 
 The backend always reads `backend/.env`; do not put the API key in `.env.example`
 and do not commit `.env`.
+
+## Signal Radar search
+
+Signal Radar uses Bocha Web Search for current news and organisation/product
+updates. Add the key only to `backend/.env`:
+
+```env
+BOCHA_API_KEY=your_bocha_api_key_here
+```
+
+The key is never committed. Without it, Signal Radar returns no external
+results rather than falling back to browser scraping.

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_timeout_sec: float = 20.0
     openrouter_site_url: Optional[str] = None
+    bocha_api_key: Optional[str] = None
     github_token: Optional[str] = None
     source_timeout_sec: float = 10.0
 
