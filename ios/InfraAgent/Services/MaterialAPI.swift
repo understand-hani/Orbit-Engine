@@ -18,6 +18,10 @@ struct MaterialAPI {
         )
     }
 
+    func generateRadarItemJudgement(sessionID: String, itemID: String) async throws -> RadarItem {
+        try await resolvedClient.post("/api/sessions/\(sessionID)/radar-items/\(itemID)/judgement")
+    }
+
     func archiveRadarItem(sessionID: String, itemID: String, archiveNote: String = "") async throws -> RadarItem {
         try await resolvedClient.post(
             "/api/sessions/\(sessionID)/radar-items/\(itemID)/archive",

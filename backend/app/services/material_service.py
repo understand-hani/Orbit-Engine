@@ -5,11 +5,15 @@ from app.db.repositories import SessionRepository
 from app.schemas.common import TaskType
 from app.schemas.research_feeder import Paper, PaperReader
 from app.schemas.tech_radar import RadarItem, RadarItemMarkRequest, RadarUserMark
+from app.agents.tech_radar_agent import MockTechRadarAgent
+from app.db.repositories import UserContextRepository
 
 
 class MaterialService:
     def __init__(self) -> None:
         self.sessions = SessionRepository()
+        self.user_contexts = UserContextRepository()
+        self.tech_radar_agent = MockTechRadarAgent()
 
     def list_radar_items(self, session_id: str) -> Optional[List[RadarItem]]:
         session = self.sessions.get_by_id(session_id)
@@ -65,6 +69,34 @@ class MaterialService:
             item_id,
             RadarItemMarkRequest(user_mark=RadarUserMark.archived, archive_note=note),
         )
+
+    def generate_radar_item_judgement(self, session_id: str, item_id: str) -> Optional[RadarItem]:
+        session = self.sessions.get_by_id(session_id)
+        if session is None or session.task_type != TaskType.tech_radar:
+            return None
+
+        updated_item: Optional[RadarItem] = None
+        updated_items: List[RadarItem] = []
+        user_context = self.user_contexts.get()
+        for item in session.payload.digest.items:
+            if item.id == item_id:
+                updated_item = self.tech_radar_agent.generate_detail_judgement(item, user_context)
+                updated_items.append(updated_item)
+            else:
+                updated_items.append(item)
+
+        if updated_item is None:
+            return None
+
+        updated_payload = session.payload.model_copy(
+            update={"digest": session.payload.digest.model_copy(update={"items": updated_items})}
+        )
+        self.sessions.save(
+            session.model_copy(
+                update={"payload": updated_payload, "updated_at": datetime.now(timezone.utc)}
+            )
+        )
+        return updated_item
 
     def list_papers(self, session_id: str) -> Optional[List[Paper]]:
         session = self.sessions.get_by_id(session_id)

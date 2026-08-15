@@ -830,8 +830,10 @@ private struct RadarDecisionDetailView: View {
     let decision: RadarDecision
 
     @State private var currentMark: String
+    @State private var enrichedItem: RadarItem?
     @State private var statusMessage: String?
     @State private var isUpdatingMark = false
+    @State private var isLoadingJudgement = false
     private let materialAPI = MaterialAPI()
 
     init(session: BaseSession, decision: RadarDecision) {
@@ -855,9 +857,17 @@ private struct RadarDecisionDetailView: View {
                 RadarSummaryLine(title: "来源详情", value: decision.sourceDetail)
                 RadarSummaryLine(title: "发布日期", value: radarPublishedDate(decision.publishedAt))
                 RadarSummaryLine(title: "Agent 相关度", value: "\(decision.relevanceScore) / 5")
-                RadarSummaryLine(title: "摘要", value: decision.whatChanged)
-                RadarSummaryLine(title: "为什么和我有关", value: decision.whyRelevant)
-                RadarSummaryLine(title: "噪音 / 可信度判断", value: decision.noiseJudgement)
+                RadarSummaryLine(title: "摘要", value: enrichedItem?.summary ?? decision.whatChanged)
+                RadarSummaryLine(title: "为什么和我有关", value: enrichedItem?.whyItMatters ?? decision.whyRelevant)
+                RadarSummaryLine(title: "噪音 / 可信度判断", value: enrichedItem?.marketingNoise ?? decision.noiseJudgement)
+                if isLoadingJudgement {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Agent 正在补充这条信号的判断…")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
             }
 
             Section("原文 / 材料入口") {
@@ -953,6 +963,23 @@ private struct RadarDecisionDetailView: View {
             )
         }
         .navigationTitle("Signal Radar 详情")
+        .task {
+            await loadJudgement()
+        }
+    }
+
+    private func loadJudgement() async {
+        isLoadingJudgement = true
+        defer { isLoadingJudgement = false }
+        do {
+            enrichedItem = try await materialAPI.generateRadarItemJudgement(
+                sessionID: session.id,
+                itemID: decision.id
+            )
+        } catch {
+            // The deterministic, evidence-bound text remains visible if the
+            // optional Agent detail request is unavailable.
+        }
     }
 
     private func updateMark(_ mark: String, message: String) {

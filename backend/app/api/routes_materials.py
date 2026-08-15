@@ -29,6 +29,14 @@ def mark_radar_item(session_id: str, item_id: str, request: RadarItemMarkRequest
     return item
 
 
+@router.post("/sessions/{session_id}/radar-items/{item_id}/judgement", response_model=RadarItem)
+def generate_radar_item_judgement(session_id: str, item_id: str) -> RadarItem:
+    item = material_service.generate_radar_item_judgement(session_id, item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Radar item not found")
+    return item
+
+
 @router.post("/sessions/{session_id}/radar-items/{item_id}/archive", response_model=RadarItem)
 def archive_radar_item(session_id: str, item_id: str, request: RadarItemMarkRequest) -> RadarItem:
     item = material_service.archive_radar_item(session_id, item_id, request.archive_note)

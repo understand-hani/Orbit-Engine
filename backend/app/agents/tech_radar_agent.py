@@ -80,13 +80,16 @@ class RadarCandidateRating(BaseModel):
     id: str
     relevance_score: int = Field(ge=1, le=5)
     agent_observation: str = ""
-    agent_summary: str = ""
-    agent_why_it_matters: str = ""
-    agent_noise_judgement: str = ""
 
 
 class RadarCandidateSelection(BaseModel):
     selections: List[RadarCandidateRating] = Field(default_factory=list)
+
+
+class RadarDetailJudgement(BaseModel):
+    summary: str = ""
+    why_it_matters: str = ""
+    noise_judgement: str = ""
 
 
 RADAR_SEARCH_PLANNER_PROMPT = """
@@ -131,13 +134,21 @@ For every selected candidate, write agent_observation in concise Chinese,
 roughly 100-300 Chinese characters: state the concrete signal, explain its
 relationship to the current goal/weekly plan, and name one verification caveat.
 Do not repeat the title, use generic filler, or write a long research summary.
-Also write these three concise Chinese fields, each roughly 60-120 characters
-and grounded only in the supplied candidate and user direction:
-- agent_summary: what objectively changed or was reported.
-- agent_why_it_matters: the specific connection to this user's current goal
-  and weekly plan; do not use a generic Radar explanation.
-- agent_noise_judgement: source/claim limits and the one most important thing
-  to verify. Do not claim the item is verified when only metadata is present.
+Return only JSON matching the supplied schema.
+""".strip()
+
+
+RADAR_DETAIL_JUDGEMENT_PROMPT = """
+You write three concise, evidence-bound Chinese judgments for one Signal Radar
+detail page. Use only the supplied signal and user direction. Do not invent
+facts, experiments, product capabilities, or source verification.
+
+- summary: objectively state what changed or was reported, 60-120 Chinese characters.
+- why_it_matters: explain the specific connection to the user's current goal
+  and weekly plan, 60-120 Chinese characters; do not give a generic Radar explanation.
+- noise_judgement: state the source/claim limitation and the most important
+  thing to verify, 60-120 Chinese characters.
+
 Return only JSON matching the supplied schema.
 """.strip()
 
@@ -184,6 +195,52 @@ class MockTechRadarAgent:
                         "follow_up_questions": follow_up,
                     }
                 ),
+            }
+        )
+
+    def generate_detail_judgement(
+        self,
+        item: RadarItem,
+        user_context: Optional[UserContext],
+    ) -> RadarItem:
+        """Enrich one opened detail without putting copy generation on the Radar refresh path."""
+        settings = get_settings()
+        if user_context is None or settings.llm_provider.lower() != "openrouter" or not settings.openrouter_api_key:
+            return item
+        try:
+            judgement = OpenRouterChatService().generate_json(
+                system_prompt=RADAR_DETAIL_JUDGEMENT_PROMPT,
+                user_payload={
+                    "user_direction": {
+                        "goal": user_context.profile.goal,
+                        "current_stage": user_context.profile.current_stage,
+                        "weekly_focus": user_context.plan.weekly_focus,
+                        "tracking_keywords": user_context.plan.tracking_keywords,
+                        "fields": user_context.preferences.fields,
+                    },
+                    "signal": {
+                        "title": item.title,
+                        "source": item.source,
+                        "summary": item.summary,
+                        "technical_substance": item.technical_substance,
+                        "source_passages": [passage.excerpt[:500] for passage in item.source_passages[:3]],
+                        "evidence_status": item.evidence_status,
+                        "published_at": item.published_at.isoformat() if item.published_at else "",
+                    },
+                },
+                output_model=RadarDetailJudgement,
+                schema_name="radar_detail_judgement",
+            )
+        except Exception:
+            # Detail copy is optional: keep the existing evidence-bound fallback
+            # rather than turning a readable Radar result into an error.
+            return item
+
+        return item.model_copy(
+            update={
+                "summary": self._normalize_agent_text(judgement.summary, item.summary),
+                "why_it_matters": self._normalize_agent_text(judgement.why_it_matters, item.why_it_matters),
+                "marketing_noise": self._normalize_agent_text(judgement.noise_judgement, item.marketing_noise),
             }
         )
 
@@ -323,18 +380,6 @@ class MockTechRadarAgent:
                     source_item.extra["agent_observation"] = self._normalize_agent_observation(
                         item.agent_observation,
                         source_item,
-                    )
-                    source_item.extra["agent_summary"] = self._normalize_agent_text(
-                        item.agent_summary,
-                        source_item.summary,
-                    )
-                    source_item.extra["agent_why_it_matters"] = self._normalize_agent_text(
-                        item.agent_why_it_matters,
-                        "",
-                    )
-                    source_item.extra["agent_noise_judgement"] = self._normalize_agent_text(
-                        item.agent_noise_judgement,
-                        "",
                     )
             return self._fill_minimum_radar_candidates(selected, candidates, required_terms)
         except Exception:
@@ -606,7 +651,7 @@ class MockTechRadarAgent:
             source=source_label,
             url=source_item.url,
             signal_type=signal_type,
-            summary=source_item.extra.get("agent_summary") or self._summary_for_source(source_item),
+            summary=self._summary_for_source(source_item),
             published_at=source_item.published_at,
             relevance_score=max(1, min(relevance_score, 5)),
             agent_observation=self._normalize_agent_observation(
@@ -614,8 +659,8 @@ class MockTechRadarAgent:
                 source_item,
             ),
             technical_substance=summary,
-            marketing_noise=source_item.extra.get("agent_noise_judgement") or self._noise_for_source(source_item),
-            why_it_matters=source_item.extra.get("agent_why_it_matters") or self._why_source_matters(source_item),
+            marketing_noise=self._noise_for_source(source_item),
+            why_it_matters=self._why_source_matters(source_item),
             evidence_status=self._evidence_status(source_item, source_passages),
             source_passages=source_passages,
             visuals=[],

@@ -405,9 +405,9 @@ def test_radar_item_marks_metadata_only_when_page_unreadable():
     assert item.published_at == source_item.published_at
     assert item.relevance_score == 3
     assert item.agent_observation == source_item.summary
-    assert item.summary == source_item.extra["agent_summary"]
-    assert item.why_it_matters == source_item.extra["agent_why_it_matters"]
-    assert item.marketing_noise == source_item.extra["agent_noise_judgement"]
+    assert item.summary == agent._summary_for_source(source_item)
+    assert item.why_it_matters == agent._why_source_matters(source_item)
+    assert item.marketing_noise == agent._noise_for_source(source_item)
 
 
 def test_tech_radar_refresh_does_not_fallback_to_mock_items():
