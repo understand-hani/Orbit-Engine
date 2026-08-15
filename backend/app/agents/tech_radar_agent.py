@@ -74,7 +74,9 @@ term that is explicitly present in the provided context when applicable.
 RADAR_RESULT_SELECTOR_PROMPT = """
 You are the final relevance gate for a personal Signal Radar.
 
-Select at most 3 candidate IDs that directly advance the user's current
+Select 2 or 3 candidate IDs when at least two candidates meet the relevance
+threshold. Select only one when there is truly only one qualifying candidate.
+Each selected result must directly advance the user's current
 technical direction. A weak shared category such as AI, autonomous driving,
 university, product, or research is insufficient on its own. Prefer concrete
 progress on the user's stated methods, systems, applications, or organisations.
@@ -82,9 +84,15 @@ progress on the user's stated methods, systems, applications, or organisations.
 Always reject journal homepages, calls for papers, conference notices, generic
 university announcements, generic AI-agent news, and generic industry news.
 Return an empty list rather than filling the quota with weakly related results.
-For each selected candidate, assign relevance_score from 1 to 5: 5 means a
-direct match to the current technical line with concrete progress; 3 means a
-clear but secondary connection. Do not select 1-2 star candidates.
+For each selected candidate, assign relevance_score using this exact rubric:
+- 5: directly changes or validates the current week's technical route, with
+  concrete progress on the user's core method/system/application.
+- 4: directly concerns a primary target direction, but is not an immediate
+  decision or evidence for this week's plan.
+- 3: a clearly useful secondary or enabling connection.
+- 1-2: broad-field or weakly related; do not select these.
+Rate candidates comparatively. Do not assign 5 to every selected result; use
+5 sparingly, normally for no more than one result in a run.
 Return only JSON matching the supplied schema.
 """.strip()
 
@@ -258,11 +266,12 @@ class MockTechRadarAgent:
                 output_model=RadarCandidateSelection,
                 schema_name="radar_candidate_selection",
             )
-            return [
+            selected = [
                 (candidate_by_id[item.id], item.relevance_score)
                 for item in selection.selections
                 if item.id in candidate_by_id and item.relevance_score >= 3
-            ][:RADAR_ITEM_LIMIT]
+            ]
+            return self._fill_minimum_radar_candidates(selected, candidates, required_terms)
         except Exception:
             # Network/model failure should preserve a useful deterministic
             # result rather than breaking the whole Radar session.
@@ -271,10 +280,47 @@ class MockTechRadarAgent:
                 for item in candidates[:RADAR_ITEM_LIMIT]
             ]
 
+    def _fill_minimum_radar_candidates(
+        self,
+        selected: List[tuple[SourceItem, int]],
+        candidates: List[SourceItem],
+        required_terms: List[str],
+    ) -> List[tuple[SourceItem, int]]:
+        deduped: List[tuple[SourceItem, int]] = []
+        selected_ids = set()
+        for item, score in selected:
+            if item.id in selected_ids:
+                continue
+            selected_ids.add(item.id)
+            deduped.append((item, max(3, min(score, 5))))
+            if len(deduped) >= RADAR_ITEM_LIMIT:
+                return deduped
+
+        # The search layer has already applied the user-specific relevance
+        # filter. If the model under-selects, retain the best remaining related
+        # candidates so a normal Radar card contains at least two signals.
+        minimum = min(2, len(candidates))
+        for item in candidates:
+            if len(deduped) >= minimum:
+                break
+            if item.id in selected_ids:
+                continue
+            selected_ids.add(item.id)
+            deduped.append((item, self._deterministic_relevance_score(item, required_terms)))
+        return deduped[:RADAR_ITEM_LIMIT]
+
     def _deterministic_relevance_score(self, source_item: SourceItem, required_terms: List[str]) -> int:
         haystack = " ".join([source_item.title, source_item.summary]).lower()
-        matches = sum(term in haystack for term in self._context_match_terms(required_terms))
-        return 5 if matches >= 3 else 4 if matches >= 2 else 3
+        # This is a fallback only. It deliberately never gives 5 stars because
+        # overlapping CJK fragments can make keyword counts look stronger than
+        # the real relationship to the user's active plan.
+        direct_terms = [
+            term.lower().strip()
+            for term in required_terms
+            if len(term.strip()) >= 3 and term.lower().strip() not in GENERIC_INDUSTRY_TERMS
+        ]
+        matches = sum(term in haystack for term in self._dedupe_terms(direct_terms))
+        return 4 if matches >= 2 else 3
 
     def _build_search_plan(
         self,

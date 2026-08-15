@@ -235,6 +235,36 @@ def test_radar_rejects_calls_for_papers_and_journal_homepages_before_selection()
     assert agent._is_obvious_radar_noise(call_for_papers)
 
 
+def test_radar_selection_fills_to_two_related_candidates_without_inflating_score():
+    agent = MockTechRadarAgent()
+    first = SourceItem(
+        id="web_006",
+        source=SourceType.web,
+        item_type=SourceItemType.article,
+        title="4DGS driving scene reconstruction update",
+        url="https://example.com/4dgs",
+        summary="A concrete 4D Gaussian Splatting update for driving scenes.",
+    )
+    second = SourceItem(
+        id="web_007",
+        source=SourceType.web,
+        item_type=SourceItemType.article,
+        title="World model evaluation for autonomous driving",
+        url="https://example.com/world-model",
+        summary="A secondary update relevant to the driving world-model route.",
+    )
+
+    selected = agent._fill_minimum_radar_candidates(
+        [(first, 5)],
+        [first, second],
+        ["4DGS", "World Model"],
+    )
+
+    assert [item.id for item, _ in selected] == ["web_006", "web_007"]
+    assert selected[0][1] == 5
+    assert selected[1][1] == 3
+
+
 def test_radar_source_passages_separate_excerpt_and_agent_analysis():
     agent = MockTechRadarAgent(search_service=StaticSearchService())
     source_item = SourceItem(
