@@ -2,9 +2,13 @@ from datetime import datetime, timezone
 import re
 from typing import List, Optional, Set
 
+from pydantic import BaseModel, Field
+
+from app.config import get_settings
 from app.schemas.source import SourceItem, SourceItemType, SourceType
 from app.schemas.tech_radar import RadarItem, RadarSourcePassage, RecommendedDepth, TechRadarPayload
 from app.schemas.user_context import UserContext
+from app.services.llm_service import OpenRouterChatService
 from app.services.search_service import SearchService
 
 
@@ -37,6 +41,27 @@ GENERIC_INDUSTRY_TERMS = [
 ]
 
 
+class RadarSearchPlan(BaseModel):
+    """Small, user-grounded search contract produced before a Radar run."""
+
+    queries: List[str] = Field(default_factory=list)
+    required_terms: List[str] = Field(default_factory=list)
+    excluded_terms: List[str] = Field(default_factory=list)
+
+
+RADAR_SEARCH_PLANNER_PROMPT = """
+You plan current-news searches for a personal Signal Radar.
+
+Use only the supplied user context. Return 2 or 3 concise, topic-specific web
+search queries plus 2 to 8 terms that a result must contain to be relevant.
+The user wants current news, product releases, company/lab/university progress,
+not papers or code repositories. Do not substitute generic AI-agent content for
+the user's actual domain. Do not invent a new career direction. Include a term
+such as 4DGS, StreetGaussian, SLAM, world model, autonomous driving, or another
+term that is explicitly present in the provided context when applicable.
+""".strip()
+
+
 class MockTechRadarAgent:
     def __init__(self, search_service: Optional[SearchService] = None) -> None:
         self.search_service = search_service or SearchService()
@@ -48,7 +73,14 @@ class MockTechRadarAgent:
         user_context: Optional[UserContext] = None,
     ) -> TechRadarPayload:
         radar_context = self._radar_context_terms(payload, user_context)
-        items = self._industry_items_from_search(payload, excluded_source_keys or set(), radar_context)
+        search_plan = self._build_search_plan(user_context, radar_context)
+        items = self._industry_items_from_search(
+            payload,
+            excluded_source_keys or set(),
+            search_plan.queries,
+            search_plan.required_terms,
+            search_plan.excluded_terms,
+        )
         if items:
             summary = "本轮 Signal Radar 已基于公开网页、新闻/RSS、开源与论文 metadata 生成行业动态信号。"
             top_signals = [items[0].summary]
@@ -77,9 +109,10 @@ class MockTechRadarAgent:
         self,
         payload: TechRadarPayload,
         excluded_source_keys: Set[str],
-        radar_context: List[str],
+        queries: List[str],
+        required_terms: List[str],
+        excluded_terms: List[str],
     ) -> List[RadarItem]:
-        queries = self._industry_queries(payload, radar_context)
         collected: List[SourceItem] = []
         seen_urls = set()
         for query in queries:
@@ -93,7 +126,7 @@ class MockTechRadarAgent:
             for source_item in response.items:
                 if source_item.id.endswith("_search_error") or "error" in source_item.tags:
                     continue
-                if not self._is_relevant_source(source_item, radar_context):
+                if not self._is_relevant_source(source_item, required_terms, excluded_terms):
                     continue
                 dedupe_key = self._source_key(source_item)
                 if dedupe_key in excluded_source_keys:
@@ -107,14 +140,19 @@ class MockTechRadarAgent:
             if len(collected) >= RADAR_ITEM_LIMIT:
                 break
         return [
-            self._radar_item_from_source(payload, item, index, radar_context)
+            self._radar_item_from_source(payload, item, index, required_terms)
             for index, item in enumerate(collected[:RADAR_ITEM_LIMIT], start=1)
         ]
 
     def _source_key(self, source_item: SourceItem) -> str:
         return str(source_item.url) if source_item.url else f"{source_item.source.value}:{source_item.id}"
 
-    def _is_relevant_source(self, source_item: SourceItem, radar_context: List[str]) -> bool:
+    def _is_relevant_source(
+        self,
+        source_item: SourceItem,
+        required_terms: List[str],
+        excluded_terms: Optional[List[str]] = None,
+    ) -> bool:
         haystack = " ".join(
             [
                 source_item.title,
@@ -123,13 +161,69 @@ class MockTechRadarAgent:
                 str(source_item.extra.get("publisher", "")),
             ]
         ).lower()
-        meaningful_context = self._context_match_terms(radar_context)
+        meaningful_context = self._context_match_terms(required_terms)
+        excluded = self._context_match_terms(excluded_terms or [])
+        if any(term in haystack for term in excluded):
+            return False
         # When the user has supplied a focus, generic words such as "product",
         # "platform" or "company" must not admit unrelated news.  They are only
         # a fallback for a brand-new user with no usable domain context.
         if meaningful_context:
             return any(term in haystack for term in meaningful_context)
         return any(term in haystack for term in GENERIC_INDUSTRY_TERMS)
+
+    def _build_search_plan(
+        self,
+        user_context: Optional[UserContext],
+        radar_context: List[str],
+    ) -> RadarSearchPlan:
+        fallback = self._fallback_search_plan(radar_context)
+        settings = get_settings()
+        if user_context is None or settings.llm_provider.lower() != "openrouter" or not settings.openrouter_api_key:
+            return fallback
+
+        try:
+            planned = OpenRouterChatService().generate_json(
+                system_prompt=RADAR_SEARCH_PLANNER_PROMPT,
+                user_payload={
+                    "goal": user_context.profile.goal,
+                    "current_stage": user_context.profile.current_stage,
+                    "weekly_focus": user_context.plan.weekly_focus,
+                    "next_action": user_context.plan.next_action,
+                    "tracking_keywords": user_context.plan.tracking_keywords,
+                    "fields": user_context.preferences.fields,
+                },
+                output_model=RadarSearchPlan,
+                schema_name="radar_search_plan",
+            )
+            queries = self._dedupe_terms([value.strip() for value in planned.queries if value.strip()])[:3]
+            required_terms = self._dedupe_terms(
+                [value.strip() for value in planned.required_terms if value.strip()]
+            )[:8]
+            if queries and required_terms:
+                return RadarSearchPlan(
+                    queries=queries,
+                    required_terms=required_terms,
+                    excluded_terms=self._dedupe_terms(planned.excluded_terms)[:8],
+                )
+        except Exception:
+            pass
+        return fallback
+
+    def _fallback_search_plan(self, radar_context: List[str]) -> RadarSearchPlan:
+        seeds = self._query_seed_terms(radar_context)
+        if not seeds:
+            return RadarSearchPlan(
+                queries=["technology company product research news"],
+                required_terms=[],
+            )
+        # Search one query per high-priority seed instead of spending all calls
+        # on generic rewrites of the first sentence in the profile.
+        queries = [f"{seed} news product research update" for seed in seeds[:3]]
+        return RadarSearchPlan(
+            queries=queries,
+            required_terms=self._context_match_terms(radar_context),
+        )
 
     def _context_match_terms(self, radar_context: List[str]) -> List[str]:
         terms: List[str] = []
