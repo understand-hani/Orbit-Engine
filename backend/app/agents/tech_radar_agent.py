@@ -124,11 +124,12 @@ class MockTechRadarAgent:
             ]
         ).lower()
         meaningful_context = self._context_match_terms(radar_context)
-        if not meaningful_context:
-            return any(term in haystack for term in GENERIC_INDUSTRY_TERMS)
-        return any(term in haystack for term in meaningful_context) or any(
-            term in haystack for term in GENERIC_INDUSTRY_TERMS
-        )
+        # When the user has supplied a focus, generic words such as "product",
+        # "platform" or "company" must not admit unrelated news.  They are only
+        # a fallback for a brand-new user with no usable domain context.
+        if meaningful_context:
+            return any(term in haystack for term in meaningful_context)
+        return any(term in haystack for term in GENERIC_INDUSTRY_TERMS)
 
     def _context_match_terms(self, radar_context: List[str]) -> List[str]:
         terms: List[str] = []
@@ -139,9 +140,9 @@ class MockTechRadarAgent:
             terms.append(lowered)
             terms.extend(re.findall(r"[a-z0-9][a-z0-9\-/+.]{2,}", lowered))
             for chunk in re.findall(r"[\u4e00-\u9fff]{2,}", lowered):
-                if len(chunk) <= 8:
-                    terms.append(chunk)
-                    continue
+                terms.append(chunk)
+                # Preserve the full user phrase and add domain-sized segments
+                # so “量化交易风控平台” can match a related “量化交易风控产品”.
                 for size in (4, 3):
                     terms.extend(chunk[index : index + size] for index in range(0, len(chunk) - size + 1))
         stop_terms = {"当前", "目标", "计划", "本周", "材料", "生成", "记录", "观察", "行业", "动态", "平台"}
@@ -207,14 +208,14 @@ class MockTechRadarAgent:
         if user_context is not None:
             terms.extend(
                 [
-                    user_context.profile.goal,
-                    user_context.profile.current_stage,
-                    user_context.plan.long_term_goal,
                     user_context.plan.weekly_focus,
-                    user_context.plan.next_action,
-                    *user_context.plan.active_tasks,
                     *user_context.plan.tracking_keywords,
                     *user_context.preferences.fields,
+                    user_context.profile.goal,
+                    user_context.plan.long_term_goal,
+                    user_context.profile.current_stage,
+                    user_context.plan.next_action,
+                    *user_context.plan.active_tasks,
                 ]
             )
         else:

@@ -165,7 +165,7 @@ def test_tech_radar_uses_user_goal_for_queries_and_relevance():
         assert refreshed is not None
         assert len(refreshed.payload.digest.items) == 3
         joined_queries = " ".join(search.queries)
-        assert "量化交易风控平台" in joined_queries
+        assert "量化交易风控" in joined_queries
         assert "autonomous driving" not in joined_queries.lower()
     finally:
         if original_path is None:
@@ -175,19 +175,49 @@ def test_tech_radar_uses_user_goal_for_queries_and_relevance():
         get_settings.cache_clear()
 
 
-def test_radar_relevance_allows_industry_signal_without_exact_goal_sentence():
+def test_radar_relevance_allows_signal_matching_a_specific_goal_term():
     agent = MockTechRadarAgent()
     source_item = SourceItem(
         id="web_001",
         source=SourceType.web,
         item_type=SourceItemType.article,
-        title="某金融科技公司发布新一代风控产品",
+        title="某金融科技公司发布量化交易风控产品",
         url="https://example.com/fintech-risk-product",
         summary="该产品面向证券机构，提供平台化风险管理能力。",
         tags=["public_web"],
     )
 
     assert agent._is_relevant_source(source_item, ["量化交易风控平台"])
+
+
+def test_radar_relevance_rejects_generic_industry_news_when_user_has_focus():
+    agent = MockTechRadarAgent()
+    unrelated_item = SourceItem(
+        id="web_003",
+        source=SourceType.web,
+        item_type=SourceItemType.article,
+        title="自动化运维任务执行的可追踪性与日志存储",
+        url="https://example.com/linux-task-log",
+        summary="某公司发布面向 Linux 运维的平台产品。",
+        tags=["public_web", "bocha_web"],
+    )
+
+    assert not agent._is_relevant_source(unrelated_item, ["4DGS / World Model"])
+
+
+def test_radar_relevance_uses_generic_fallback_only_without_user_context():
+    agent = MockTechRadarAgent()
+    source_item = SourceItem(
+        id="web_004",
+        source=SourceType.web,
+        item_type=SourceItemType.article,
+        title="某研究机构发布新产品",
+        url="https://example.com/research-product",
+        summary="研究团队公布平台能力更新。",
+        tags=["public_web"],
+    )
+
+    assert agent._is_relevant_source(source_item, [])
 
 
 def test_radar_source_passages_separate_excerpt_and_agent_analysis():
