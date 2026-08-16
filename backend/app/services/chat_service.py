@@ -110,15 +110,6 @@ class ChatService:
         ]
         conversation = conversation[-6:]
 
-        latest_user = next(
-            (item["content"] for item in reversed(conversation) if item["role"] == "user"),
-            "围绕当前任务进行了讨论。",
-        )
-        latest_assistant = next(
-            (item["content"] for item in reversed(conversation) if item["role"] == "assistant"),
-            "已形成初步判断，后续需要继续验证。",
-        )
-
         if self.settings.llm_provider == "openrouter" and conversation:
             try:
                 draft = self.openrouter.generate_json(
@@ -126,7 +117,7 @@ class ChatService:
                     user_payload={"conversation": conversation},
                     output_model=LLMCompletionDraftOutput,
                     schema_name="discussion_archive_draft",
-                    timeout_sec=6,
+                    timeout_sec=10,
                     max_tokens=240,
                 )
                 return AIChatSummary(
@@ -141,13 +132,16 @@ class ChatService:
             except Exception:
                 pass
 
+        fallback_summary, fallback_insight, fallback_action = self._fallback_discussion_takeaway(
+            thread.task_type
+        )
         return AIChatSummary(
             thread_id=thread.id,
             session_id=thread.session_id,
             suggested_title=f"Discussion note: {thread.task_type.value}",
-            summary=f"围绕“{latest_user}”完成了一次 Agent 讨论。",
-            key_insights=[latest_assistant],
-            action_items=["根据本次对话形成的判断，完成一项可验证的后续行动。"],
+            summary=fallback_summary,
+            key_insights=[fallback_insight],
+            action_items=[fallback_action],
             context_refs=thread.context_refs,
         )
 
@@ -453,3 +447,22 @@ class ChatService:
             "远端 Agent 暂未响应",
         )
         return not any(marker in content for marker in failure_markers)
+
+    def _fallback_discussion_takeaway(self, task_type: TaskType) -> tuple[str, str, str]:
+        if task_type == TaskType.tech_radar:
+            return (
+                "本次讨论聚焦于当前信号的信息可信度、技术实质与跟进价值。",
+                "核心判断是先区分一手证据与转载信息，再评估信号的技术实质和跟进价值。",
+                "核验信号的一手来源，并据此决定是否转入 Deep Dive。",
+            )
+        if task_type == TaskType.research_feeder:
+            return (
+                "本次讨论聚焦于论文结论、证据支撑及其与当前研究任务的关联。",
+                "核心判断是用原文段落和图表证据校验结论，避免把材料概述视为已验证事实。",
+                "回到原文核对一条能直接支持当前判断的证据。",
+            )
+        return (
+            "本次讨论聚焦于岗位要求、现有能力证据与优先补齐方向。",
+            "核心判断是把岗位要求映射到已有经历与能力缺口，再确定可验证的优先行动。",
+            "选择一个最关键的能力缺口，完成对应的验证行动。",
+        )

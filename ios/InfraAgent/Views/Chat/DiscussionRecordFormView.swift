@@ -69,13 +69,9 @@ struct DiscussionRecordFormView: View {
 
     private func loadSummary() async {
         guard summary.isEmpty && keyInsight.isEmpty && nextAction.isEmpty else { return }
-        let latestQuestion = thread.messages.last(where: { $0.role == "user" })?.content
-            ?? "围绕当前材料进行了讨论"
-        let latestAnswer = thread.messages.last(where: { $0.role == "assistant" })?.content
-            ?? "已明确需要回到当前材料核对证据与结论边界。"
 
-        let localSummary = "围绕“\(session.title)”完成了一次 Agent 讨论，重点问题：\(latestQuestion)"
-        let localInsight = latestAnswer
+        let localSummary = localDiscussionSummary
+        let localInsight = localKeyInsight
         let localAction = localNextAction
         summary = localSummary
         keyInsight = localInsight
@@ -131,6 +127,28 @@ struct DiscussionRecordFormView: View {
             return "核对该信号的一手来源，再决定是否转入 Deep Dive。"
         case .jdAnalysis:
             return "把讨论结论转成一个可验证的能力补齐或求职行动。"
+        }
+    }
+
+    private var localKeyInsight: String {
+        switch session.taskType {
+        case .researchFeeder:
+            return "核心判断是用原文段落和图表证据校验结论，避免把材料概述视为已验证事实。"
+        case .techRadar:
+            return "核心判断是先区分一手证据与转载信息，再评估信号的技术实质和跟进价值。"
+        case .jdAnalysis:
+            return "核心判断是把岗位要求映射到已有经历与能力缺口，再确定可验证的优先行动。"
+        }
+    }
+
+    private var localDiscussionSummary: String {
+        switch session.taskType {
+        case .researchFeeder:
+            return "本次讨论聚焦于论文结论、证据支撑及其与当前研究任务的关联。"
+        case .techRadar:
+            return "本次讨论聚焦于当前信号的信息可信度、技术实质与跟进价值。"
+        case .jdAnalysis:
+            return "本次讨论聚焦于岗位要求、现有能力证据与优先补齐方向。"
         }
     }
 }

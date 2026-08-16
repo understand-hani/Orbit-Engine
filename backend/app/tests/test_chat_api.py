@@ -101,6 +101,7 @@ def test_summarize_thread_returns_mock_history_draft():
         assert summary.summary
         assert summary.key_insights
         assert summary.action_items
+        assert response.assistant_message.content not in summary.key_insights
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)
