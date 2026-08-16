@@ -152,9 +152,9 @@ struct DirectionProfileView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             Form {
-                if let sheetErrorMessage {
+                if let currentSheetError = sheetErrorMessage {
                     Section {
-                        Text(sheetErrorMessage)
+                        Text(currentSheetError)
                             .font(.subheadline)
                             .foregroundStyle(.red)
                         Button("重试当前步骤") {
