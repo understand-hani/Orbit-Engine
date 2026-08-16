@@ -22,6 +22,8 @@ from app.services.llm_service import (
     OpenRouterChatService,
 )
 
+DIRECTION_SUGGESTION_LLM_TIMEOUT_SEC = 12.0
+
 
 class UserContextService:
     def __init__(self) -> None:
@@ -45,6 +47,15 @@ class UserContextService:
         self,
         request: DirectionProfileSuggestionRequest,
     ) -> DirectionProfileSuggestion:
+        # Once the user has confirmed or edited a full-cycle plan, downstream
+        # week/strategy regeneration must be fast and deterministic. The LLM is
+        # reserved for the first draft instead of being called again at every
+        # confirmation step.
+        if request.full_cycle_plan:
+            return self._normalize_direction_profile_suggestion(
+                request,
+                self._fallback_direction_profile(request),
+            )
         if self.settings.llm_provider == "openrouter":
             try:
                 output = self.llm.generate_json(
@@ -52,6 +63,7 @@ class UserContextService:
                     user_payload=request.model_dump(mode="json"),
                     output_model=DirectionProfileSuggestion,
                     schema_name="direction_profile_suggestion",
+                    timeout_sec=DIRECTION_SUGGESTION_LLM_TIMEOUT_SEC,
                 )
                 return self._normalize_direction_profile_suggestion(request, output)
             except Exception:

@@ -98,7 +98,7 @@ struct DirectionProfileView: View {
                 } label: {
                     HStack {
                         Spacer()
-                        Text(isGenerating ? "Agent 正在生成" : "提交方向，让 Agent 生成计划")
+                        Text(isGenerating ? "Agent 正在生成" : directionEntryButtonTitle)
                             .fontWeight(.semibold)
                         Spacer()
                     }
@@ -160,6 +160,11 @@ struct DirectionProfileView: View {
                         Button("重试当前步骤") {
                             Task { await retryCurrentPlanStep() }
                         }
+                        if isFullCycleStep && hasReusableFullCyclePlan {
+                            Button("继续使用当前计划") {
+                                sheetErrorMessage = nil
+                            }
+                        }
                     }
                 }
 
@@ -171,6 +176,9 @@ struct DirectionProfileView: View {
                             .foregroundStyle(.secondary)
                         TextField("阶段之间用空行分隔", text: $fullCyclePlanText, axis: .vertical)
                             .lineLimit(4...10)
+                        Button("重新生成全周期计划") {
+                            Task { await generateSuggestion() }
+                        }
                     }
                     if let issue = fullCyclePlanValidationMessage {
                         Section {
@@ -307,7 +315,9 @@ struct DirectionProfileView: View {
         planStep = .fullCycle
         sheetErrorMessage = nil
         isShowingPlanSheet = true
-        await generateSuggestion()
+        if !hasReusableFullCyclePlan {
+            await generateSuggestion()
+        }
     }
 
     private func confirmCurrentPlanStep() async {
@@ -591,6 +601,21 @@ struct DirectionProfileView: View {
                 !splitLines(keywordsText).isEmpty &&
                 !splitLines(fieldsText).isEmpty
         }
+    }
+
+    private var hasReusableFullCyclePlan: Bool {
+        !splitPlanBlocks(fullCyclePlanText).isEmpty && fullCyclePlanValidationMessage == nil
+    }
+
+    private var isFullCycleStep: Bool {
+        if case .fullCycle = planStep {
+            return true
+        }
+        return false
+    }
+
+    private var directionEntryButtonTitle: String {
+        hasReusableFullCyclePlan ? "查看并确认当前计划" : "提交方向，让 Agent 生成计划"
     }
 
     private var fullCyclePlanValidationMessage: String? {

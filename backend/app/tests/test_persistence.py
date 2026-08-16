@@ -257,6 +257,37 @@ def test_direction_strategy_rejects_unrelated_demo_defaults():
     ]
 
 
+def test_confirmed_full_cycle_plan_does_not_call_llm_again():
+    class OpenRouterSettings:
+        llm_provider = "openrouter"
+
+    class LLMShouldNotRun:
+        def generate_json(self, **kwargs):
+            raise AssertionError("confirmed plan refinement must not call the LLM")
+
+    service = UserContextService()
+    service.settings = OpenRouterSettings()
+    service.llm = LLMShouldNotRun()
+    request = DirectionProfileSuggestionRequest(
+        long_term_goal="建立自动驾驶世界模型研究能力",
+        current_direction="SLAM x 4DGS x Driving World Model",
+        current_stage="比较 reconstruction 与 generation",
+        full_cycle_plan=[
+            "第 1 阶段：精读 StreetGaussian 与 4DGS",
+            "第 2 阶段：比较 driving video generation",
+            "第 3 阶段：验证 World Model pipeline",
+        ],
+        weekly_focus="本周聚焦 4DGS 与 World Model",
+        active_tasks=["比较 StreetGaussian 与 WorldSplat"],
+    )
+
+    suggestion = service.suggest_direction_profile(request)
+
+    assert "4DGS" in suggestion.tracking_keywords
+    assert "World Model" in suggestion.tracking_keywords
+    assert suggestion.weekly_focus == request.weekly_focus
+
+
 def test_existing_context_plan_is_normalized_on_read(tmp_path):
     original_path = os.environ.get("DATABASE_PATH")
     db_path = tmp_path / "infra_plan_normalize_test.db"
