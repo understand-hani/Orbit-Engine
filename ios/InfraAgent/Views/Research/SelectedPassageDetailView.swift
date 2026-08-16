@@ -37,11 +37,6 @@ struct SelectedPassageDetailView: View {
                 }
             }
 
-            PartRecordFormView(
-                session: session,
-                defaultSummary: passage.textExcerpt,
-                defaultKeyInsight: passage.whySelected
-            )
         }
         .navigationTitle("段落")
         .navigationBarTitleDisplayMode(.inline)

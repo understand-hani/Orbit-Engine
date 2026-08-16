@@ -44,11 +44,6 @@ struct KeyFigureDetailView: View {
                 }
             }
 
-            PartRecordFormView(
-                session: session,
-                defaultSummary: figure.figureLabel.isEmpty ? "复盘关键图" : "复盘 \(figure.figureLabel)",
-                defaultKeyInsight: figure.whyImportant
-            )
         }
         .navigationTitle("图")
         .navigationBarTitleDisplayMode(.inline)
