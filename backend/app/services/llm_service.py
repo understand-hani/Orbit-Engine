@@ -143,6 +143,8 @@ class OpenRouterChatService:
         *,
         system_prompt: str,
         messages: List[Dict[str, str]],
+        timeout_sec: Optional[float] = None,
+        max_tokens: Optional[int] = None,
     ) -> str:
         if not self.settings.openrouter_api_key:
             raise RuntimeError("OPENROUTER_API_KEY is not configured")
@@ -151,6 +153,8 @@ class OpenRouterChatService:
             "model": self.settings.openrouter_model,
             "messages": [{"role": "system", "content": system_prompt}] + messages,
         }
+        if max_tokens is not None:
+            body["max_tokens"] = max_tokens
         url = f"{self.settings.openrouter_base_url.rstrip('/')}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.settings.openrouter_api_key}",
@@ -160,7 +164,8 @@ class OpenRouterChatService:
         if self.settings.openrouter_site_url:
             headers["HTTP-Referer"] = self.settings.openrouter_site_url
 
-        with httpx.Client(timeout=self.settings.openrouter_timeout_sec, trust_env=False) as client:
+        timeout = timeout_sec if timeout_sec is not None else self.settings.openrouter_timeout_sec
+        with httpx.Client(timeout=timeout, trust_env=False) as client:
             response = client.post(url, headers=headers, json=body)
             response.raise_for_status()
         return self._extract_output_text(response.json())

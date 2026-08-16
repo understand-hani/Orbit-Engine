@@ -161,6 +161,8 @@ class ChatService:
             return self.openrouter.generate_text(
                 system_prompt=self._system_prompt_for(thread),
                 messages=self._messages_for(thread, content),
+                timeout_sec=8,
+                max_tokens=320,
             )
         except Exception as exc:
             return (
@@ -181,7 +183,7 @@ class ChatService:
                 "role": "assistant" if message.role == ChatRole.assistant else "user",
                 "content": message.content,
             }
-            for message in thread.messages[-8:]
+            for message in thread.messages[-4:]
             if message.role in {ChatRole.user, ChatRole.assistant}
         ]
         context_message = self._context_message_for(thread)
@@ -232,7 +234,7 @@ class ChatService:
                 lines.append(
                     "- "
                     f"title={material.title}; "
-                    f"summary={material.summary}; "
+                    f"summary={self._truncate(material.summary, 500)}; "
                     f"url={material_url}; "
                     f"source_type={material.source_type}"
                 )
@@ -250,8 +252,8 @@ class ChatService:
                     f"- url: {str(paper.url) if paper.url else ''}",
                     f"- pdf_url: {str(paper.pdf_url) if paper.pdf_url else ''}",
                     f"- repo_url: {str(paper.repo_url) if paper.repo_url else ''}",
-                    f"- summary: {paper.summary}",
-                    f"- why_selected: {paper.why_selected}",
+                    f"- summary: {self._truncate(paper.summary, 800)}",
+                    f"- why_selected: {self._truncate(paper.why_selected, 400)}",
                     f"- tags: {', '.join(paper.tags)}",
                 ]
             )
@@ -390,7 +392,7 @@ class ChatService:
                     f"why_read={section.why_read}; "
                     f"agent_instruction={section.agent_instruction}; "
                     f"knowledge_points={', '.join(section.knowledge_points)}; "
-                    f"extracted_text={section.extracted_text}"
+                    f"extracted_text={self._truncate(section.extracted_text, 1200)}"
                 )
 
         passages = matching_passages or reader.selected_passages[:3]
@@ -401,7 +403,7 @@ class ChatService:
                     "- "
                     f"section={passage.section_name}; "
                     f"page={passage.page or ''}; "
-                    f"text={passage.text_excerpt}; "
+                    f"text={self._truncate(passage.text_excerpt, 1000)}; "
                     f"why_selected={passage.why_selected}; "
                     f"reading_question={passage.reading_question}"
                 )
@@ -433,3 +435,9 @@ class ChatService:
         if "OPENROUTER_API_KEY" in text:
             return "missing OPENROUTER_API_KEY"
         return text[:180]
+
+    def _truncate(self, value: str, limit: int) -> str:
+        text = value.strip()
+        if len(text) <= limit:
+            return text
+        return f"{text[:limit].rstrip()}..."

@@ -8,7 +8,11 @@ struct ChatAPI {
     }
 
     func createThread(_ request: AIChatThreadCreate) async throws -> AIChatThread {
-        try await resolvedClient.post("/api/chat/threads", body: request)
+        try await resolvedClient.post(
+            "/api/chat/threads",
+            timeoutInterval: 4,
+            body: request
+        )
     }
 
     func thread(id: String) async throws -> AIChatThread {
@@ -22,6 +26,7 @@ struct ChatAPI {
     func send(threadID: String, content: String) async throws -> AIChatSendResponse {
         try await resolvedClient.post(
             "/api/chat/threads/\(threadID)/messages",
+            timeoutInterval: 10,
             body: AIChatSendRequest(content: content)
         )
     }
