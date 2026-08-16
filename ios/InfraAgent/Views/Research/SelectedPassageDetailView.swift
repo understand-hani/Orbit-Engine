@@ -7,13 +7,16 @@ struct SelectedPassageDetailView: View {
 
     var body: some View {
         List {
-            Section("提取段落") {
+            Section("原文段落") {
                 if let page = passage.page {
                     LabeledContent("页码", value: "\(page)")
                 }
                 if !passage.sectionName.isEmpty {
                     LabeledContent("章节", value: passage.sectionName)
                 }
+                Text("以下内容直接提取自 PDF 文本层，保持原文，不由 Agent 改写。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Text(passage.textExcerpt)
             }
 

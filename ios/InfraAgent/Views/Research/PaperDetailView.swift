@@ -247,12 +247,13 @@ struct PaperDetailView: View {
             hasExtractedReadingSignals = true
 
             do {
-                _ = try await MaterialAPI().savePaperReader(
+                let analyzedReader = try await MaterialAPI().savePaperReader(
                     sessionID: session.id,
                     paperID: paper.id,
                     reader: updatedReader
                 )
-                extractionStatus = "已从真实 PDF 提取 \(updatedReader.selectedPassages.count) 个精选段落、\(updatedReader.keyFigures.count) 个图表标题，并同步到本次 Deep Dive。"
+                extractedReader = analyzedReader
+                extractionStatus = "已从真实 PDF 提取 \(analyzedReader.selectedPassages.count) 个精选段落、\(analyzedReader.keyFigures.count) 个图表标题，并完成 Agent 分析。"
             } catch {
                 extractionStatus = "已从真实 PDF 提取 \(updatedReader.selectedPassages.count) 个精选段落、\(updatedReader.keyFigures.count) 个图表标题；后端同步失败，但本页结果仍可阅读。"
             }

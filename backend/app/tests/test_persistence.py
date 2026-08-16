@@ -5,14 +5,18 @@ from pathlib import Path
 from app.config import get_settings
 from app.db.migrations import init_db
 from app.schemas.common import TaskType
-from app.schemas.research_feeder import SelectedPassage
+from app.schemas.research_feeder import PaperReader, SelectedPassage
 from app.schemas.user_context import (
     DirectionProfileSuggestion,
     DirectionProfileSuggestionRequest,
     MaterialSourceType,
 )
 from app.services.feed_service import FeedService
-from app.services.material_service import MaterialService
+from app.services.material_service import (
+    MaterialService,
+    PaperReaderAgentAnalysis,
+    PassageAgentAnalysis,
+)
 from app.services.user_context_service import UserContextService
 from app.agents.research_feeder_agent import ResearchFeederAgent
 from app.tests.research_source_stub import StaticResearchSearchService
@@ -87,6 +91,42 @@ def test_extracted_paper_reader_is_saved_for_later_agent_context(tmp_path):
         else:
             os.environ["DATABASE_PATH"] = original_path
         get_settings.cache_clear()
+
+
+def test_agent_analysis_never_rewrites_extracted_passage_text():
+    service = MaterialService()
+    original_text = "This exact paragraph was extracted from the PDF, including punctuation."
+    paper_id = "paper-under-test"
+    reader = PaperReader(
+        paper_id=paper_id,
+        selected_passages=[
+            SelectedPassage(
+                id="verbatim-passage",
+                paper_id=paper_id,
+                page=3,
+                section_name="Method",
+                text_excerpt=original_text,
+                why_selected="Old provenance-only placeholder.",
+                reading_question="Old question?",
+            )
+        ],
+    )
+    analysis = PaperReaderAgentAnalysis(
+        passages=[
+            PassageAgentAnalysis(
+                passage_id="verbatim-passage",
+                analysis="该段定义了方法成立所需的输入与约束，应继续核对后文实验是否覆盖这些条件。",
+                reading_question="实验设置是否真正覆盖了本段声明的输入条件？",
+            )
+        ],
+        figures=[],
+    )
+
+    enriched = service._apply_reader_analysis(reader, analysis)
+
+    assert enriched.selected_passages[0].text_excerpt == original_text
+    assert enriched.selected_passages[0].why_selected == analysis.passages[0].analysis
+    assert "PDF" not in enriched.selected_passages[0].why_selected
 
 
 def test_save_and_read_user_context_direction_profile(tmp_path):
