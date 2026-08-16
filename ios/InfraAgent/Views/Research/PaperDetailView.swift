@@ -255,11 +255,58 @@ struct PaperDetailView: View {
                 extractedReader = analyzedReader
                 extractionStatus = "已从真实 PDF 提取 \(analyzedReader.selectedPassages.count) 个精选段落、\(analyzedReader.keyFigures.count) 个图表标题，并完成 Agent 分析。"
             } catch {
-                extractionStatus = "原文已完整提取，但 Agent 分析生成或同步失败：\(error.localizedDescription)。请确认后端和 OpenRouter 后重试。"
+                let fallbackReader = localFallbackAnalyzedReader(updatedReader)
+                extractedReader = fallbackReader
+                extractionStatus = "原文已完整提取；远端 Agent 分析超时，已先生成本地保守分析。可稍后重试同步。"
             }
         } catch {
             extractionStatus = "读取失败：\(error.localizedDescription)"
         }
+    }
+
+    private func localFallbackAnalyzedReader(_ reader: PaperReader) -> PaperReader {
+        PaperReader(
+            paperID: reader.paperID,
+            pdfLocalPath: reader.pdfLocalPath,
+            pdfURL: reader.pdfURL,
+            sections: reader.sections,
+            selectedPassages: reader.selectedPassages.map { passage in
+                SelectedPassage(
+                    id: passage.id,
+                    paperID: passage.paperID,
+                    page: passage.page,
+                    sectionName: passage.sectionName,
+                    textExcerpt: passage.textExcerpt,
+                    whySelected: localPassageAnalysis(passage),
+                    readingQuestion: "作者在这段中提出了什么可验证判断，证据是否足以支持它，在哪些条件下可能不成立？",
+                    status: passage.status
+                )
+            },
+            keyFigures: reader.keyFigures.map { figure in
+                KeyFigure(
+                    id: figure.id,
+                    paperID: figure.paperID,
+                    page: figure.page,
+                    figureLabel: figure.figureLabel,
+                    visual: figure.visual,
+                    whyImportant: localFigureAnalysis(figure),
+                    readingQuestion: "这张图实际比较了什么，图中的变化是否足以支持正文对应结论？"
+                )
+            },
+            annotations: reader.annotations
+        )
+    }
+
+    private func localPassageAnalysis(_ passage: SelectedPassage) -> String {
+        let excerpt = passage.textExcerpt
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .prefix(180)
+        return "这段原文适合作为精读入口。阅读时先拆出作者的问题定义、方法假设和证据链，再判断结论是否依赖特定数据集、指标或实验设置。摘录线索：\(excerpt)"
+    }
+
+    private func localFigureAnalysis(_ figure: KeyFigure) -> String {
+        let label = figure.figureLabel.isEmpty ? "这张图表" : figure.figureLabel
+        return "\(label) 需要结合图中变量、模块、对照组和趋势来核对。当前只能从图题和截图定位判断它是关键证据入口，不能仅凭标题推断具体数值或因果关系。"
     }
 }
 
