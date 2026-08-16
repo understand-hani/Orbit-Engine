@@ -1,7 +1,8 @@
 import re
-from concurrent.futures import ThreadPoolExecutor, wait
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from datetime import datetime, timedelta, timezone
 from math import ceil
+from time import monotonic
 from typing import List, Optional
 from urllib.parse import urlparse
 
@@ -188,10 +189,23 @@ class ResearchFeederAgent:
         executor = ThreadPoolExecutor(max_workers=2)
         arxiv_future = executor.submit(self._search_arxiv_items, arxiv_query)
         web_future = executor.submit(self._search_web_items, web_query)
+        started_at = monotonic()
         done, pending = wait(
             {arxiv_future, web_future},
             timeout=RESEARCH_SOURCE_DEADLINE_SEC,
+            return_when=FIRST_COMPLETED,
         )
+        arxiv_items = self._completed_source_items(arxiv_future, done)
+        web_items = self._completed_source_items(web_future, done)
+        if pending and not self._has_sufficient_source_items(
+            [*arxiv_items, *web_items],
+            plan.required_terms,
+        ):
+            remaining = max(0.0, RESEARCH_SOURCE_DEADLINE_SEC - (monotonic() - started_at))
+            additional_done, pending = wait(pending, timeout=remaining)
+            done.update(additional_done)
+            arxiv_items = self._completed_source_items(arxiv_future, done)
+            web_items = self._completed_source_items(web_future, done)
         for future in pending:
             future.cancel()
         # Do not let a transport that ignores its socket timeout hold the API
@@ -199,14 +213,6 @@ class ResearchFeederAgent:
         # current material-generation request observes the explicit deadline.
         executor.shutdown(wait=False, cancel_futures=True)
 
-        try:
-            arxiv_items = arxiv_future.result() if arxiv_future in done else []
-        except Exception:
-            arxiv_items = []
-        try:
-            web_items = web_future.result() if web_future in done else []
-        except Exception:
-            web_items = []
         self._append_research_candidates(candidates, seen_ids, arxiv_items, plan.required_terms)
         self._append_research_candidates(candidates, seen_ids, web_items, plan.required_terms)
 
@@ -225,17 +231,54 @@ class ResearchFeederAgent:
             freshness="oneYear",
         ).items
 
+    def _completed_source_items(self, future, done: set) -> List[SourceItem]:
+        if future not in done:
+            return []
+        try:
+            return future.result()
+        except Exception:
+            return []
+
+    def _has_sufficient_source_items(
+        self,
+        items: List[SourceItem],
+        required_terms: List[str],
+    ) -> bool:
+        eligible = [
+            item
+            for item in self._validated_arxiv_sources(items)
+            if self._is_recent(item)
+            and self._deterministic_relevance_score(item, required_terms) >= RESEARCH_MIN_SCORE
+        ]
+        return len(eligible) >= 2 and any(
+            self._deterministic_relevance_score(item, required_terms) == RESEARCH_PRIMARY_SCORE
+            for item in eligible
+        )
+
     def _combined_arxiv_query(self, plan: ResearchSearchPlan) -> str:
-        anchors = plan.required_terms[:6] or plan.queries[:3]
+        anchors = self._specific_search_anchors(plan)
         escaped = [term.replace('"', "").strip() for term in anchors if term.strip()]
         return " OR ".join(f'all:"{term}"' for term in escaped) or 'all:"computer vision"'
 
     def _combined_web_query(self, plan: ResearchSearchPlan) -> str:
-        queries = [query.replace('"', "").strip() for query in plan.queries[:3] if query.strip()]
-        if not queries:
-            queries = plan.required_terms[:4]
+        queries = [query.replace('"', "").strip() for query in self._specific_search_anchors(plan)]
         joined = " OR ".join(f'"{query}"' for query in queries)
         return f"site:arxiv.org/abs ({joined})"
+
+    def _specific_search_anchors(self, plan: ResearchSearchPlan) -> List[str]:
+        anchors = plan.required_terms or plan.queries
+        ranked = sorted(
+            enumerate(anchors),
+            key=lambda pair: (-len(self._normalized_anchor_tokens(pair[1])), pair[0]),
+        )
+        specific = [
+            value
+            for _, value in ranked
+            if len(self._normalized_anchor_tokens(value)) >= 3
+        ]
+        # When concrete route/application phrases exist, broad two-word fields
+        # such as "World Models" must not dominate newest-first recall.
+        return (specific or [value for _, value in ranked])[:6]
 
     def _append_research_candidates(
         self,

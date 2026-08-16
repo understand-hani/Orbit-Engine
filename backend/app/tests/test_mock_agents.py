@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from threading import Barrier
 
 from app.agents.tech_radar_agent import MockTechRadarAgent
-from app.agents.research_feeder_agent import ResearchFeederAgent
+from app.agents.research_feeder_agent import ResearchFeederAgent, ResearchSearchPlan
 from app.schemas.common import SuggestedAction, TaskType
 from app.schemas.research_feeder import ResearchDayRole
 from app.schemas.source import CombinedSearchResponse, SourceItem, SourceItemType, SourceSearchResponse, SourceType
@@ -437,3 +437,25 @@ def test_deep_dive_five_star_requires_specific_route_coverage():
 
     assert agent._deterministic_relevance_score(generic, terms) == 4
     assert agent._deterministic_relevance_score(specific, terms) == 5
+
+
+def test_deep_dive_query_prefers_specific_routes_over_broad_field():
+    agent = ResearchFeederAgent()
+    plan = ResearchSearchPlan(
+        queries=["World Models", "Auto Driving World Model", "Driving Scene Generation"],
+        required_terms=[
+            "world models",
+            "auto driving world model",
+            "driving scene generation",
+            "model-based rl for driving",
+            "autonomous driving",
+        ],
+    )
+
+    arxiv_query = agent._combined_arxiv_query(plan)
+    web_query = agent._combined_web_query(plan)
+
+    assert 'all:"world models"' not in arxiv_query
+    assert '"world models"' not in web_query
+    assert "auto driving world model" in arxiv_query
+    assert "driving scene generation" in web_query
