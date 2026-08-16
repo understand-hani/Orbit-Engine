@@ -76,8 +76,8 @@ struct MoreView: View {
                 }
             }
             .navigationTitle("我的")
-            .task {
-                await load()
+            .onAppear {
+                Task { await load(force: true) }
             }
             .refreshable {
                 await load(force: true)
