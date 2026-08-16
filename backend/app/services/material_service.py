@@ -122,3 +122,37 @@ class MaterialService:
         if session.task_type != TaskType.research_feeder:
             return None
         return session.payload.paper_reader
+
+    def save_paper_reader(
+        self,
+        session_id: str,
+        paper_id: str,
+        reader: PaperReader,
+    ) -> Optional[PaperReader]:
+        session = self.sessions.get_by_id(session_id)
+        if session is None or session.task_type != TaskType.research_feeder:
+            return None
+        if reader.paper_id != paper_id or not any(paper.id == paper_id for paper in session.payload.papers):
+            return None
+
+        readers = [item for item in session.payload.paper_readers if item.paper_id != paper_id]
+        readers.append(reader)
+        primary_reader = session.payload.paper_reader
+        if primary_reader is None or primary_reader.paper_id == paper_id:
+            primary_reader = reader
+
+        updated_payload = session.payload.model_copy(
+            update={
+                "paper_reader": primary_reader,
+                "paper_readers": readers,
+            }
+        )
+        self.sessions.save(
+            session.model_copy(
+                update={
+                    "payload": updated_payload,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            )
+        )
+        return reader

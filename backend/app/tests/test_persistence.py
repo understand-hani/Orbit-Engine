@@ -4,13 +4,18 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.db.migrations import init_db
+from app.schemas.common import TaskType
+from app.schemas.research_feeder import SelectedPassage
 from app.schemas.user_context import (
     DirectionProfileSuggestion,
     DirectionProfileSuggestionRequest,
     MaterialSourceType,
 )
 from app.services.feed_service import FeedService
+from app.services.material_service import MaterialService
 from app.services.user_context_service import UserContextService
+from app.agents.research_feeder_agent import ResearchFeederAgent
+from app.tests.research_source_stub import StaticResearchSearchService
 
 
 def test_generate_save_and_read_session(tmp_path):
@@ -29,6 +34,53 @@ def test_generate_save_and_read_session(tmp_path):
         assert loaded.id == saved.id
         assert len(by_date) == 1
         assert Path(db_path).exists()
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        get_settings.cache_clear()
+
+
+def test_extracted_paper_reader_is_saved_for_later_agent_context(tmp_path):
+    original_path = os.environ.get("DATABASE_PATH")
+    os.environ["DATABASE_PATH"] = str(tmp_path / "reader_extraction.db")
+    get_settings.cache_clear()
+    try:
+        init_db()
+        feed = FeedService()
+        feed.research_agent = ResearchFeederAgent(search_service=StaticResearchSearchService())
+        session = feed.generate_and_save_mock_session(
+            date(2026, 7, 16),
+            task_type=TaskType.research_feeder,
+        )
+        paper = session.payload.papers[0]
+        reader = session.payload.paper_readers[0]
+        extracted = reader.model_copy(
+            update={
+                "pdf_local_path": "/tmp/test-paper.pdf",
+                "selected_passages": [
+                    SelectedPassage(
+                        id=f"{paper.id}_passage_1",
+                        paper_id=paper.id,
+                        page=2,
+                        section_name="PDF 第 2 页",
+                        text_excerpt="A real extracted paragraph from the PDF text layer.",
+                        why_selected="Contains method evidence.",
+                        reading_question="What evidence supports the method?",
+                    )
+                ],
+            }
+        )
+
+        saved = MaterialService().save_paper_reader(session.id, paper.id, extracted)
+        reloaded = FeedService().get_session(session.id)
+
+        assert saved is not None
+        assert reloaded is not None
+        persisted = next(item for item in reloaded.payload.paper_readers if item.paper_id == paper.id)
+        assert persisted.pdf_local_path == "/tmp/test-paper.pdf"
+        assert persisted.selected_passages[0].text_excerpt.startswith("A real extracted")
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)

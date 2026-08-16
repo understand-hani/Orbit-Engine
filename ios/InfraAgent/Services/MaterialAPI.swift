@@ -43,4 +43,11 @@ struct MaterialAPI {
     func paperReader(sessionID: String) async throws -> PaperReader {
         try await resolvedClient.get("/api/sessions/\(sessionID)/paper-reader")
     }
+
+    func savePaperReader(sessionID: String, paperID: String, reader: PaperReader) async throws -> PaperReader {
+        try await resolvedClient.put(
+            "/api/sessions/\(sessionID)/papers/\(paperID)/reader",
+            body: reader
+        )
+    }
 }

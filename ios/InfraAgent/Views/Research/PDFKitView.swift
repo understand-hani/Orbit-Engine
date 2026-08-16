@@ -3,6 +3,7 @@ import SwiftUI
 
 struct PDFKitView: UIViewRepresentable {
     let documentURL: URL
+    var initialPage: Int? = nil
 
     func makeUIView(context: Context) -> PDFView {
         let pdfView = PDFView()
@@ -10,7 +11,12 @@ struct PDFKitView: UIViewRepresentable {
         pdfView.displayMode = .singlePageContinuous
         pdfView.displayDirection = .vertical
         pdfView.usePageViewController(false)
-        pdfView.document = PDFDocument(url: documentURL)
+        let document = PDFDocument(url: documentURL)
+        pdfView.document = document
+        if let initialPage,
+           let page = document?.page(at: max(0, initialPage - 1)) {
+            pdfView.go(to: page)
+        }
         return pdfView
     }
 

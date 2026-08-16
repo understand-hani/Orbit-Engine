@@ -67,3 +67,11 @@ def get_paper_reader(session_id: str) -> PaperReader:
     if reader is None:
         raise HTTPException(status_code=404, detail="Paper reader not found")
     return reader
+
+
+@router.put("/sessions/{session_id}/papers/{paper_id}/reader", response_model=PaperReader)
+def save_paper_reader(session_id: str, paper_id: str, reader: PaperReader) -> PaperReader:
+    saved = material_service.save_paper_reader(session_id, paper_id, reader)
+    if saved is None:
+        raise HTTPException(status_code=404, detail="Paper reader or session not found")
+    return saved

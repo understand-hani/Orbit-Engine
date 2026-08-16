@@ -15,6 +15,13 @@ struct KeyFigureDetailView: View {
                 }
                 Text(figure.visual.caption)
                     .foregroundStyle(.secondary)
+                if !figure.visual.localPath.isEmpty {
+                    PDFKitView(
+                        documentURL: URL(fileURLWithPath: figure.visual.localPath),
+                        initialPage: figure.page
+                    )
+                    .frame(minHeight: 420)
+                }
             }
 
             Section("Agent 分析") {
