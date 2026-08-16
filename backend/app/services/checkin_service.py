@@ -20,8 +20,6 @@ from app.schemas.session import BaseSession
 from app.schemas.tech_radar import TechRadarPayload
 from app.config import get_settings
 from app.services.llm_service import (
-    DEEP_DIVE_COMPLETION_DRAFT_SYSTEM_PROMPT,
-    LLMCompletionDraftOutput,
     LLMWeeklyStudioDraftOutput,
     OpenRouterChatService,
     WEEKLY_STUDIO_DRAFT_SYSTEM_PROMPT,
@@ -64,23 +62,6 @@ class CheckinService:
         session = self.sessions.get_by_id(session_id)
         if session is None:
             return None
-
-        if self.settings.llm_provider == "openrouter":
-            try:
-                output = self.llm.generate_json(
-                    system_prompt=DEEP_DIVE_COMPLETION_DRAFT_SYSTEM_PROMPT,
-                    user_payload=self._draft_payload(session, request),
-                    output_model=LLMCompletionDraftOutput,
-                    schema_name="deep_dive_completion_draft",
-                )
-                return CompletionDraftResponse(
-                    summary=output.summary,
-                    key_insight=output.key_insight,
-                    next_action=output.next_action,
-                    provider="openrouter",
-                )
-            except Exception:
-                pass
 
         mock = self._mock_draft(session, request)
         return mock.model_copy(update={"provider": "mock"})
