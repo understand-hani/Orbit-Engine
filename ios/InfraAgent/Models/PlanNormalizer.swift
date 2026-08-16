@@ -21,7 +21,7 @@ struct PlanNormalizer {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         if formatted.count >= 3, formatted.count <= 4, formatted.allSatisfy(isStructuredPhase) {
-            return formatted
+            return formatted.map(stripExecutionTimingLabels)
         }
 
         var cleaned = items
@@ -160,9 +160,17 @@ struct PlanNormalizer {
 
     private static func phaseExecutionSteps(index: Int, goalFocus: String, durationWeeks: Int) -> [String] {
         let templates = executionTemplates(index: index, goalFocus: goalFocus)
-        return weekRanges(totalWeeks: max(durationWeeks, 1)).enumerated().map { offset, range in
-            "\(weekLabel(start: range.start, end: range.end)) / Day 1-5：\(templates[min(offset, templates.count - 1)])"
+        return weekRanges(totalWeeks: max(durationWeeks, 1)).enumerated().map { offset, _ in
+            templates[min(offset, templates.count - 1)]
         }
+    }
+
+    private static func stripExecutionTimingLabels(_ value: String) -> String {
+        value.replacingOccurrences(
+            of: #"(?m)^(\s*\d+\.\s*)Week\s+\d+(?:\s*[-—~～至到]\s*\d+)?\s*/\s*Day\s+\d+(?:\s*[-—~～至到]\s*\d+)?\s*[：:]\s*"#,
+            with: "$1",
+            options: .regularExpression
+        )
     }
 
     private static func executionTemplates(index: Int, goalFocus: String) -> [String] {
@@ -374,9 +382,9 @@ struct PlanNormalizer {
         if objective.contains("目标：") || objective.range(of: #"第\s*\d+\s*阶段"#, options: .regularExpression) != nil {
             return false
         }
-        return !goalCandidates(objective).isEmpty &&
-            execution.contains("Week") &&
-            execution.contains("Day") &&
+        let goals = goalCandidates(objective)
+        return !goals.isEmpty &&
+            goals.allSatisfy { !isVaguePlanItem($0) } &&
             executionCoversPhase(item: item, execution: String(execution)) &&
             ["目标：", "具体执行计划：", "产出："].allSatisfy { marker in
                 guard let range = item.range(of: marker) else { return false }
@@ -387,7 +395,11 @@ struct PlanNormalizer {
     private static func executionCoversPhase(item: String, execution: String) -> Bool {
         let title = item.components(separatedBy: .newlines).first ?? ""
         let durationWeeks = phaseDurationWeeks(title)
-        return highestWeekNumber(in: execution) >= durationWeeks
+        let actionCount = execution
+            .components(separatedBy: .newlines)
+            .filter { $0.range(of: #"^\s*\d+\.\s+"#, options: .regularExpression) != nil }
+            .count
+        return actionCount >= weekRanges(totalWeeks: max(durationWeeks, 1)).count
     }
 
     private static func phaseTimeRanges(targetCycle: String, count: Int) -> [String] {

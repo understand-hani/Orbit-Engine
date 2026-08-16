@@ -29,9 +29,7 @@ struct DirectionProfileView: View {
         ("arxiv", "arXiv"),
         ("github", "GitHub"),
         ("official_doc", "官方文档"),
-        ("url", "网页"),
-        ("pdf", "PDF"),
-        ("manual", "手动材料")
+        ("url", "网页")
     ]
 
     var body: some View {
@@ -393,7 +391,7 @@ struct DirectionProfileView: View {
         keywordsText = context.plan.trackingKeywords.joined(separator: "\n")
         activeTasksText = context.plan.activeTasks.joined(separator: "\n")
         constraintsText = context.profile.constraints.joined(separator: "\n")
-        sourcePreferences = Set(context.preferences.sourcePreferences)
+        sourcePreferences = searchableSources(context.preferences.sourcePreferences)
         timeBudget = context.preferences.sessionTimeBudgetMin
     }
 
@@ -410,7 +408,7 @@ struct DirectionProfileView: View {
         keywordsText = suggestion.trackingKeywords.joined(separator: "\n")
         fieldsText = suggestion.fields.joined(separator: "\n")
         constraintsText = suggestion.constraints.joined(separator: "\n")
-        sourcePreferences = Set(suggestion.sourcePreferences)
+        sourcePreferences = searchableSources(suggestion.sourcePreferences)
     }
 
     private func regenerateWeekPlanFromEditedFullCycle() async -> Bool {
@@ -434,7 +432,7 @@ struct DirectionProfileView: View {
             keywordsText = suggestion.trackingKeywords.joined(separator: "\n")
             fieldsText = suggestion.fields.joined(separator: "\n")
             constraintsText = suggestion.constraints.joined(separator: "\n")
-            sourcePreferences = Set(suggestion.sourcePreferences)
+            sourcePreferences = searchableSources(suggestion.sourcePreferences)
             message = "已根据你修改后的全周期计划重新生成第一周计划。"
             return true
         } catch {
@@ -467,7 +465,7 @@ struct DirectionProfileView: View {
             keywordsText = suggestion.trackingKeywords.joined(separator: "\n")
             fieldsText = suggestion.fields.joined(separator: "\n")
             constraintsText = suggestion.constraints.joined(separator: "\n")
-            sourcePreferences = Set(suggestion.sourcePreferences)
+            sourcePreferences = searchableSources(suggestion.sourcePreferences)
             message = "已根据你确认后的第一周计划重新生成检索策略。"
             return true
         } catch {
@@ -512,6 +510,11 @@ struct DirectionProfileView: View {
         } else {
             sourcePreferences.insert(source)
         }
+    }
+
+    private func searchableSources(_ values: [String]) -> Set<String> {
+        let allowed = Set(sourceOptions.map { $0.0 })
+        return Set(values.filter { allowed.contains($0) })
     }
 
     private func splitLines(_ text: String) -> [String] {

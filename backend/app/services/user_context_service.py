@@ -23,6 +23,12 @@ from app.services.llm_service import (
 )
 
 DIRECTION_SUGGESTION_LLM_TIMEOUT_SEC = 12.0
+SEARCHABLE_DIRECTION_SOURCES = {
+    MaterialSourceType.arxiv,
+    MaterialSourceType.github,
+    MaterialSourceType.official_doc,
+    MaterialSourceType.url,
+}
 
 
 class UserContextService:
@@ -195,9 +201,22 @@ class UserContextService:
 
     def _normalize_context(self, context: UserContext) -> UserContext:
         normalized_plan = self._normalize_work_learning_plan(context)
-        if normalized_plan == context.plan:
+        normalized_sources = [
+            source
+            for source in context.preferences.source_preferences
+            if source in SEARCHABLE_DIRECTION_SOURCES
+        ]
+        normalized_preferences = context.preferences.model_copy(
+            update={"source_preferences": normalized_sources}
+        )
+        if normalized_plan == context.plan and normalized_preferences == context.preferences:
             return context
-        return context.model_copy(update={"plan": normalized_plan})
+        return context.model_copy(
+            update={
+                "plan": normalized_plan,
+                "preferences": normalized_preferences,
+            }
+        )
 
     def _normalize_work_learning_plan(self, context: UserContext) -> WorkLearningPlan:
         direction = context.profile.goal or context.plan.long_term_goal or "当前方向"
@@ -240,11 +259,14 @@ class UserContextService:
         fields = self._dedupe_strategy_values(
             [direction, *suggested_fields]
         )[:4]
-        source_preferences = suggestion.source_preferences or [
+        source_preferences = [
+            source
+            for source in suggestion.source_preferences
+            if source in SEARCHABLE_DIRECTION_SOURCES
+        ] or [
             MaterialSourceType.arxiv,
             MaterialSourceType.official_doc,
             MaterialSourceType.url,
-            MaterialSourceType.pdf,
         ]
 
         return suggestion.model_copy(
@@ -340,7 +362,7 @@ class UserContextService:
     def _normalize_plan_items(self, items: list[str], direction: str, target_cycle: str = "") -> list[str]:
         formatted = [item.strip() for item in items if item.strip()]
         if 3 <= len(formatted) <= 4 and all(self._is_structured_phase(item) for item in formatted):
-            return formatted
+            return [self._strip_execution_timing_labels(item) for item in formatted]
 
         cleaned = [self._phase_source_text(item) for item in items if item.strip()]
         if not cleaned:
@@ -456,9 +478,16 @@ class UserContextService:
         templates = self._execution_templates(index, goal_focus)
         ranges = self._week_ranges(max(duration_weeks, 1))
         return [
-            f"{self._week_label(start, end)} / Day 1-5：{templates[min(offset, len(templates) - 1)]}"
-            for offset, (start, end) in enumerate(ranges)
+            templates[min(offset, len(templates) - 1)]
+            for offset, _ in enumerate(ranges)
         ]
+
+    def _strip_execution_timing_labels(self, value: str) -> str:
+        return re.sub(
+            r"(?m)^(\s*\d+\.\s*)Week\s+\d+(?:\s*[-—~～至到]\s*\d+)?\s*/\s*Day\s+\d+(?:\s*[-—~～至到]\s*\d+)?\s*[：:]\s*",
+            r"\1",
+            value,
+        )
 
     def _execution_templates(self, index: int, goal_focus: str) -> list[str]:
         if index == 1:
@@ -693,8 +722,7 @@ class UserContextService:
         goals = self._goal_candidates(objective)
         return (
             bool(goals)
-            and "Week" in execution
-            and "Day" in execution
+            and all(not self._is_vague_plan_item(goal) for goal in goals)
             and self._execution_covers_phase(item, execution)
             and all("\n1. " in item.split(marker, 1)[1] for marker in ["目标：", "具体执行计划：", "产出："])
         )
@@ -702,10 +730,12 @@ class UserContextService:
     def _execution_covers_phase(self, item: str, execution: str) -> bool:
         title = item.splitlines()[0] if item.splitlines() else ""
         duration_weeks = self._phase_duration_weeks(title)
-        week_numbers = [int(value) for value in re.findall(r"Week\s+\d+(?:\s*[-—~～至到]\s*(\d+))?", execution) if value]
-        week_starts = [int(value) for value in re.findall(r"Week\s+(\d+)", execution)]
-        highest_week = max([*week_numbers, *week_starts], default=0)
-        return highest_week >= duration_weeks
+        execution_steps = [
+            line
+            for line in execution.splitlines()
+            if re.match(r"^\s*\d+\.\s+", line)
+        ]
+        return len(execution_steps) >= len(self._week_ranges(max(duration_weeks, 1)))
 
     def _default_context(self) -> UserContext:
         now = datetime.now(timezone.utc)
