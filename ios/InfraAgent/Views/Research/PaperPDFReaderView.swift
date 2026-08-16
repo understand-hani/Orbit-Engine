@@ -63,16 +63,16 @@ enum PaperPDFLoader {
             return destination
         }
 
-        guard let remoteURL = normalizedPDFURL(reader.pdfURL) else {
+        guard let remoteURL = reader.pdfURL else {
             throw PaperPDFLoadError.missingURL
         }
 
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 20
-        configuration.timeoutIntervalForResource = 45
+        configuration.timeoutIntervalForRequest = 60
+        configuration.timeoutIntervalForResource = 180
         configuration.waitsForConnectivity = false
         let session = URLSession(configuration: configuration)
-        var request = URLRequest(url: remoteURL, timeoutInterval: 20)
+        var request = URLRequest(url: remoteURL, timeoutInterval: 60)
         request.setValue("OrbitEngine/0.1 (PDF reader)", forHTTPHeaderField: "User-Agent")
 
         let (downloadURL, response) = try await session.download(for: request)
@@ -92,18 +92,6 @@ enum PaperPDFLoader {
             throw PaperPDFLoadError.invalidPDF
         }
         return destination
-    }
-
-    private static func normalizedPDFURL(_ value: URL?) -> URL? {
-        guard let value else { return nil }
-        guard value.host?.lowercased().hasSuffix("arxiv.org") == true,
-              value.path.hasPrefix("/pdf/"),
-              value.pathExtension.lowercased() != "pdf" else {
-            return value
-        }
-        var components = URLComponents(url: value, resolvingAgainstBaseURL: false)
-        components?.path += ".pdf"
-        return components?.url ?? value
     }
 
     private static func cachedURL(paperID: String) -> URL {
