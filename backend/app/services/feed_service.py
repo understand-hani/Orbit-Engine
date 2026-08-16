@@ -93,22 +93,33 @@ class FeedService:
         target_date: Optional[date] = None,
         task_type: Optional[TaskType] = None,
         weekly_studio: bool = False,
+        manual_workspace: bool = False,
     ) -> BaseSession:
-        seed_session = self.coordinator.create_session(
-            target_date,
-            task_type_override=task_type,
-            weekly_studio=weekly_studio,
-        )
-        if seed_session.task_type == TaskType.tech_radar:
-            session = seed_session
-        else:
-            excluded_radar_keys = self._radar_source_keys()
-            session = self.generate_mock_session(
+        if manual_workspace and task_type == TaskType.research_feeder and not weekly_studio:
+            # A Manual Deep Dive card is an empty persisted workspace. Search
+            # starts only after the user opens it and taps “生成候选”.
+            seed_session = self.preview_session(
                 target_date,
                 task_type=task_type,
-                excluded_radar_keys=excluded_radar_keys,
+                manual_workspace=True,
+            )
+            session = seed_session
+        else:
+            seed_session = self.coordinator.create_session(
+                target_date,
+                task_type_override=task_type,
                 weekly_studio=weekly_studio,
             )
+            if seed_session.task_type == TaskType.tech_radar:
+                session = seed_session
+            else:
+                excluded_radar_keys = self._radar_source_keys()
+                session = self.generate_mock_session(
+                    target_date,
+                    task_type=task_type,
+                    excluded_radar_keys=excluded_radar_keys,
+                    weekly_studio=weekly_studio,
+                )
         if self.sessions.get_by_id(session.id) is not None:
             suffix = uuid4().hex[:8]
             session = session.model_copy(

@@ -30,8 +30,21 @@ struct SessionAPI {
         try await resolvedClient.get("/api/sessions/mock", queryItems: sessionQuery(date: date, taskType: taskType, weeklyStudio: weeklyStudio))
     }
 
-    func generateAndSaveMock(date: String? = nil, taskType: TaskType? = nil, weeklyStudio: Bool = false) async throws -> BaseSession {
-        try await resolvedClient.post("/api/sessions/mock", queryItems: sessionQuery(date: date, taskType: taskType, weeklyStudio: weeklyStudio))
+    func generateAndSaveMock(
+        date: String? = nil,
+        taskType: TaskType? = nil,
+        weeklyStudio: Bool = false,
+        manualWorkspace: Bool = false
+    ) async throws -> BaseSession {
+        try await resolvedClient.post(
+            "/api/sessions/mock",
+            queryItems: sessionQuery(
+                date: date,
+                taskType: taskType,
+                weeklyStudio: weeklyStudio,
+                manualWorkspace: manualWorkspace
+            )
+        )
     }
 
     func sessionsByDate(_ date: String) async throws -> [BaseSession] {

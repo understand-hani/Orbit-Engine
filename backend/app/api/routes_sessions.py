@@ -43,8 +43,14 @@ def generate_and_save_mock_session(
     target_date: Optional[date] = Query(default=None, alias="date"),
     task_type: Optional[TaskType] = Query(default=None),
     weekly_studio: bool = False,
+    manual_workspace: bool = False,
 ) -> BaseSession:
-    return feed_service.generate_and_save_mock_session(target_date, task_type, weekly_studio=weekly_studio)
+    return feed_service.generate_and_save_mock_session(
+        target_date,
+        task_type,
+        weekly_studio=weekly_studio,
+        manual_workspace=manual_workspace,
+    )
 
 
 @router.get("/sessions/today", response_model=BaseSession)

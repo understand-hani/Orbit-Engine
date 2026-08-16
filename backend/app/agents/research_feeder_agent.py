@@ -1,6 +1,7 @@
 import re
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import datetime, timedelta, timezone
+from math import ceil
 from typing import List, Optional
 from urllib.parse import urlparse
 
@@ -30,6 +31,7 @@ RESEARCH_FRESHNESS_DAYS = 366
 RESEARCH_MIN_SCORE = 3
 RESEARCH_PRIMARY_SCORE = 5
 RESEARCH_LLM_TIMEOUT_SEC = 6.0
+RESEARCH_SOURCE_DEADLINE_SEC = 12.0
 RESEARCH_BROAD_TERMS = {
     "ai",
     "artificial intelligence",
@@ -183,23 +185,28 @@ class ResearchFeederAgent:
         # The remote Mac may reach arXiv slowly while Bocha remains available.
         # Run both independent transports together so one timeout does not delay
         # the other by another full source-timeout window.
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            arxiv_future = executor.submit(
-                self._search_arxiv_items,
-                arxiv_query,
-            )
-            web_future = executor.submit(
-                self._search_web_items,
-                web_query,
-            )
-            try:
-                arxiv_items = arxiv_future.result()
-            except Exception:
-                arxiv_items = []
-            try:
-                web_items = web_future.result()
-            except Exception:
-                web_items = []
+        executor = ThreadPoolExecutor(max_workers=2)
+        arxiv_future = executor.submit(self._search_arxiv_items, arxiv_query)
+        web_future = executor.submit(self._search_web_items, web_query)
+        done, pending = wait(
+            {arxiv_future, web_future},
+            timeout=RESEARCH_SOURCE_DEADLINE_SEC,
+        )
+        for future in pending:
+            future.cancel()
+        # Do not let a transport that ignores its socket timeout hold the API
+        # response open. Running requests may finish in the background, but the
+        # current material-generation request observes the explicit deadline.
+        executor.shutdown(wait=False, cancel_futures=True)
+
+        try:
+            arxiv_items = arxiv_future.result() if arxiv_future in done else []
+        except Exception:
+            arxiv_items = []
+        try:
+            web_items = web_future.result() if web_future in done else []
+        except Exception:
+            web_items = []
         self._append_research_candidates(candidates, seen_ids, arxiv_items, plan.required_terms)
         self._append_research_candidates(candidates, seen_ids, web_items, plan.required_terms)
 
@@ -308,6 +315,10 @@ class ResearchFeederAgent:
             ]
         else:
             candidate_by_id = {item.id: item for item in candidates}
+            deterministic_scores = {
+                item.id: self._deterministic_relevance_score(item, required_terms)
+                for item in candidates
+            }
             try:
                 selection = OpenRouterChatService().generate_json(
                     system_prompt=RESEARCH_RESULT_SELECTOR_PROMPT,
@@ -331,10 +342,24 @@ class ResearchFeederAgent:
                     timeout_sec=RESEARCH_LLM_TIMEOUT_SEC,
                 )
                 rated = [
-                    (candidate_by_id[result.id], result.relevance_score)
+                    (
+                        candidate_by_id[result.id],
+                        (
+                            RESEARCH_PRIMARY_SCORE
+                            if deterministic_scores[result.id] == RESEARCH_PRIMARY_SCORE
+                            else min(result.relevance_score, deterministic_scores[result.id])
+                        ),
+                    )
                     for result in selection.selections
                     if result.id in candidate_by_id and result.relevance_score >= RESEARCH_MIN_SCORE
                 ]
+                selected_ids = {item.id for item, _ in rated}
+                rated.extend(
+                    (item, RESEARCH_PRIMARY_SCORE)
+                    for item in candidates
+                    if deterministic_scores[item.id] == RESEARCH_PRIMARY_SCORE
+                    and item.id not in selected_ids
+                )
             except Exception:
                 rated = [
                     (item, self._deterministic_relevance_score(item, required_terms))
@@ -373,6 +398,18 @@ class ResearchFeederAgent:
         meaningful = self._meaningful_terms(required_terms)
         title_matches = {term for term in meaningful if term in title}
         all_matches = {term for term in meaningful if term in f"{title} {abstract}"}
+        title_tokens = self._normalized_anchor_tokens(title)
+        # A concrete multi-token route can establish 5-star relevance even
+        # when wording varies (for example "Driving World Models" versus
+        # "Auto Driving World Model"). A generic "World Models" match alone
+        # remains at most 4 stars.
+        for term in meaningful:
+            anchor_tokens = self._normalized_anchor_tokens(term)
+            if len(anchor_tokens) < 3:
+                continue
+            overlap = len(anchor_tokens & title_tokens)
+            if overlap >= max(2, ceil(len(anchor_tokens) * 0.67)):
+                return 5
         if len(all_matches) >= 2 and title_matches:
             return 5
         if title_matches or len(all_matches) >= 2:
@@ -380,6 +417,16 @@ class ResearchFeederAgent:
         if all_matches:
             return 3
         return 1
+
+    def _normalized_anchor_tokens(self, value: str) -> set[str]:
+        tokens = set()
+        for token in re.findall(r"[a-z0-9]+", value.lower()):
+            if token in {"a", "an", "and", "for", "of", "the", "to", "with"}:
+                continue
+            if len(token) > 4 and token.endswith("s"):
+                token = token[:-1]
+            tokens.add(token)
+        return tokens
 
     def _build_search_plan(
         self,
@@ -496,7 +543,16 @@ class ResearchFeederAgent:
             return []
         terms: List[str] = []
         if len(cleaned) <= 48:
-            terms.append(cleaned)
+            configured_terms = [
+                term.strip()
+                for term in re.split(r"\s*(?:/|,|，|;|；|\|)\s*", cleaned)
+                if term.strip()
+            ]
+            terms.extend(configured_terms if len(configured_terms) > 1 else [cleaned])
+            # Direction settings already provide curated tracking phrases.
+            # Splitting them into world/model/deep/learning overwhelms arXiv's
+            # newest-first results with broad-field noise.
+            return terms
         tokens = re.findall(r"[A-Za-z0-9][A-Za-z0-9+./-]{1,30}", cleaned)
         stop = {"current", "week", "goal", "plan", "research", "paper", "model"}
         terms.extend(token for token in tokens if token.lower() not in stop)

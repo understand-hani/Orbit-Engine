@@ -123,7 +123,7 @@ struct SessionQueueView: View {
         .navigationTitle(sessionDisplayTitle(seedSession))
         .onAppear {
             reconcileSeedSession()
-            Task { await refreshSeedSessionStatus() }
+            Task { await refreshSessions() }
         }
         .confirmationDialog(
             "丢弃这个工作区？",
@@ -187,21 +187,19 @@ struct SessionQueueView: View {
         }
     }
 
-    private func refreshSeedSessionStatus() async {
-        guard isActive(seedSession) else {
-            sessions.removeAll { $0.id == seedSession.id }
-            return
-        }
-
+    private func refreshSessions() async {
         do {
-            let latestSession = try await sessionAPI.session(id: seedSession.id)
-            updateSession(latestSession)
-        } catch {
-            if isManualPreviewQueue {
-                updateSession(seedSession)
+            let persisted = try await sessionAPI.sessionsByDate(seedSession.date)
+                .filter { isActive($0) && belongsToCurrentQueue($0) }
+            if persisted.isEmpty {
+                reconcileSeedSession()
             } else {
-                sessions.removeAll { $0.id == seedSession.id }
+                sessions = persisted
             }
+        } catch {
+            // Keep the preview card usable when the list endpoint is briefly
+            // unavailable; material confirmation can recover and persist it.
+            reconcileSeedSession()
         }
     }
 
@@ -210,16 +208,12 @@ struct SessionQueueView: View {
         errorMessage = nil
         defer { isCreating = false }
 
-        if isManualPreviewQueue {
-            updateSession(seedSession)
-            return
-        }
-
         do {
             let session = try await sessionAPI.generateAndSaveMock(
                 date: currentDateString(),
                 taskType: taskTypeOverrideForNewSession(),
                 weeklyStudio: isWeeklyStudio(seedSession),
+                manualWorkspace: isManualPreviewQueue
             )
             guard belongsToCurrentQueue(session) else {
                 errorMessage = "后端返回了 \(sessionDisplayTitle(session))，不是当前 \(sessionDisplayTitle(seedSession)) 队列的工作区。"

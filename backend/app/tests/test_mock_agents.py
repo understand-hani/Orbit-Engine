@@ -353,6 +353,51 @@ def test_manual_deep_dive_id_does_not_collide_with_sunday_weekly_studio():
     assert scheduled.id != manual.id
 
 
+def test_manual_deep_dive_create_persists_multiple_empty_workspaces():
+    class MemorySessionRepository:
+        def __init__(self) -> None:
+            self.items = {}
+
+        def get_by_id(self, session_id: str):
+            return self.items.get(session_id)
+
+        def get_by_date_and_task(self, date_value: str, task_type: str):
+            return [
+                item
+                for item in self.items.values()
+                if item.date.isoformat() == date_value and item.task_type.value == task_type
+            ]
+
+        def save(self, session):
+            self.items[session.id] = session
+            return session
+
+    class SearchMustNotRun:
+        def generate(self, *args, **kwargs):
+            raise AssertionError("creating a Manual card must not start paper search")
+
+    feed = FeedService()
+    feed.sessions = MemorySessionRepository()
+    feed.research_agent = SearchMustNotRun()
+    sunday = date(2026, 8, 16)
+
+    first = feed.generate_and_save_mock_session(
+        sunday,
+        task_type=TaskType.research_feeder,
+        manual_workspace=True,
+    )
+    second = feed.generate_and_save_mock_session(
+        sunday,
+        task_type=TaskType.research_feeder,
+        manual_workspace=True,
+    )
+
+    assert first.id != second.id
+    assert first.title == "Deep Dive-2026/08/16-No.1"
+    assert second.title == "Deep Dive-2026/08/16-No.2"
+    assert len(feed.sessions.get_by_date_and_task("2026-08-16", "research_feeder")) == 2
+
+
 def test_deep_dive_search_anchors_keep_phrases_and_drop_generic_fragments():
     agent = ResearchFeederAgent()
 
@@ -361,3 +406,34 @@ def test_deep_dive_search_anchors_keep_phrases_and_drop_generic_fragments():
     )
 
     assert anchors == ["world models", "autonomous driving"]
+
+
+def test_deep_dive_five_star_requires_specific_route_coverage():
+    agent = ResearchFeederAgent()
+    terms = [
+        "world models",
+        "auto driving world model",
+        "driving scene generation",
+    ]
+    now = datetime.now(timezone.utc)
+    generic = SourceItem(
+        id="generic",
+        source=SourceType.arxiv,
+        item_type=SourceItemType.paper,
+        title="A Survey of World Models",
+        url="https://arxiv.org/abs/2608.10001",
+        summary="A general survey of world models across many domains.",
+        published_at=now,
+    )
+    specific = SourceItem(
+        id="specific",
+        source=SourceType.arxiv,
+        item_type=SourceItemType.paper,
+        title="Counterfactual Prediction with Driving World Models",
+        url="https://arxiv.org/abs/2608.10002",
+        summary="World models for autonomous driving prediction.",
+        published_at=now,
+    )
+
+    assert agent._deterministic_relevance_score(generic, terms) == 4
+    assert agent._deterministic_relevance_score(specific, terms) == 5
