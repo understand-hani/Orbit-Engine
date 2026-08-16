@@ -54,8 +54,8 @@ struct PaperDetailView: View {
                 Text(paper.whySelected)
             }
 
-            Section("摘要") {
-                Text(paper.summary)
+            Section("Abstract") {
+                Text(abstractText)
             }
 
             if let currentReader = activeReader {
@@ -218,6 +218,18 @@ struct PaperDetailView: View {
 
     private var activeReader: PaperReader? {
         extractedReader ?? reader
+    }
+
+    private var abstractText: String {
+        if let abstractSection = reader?.sections.first(where: { section in
+            section.sectionName.localizedCaseInsensitiveContains("abstract")
+        }) {
+            let text = abstractSection.extractedText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !text.isEmpty {
+                return text
+            }
+        }
+        return paper.summary
     }
 
     private func extractReadingSignals() async {

@@ -636,11 +636,11 @@ class ResearchFeederAgent:
             sections.append(
                 ReadingSection(
                     id=f"{paper.id}_source_summary",
-                    section_name="Abstract / Source Summary",
+                    section_name="Abstract",
                     read_mode=ReadMode.skim,
                     extracted_text=summary,
-                    why_read="这是真实公开来源返回的摘要信息，可用于决定是否打开原文继续阅读。",
-                    agent_instruction="核对原始页面后，再提炼问题、方法、证据和局限性。",
+                    why_read="这是公开论文来源返回的 abstract 原文，用于决定是否打开论文继续阅读。",
+                    agent_instruction="不要改写 abstract；只基于原文识别问题、方法、证据和局限性。",
                     knowledge_points=[],
                 )
             )
