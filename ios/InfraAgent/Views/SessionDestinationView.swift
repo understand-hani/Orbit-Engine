@@ -486,6 +486,7 @@ struct CompletionArchiveView: View {
     @State private var isGeneratingDraft = false
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @State private var infoMessage: String?
 
     private let checkinAPI = CheckinAPI()
 
@@ -495,6 +496,13 @@ struct CompletionArchiveView: View {
                 if let errorMessage {
                     Section {
                         ErrorBanner(message: errorMessage)
+                    }
+                }
+                if let infoMessage {
+                    Section {
+                        Label(infoMessage, systemImage: "info.circle")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -594,6 +602,7 @@ struct CompletionArchiveView: View {
     private func generateAgentDraft() async {
         isGeneratingDraft = true
         errorMessage = nil
+        infoMessage = nil
         defer { isGeneratingDraft = false }
 
         do {
@@ -612,7 +621,7 @@ struct CompletionArchiveView: View {
             nextAction = draft.nextAction
         } catch {
             generateLocalFallbackDraft()
-            errorMessage = "Agent 草稿接口失败，已使用本地草稿：\(error.localizedDescription)"
+            infoMessage = "远端 Agent 草稿超时，已使用本地草稿。"
         }
     }
 
@@ -651,6 +660,7 @@ struct CompletionArchiveView: View {
     private func save() async {
         isSaving = true
         errorMessage = nil
+        infoMessage = nil
         defer { isSaving = false }
 
         do {

@@ -4,19 +4,11 @@ struct PaperDetailView: View {
     let session: BaseSession
     let paper: Paper
     let reader: PaperReader?
-    let notes: PaperNotes?
-    let userNote: UserPaperNote?
-    var onNoteSaved: ((UserPaperNote) -> Void)?
 
     @State private var extractionStatus: String?
     @State private var extractedReader: PaperReader?
     @State private var hasExtractedReadingSignals = false
     @State private var isExtracting = false
-    @State private var didLoadNoteDraft = false
-    @State private var noteCoreIdea = ""
-    @State private var noteNextAction = ""
-    @State private var noteRelationToPlan = ""
-    @State private var isShowingNoteSheet = false
 
     var body: some View {
         List {
@@ -167,18 +159,6 @@ struct PaperDetailView: View {
                 }
             }
 
-            Section {
-                Button {
-                    isShowingNoteSheet = true
-                } label: {
-                    Label("写入笔记", systemImage: "square.and.pencil")
-                }
-            } header: {
-                Text("我的笔记")
-            } footer: {
-                Text("用户可以自己记录，也可以让 Agent 生成初稿后再修改。")
-            }
-
             if let url = paper.url {
                 Section("链接") {
                     Link("打开论文页面", destination: url)
@@ -188,32 +168,10 @@ struct PaperDetailView: View {
         .navigationTitle("论文")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            loadNoteDraftIfNeeded()
             if let reader, !reader.selectedPassages.isEmpty || !reader.keyFigures.isEmpty {
                 hasExtractedReadingSignals = true
             }
         }
-        .sheet(isPresented: $isShowingNoteSheet) {
-            PaperNoteSheet(
-                notes: notes,
-                onSave: { note in
-                    onNoteSaved?(note)
-                },
-                coreIdea: $noteCoreIdea,
-                nextAction: $noteNextAction,
-                relationToPlan: $noteRelationToPlan
-            )
-        }
-    }
-
-    private func loadNoteDraftIfNeeded() {
-        guard !didLoadNoteDraft else {
-            return
-        }
-        didLoadNoteDraft = true
-        noteCoreIdea = userNote?.coreIdea ?? ""
-        noteNextAction = userNote?.nextAction ?? ""
-        noteRelationToPlan = userNote?.relationToPlan ?? ""
     }
 
     private var activeReader: PaperReader? {
@@ -319,103 +277,5 @@ struct PaperDetailView: View {
     private func localFigureAnalysis(_ figure: KeyFigure) -> String {
         let label = figure.figureLabel.isEmpty ? "这张图表" : figure.figureLabel
         return "\(label) 需要结合图中变量、模块、对照组和趋势来核对。当前只能从图题和截图定位判断它是关键证据入口，不能仅凭标题推断具体数值或因果关系。"
-    }
-}
-
-struct UserPaperNote {
-    let coreIdea: String
-    let nextAction: String
-    let relationToPlan: String
-
-    var combinedText: String {
-        [
-            labeledLine("核心理解", coreIdea),
-            labeledLine("下一步", nextAction),
-            labeledLine("和当前计划的关系", relationToPlan)
-        ]
-        .compactMap { $0 }
-        .joined(separator: "\n")
-    }
-
-    private func labeledLine(_ label: String, _ value: String) -> String? {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : "\(label)：\(trimmed)"
-    }
-}
-
-private struct PaperNoteSheet: View {
-    let notes: PaperNotes?
-    var onSave: (UserPaperNote) -> Void
-
-    @Binding var coreIdea: String
-    @Binding var nextAction: String
-    @Binding var relationToPlan: String
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var noteMode = "manual"
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("笔记方式") {
-                    Picker("笔记方式", selection: $noteMode) {
-                        Text("自己编辑").tag("manual")
-                        Text("Agent 生成初稿").tag("agent")
-                    }
-                    .pickerStyle(.segmented)
-
-                    if noteMode == "agent" {
-                        Button {
-                            generateDraft()
-                        } label: {
-                            Label("生成笔记初稿", systemImage: "sparkles")
-                        }
-                    }
-                }
-
-                Section("笔记内容") {
-                    TextField("核心理解", text: $coreIdea, axis: .vertical)
-                        .lineLimit(2...5)
-                    TextField("下一步", text: $nextAction, axis: .vertical)
-                        .lineLimit(2...4)
-                    TextField("和当前计划的关系", text: $relationToPlan, axis: .vertical)
-                        .lineLimit(2...5)
-                }
-            }
-            .navigationTitle("我的笔记")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") {
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") {
-                        onSave(
-                            UserPaperNote(
-                                coreIdea: coreIdea,
-                                nextAction: nextAction,
-                                relationToPlan: relationToPlan
-                            )
-                        )
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-
-    private func generateDraft() {
-        coreIdea = nonEmpty(notes?.coreIdea) ?? "记录这篇材料的核心机制、关键假设和最值得保留的判断。"
-        nextAction = nonEmpty(notes?.nextAction) ?? "根据本次阅读决定继续精读、加入追踪或归档。"
-        relationToPlan = nonEmpty(notes?.relationToMyPlan) ?? "说明它和当前 Deep Dive 目标、能力建设或方向判断的关系。"
-    }
-
-    private func nonEmpty(_ value: String?) -> String? {
-        guard let value, !value.isEmpty else {
-            return nil
-        }
-        return value
     }
 }

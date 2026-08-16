@@ -8,7 +8,6 @@ struct ResearchReaderView: View {
 
     @State private var isShowingMaterialSheet = false
     @State private var confirmedMaterials: [ConfirmedResearchMaterial] = []
-    @State private var userNotesByPaperID: [String: UserPaperNote] = [:]
     @State private var didLoadPersistedMaterials = false
     @State private var refreshedPayload: ResearchFeederPayload?
 
@@ -102,7 +101,7 @@ struct ResearchReaderView: View {
                         Label("Check-in / 归档", systemImage: "checkmark.circle.fill")
                     }
                 } footer: {
-                    Text("归档会保存材料标题、链接、主旨和你写下的笔记，方便之后回看。")
+                    Text("归档会保存材料标题、链接和主旨，方便之后回看。")
                 }
             }
         }
@@ -217,12 +216,8 @@ struct ResearchReaderView: View {
             PaperDetailView(
                 session: session,
                 paper: paper,
-                reader: reader(for: paper),
-                notes: notes(for: paper),
-                userNote: userNotesByPaperID[paper.id]
-            ) { note in
-                userNotesByPaperID[paper.id] = note
-            }
+                reader: reader(for: paper)
+            )
         } label: {
             VStack(alignment: .leading, spacing: 8) {
                 Text(paper.title)
@@ -276,10 +271,6 @@ struct ResearchReaderView: View {
         return nil
     }
 
-    private func notes(for paper: Paper) -> PaperNotes? {
-        paper.id == activePayload.readingPack.primaryPaperID ? activePayload.notes : nil
-    }
-
     private var primaryCheckinContext: CheckinSourceContext? {
         checkinContext(for: confirmedMaterials)
     }
@@ -288,12 +279,11 @@ struct ResearchReaderView: View {
         guard let material = materials.first else {
             return nil
         }
-        let note = material.paperID.flatMap { userNotesByPaperID[$0] }
         return CheckinSourceContext(
             sourceTitle: material.title,
             sourceURL: material.url,
             sourceSummary: nonEmpty(material.summary),
-            userNotes: note?.combinedText
+            userNotes: nil
         )
     }
 
