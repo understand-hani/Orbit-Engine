@@ -207,7 +207,123 @@ class UserContextService:
     ) -> DirectionProfileSuggestion:
         direction = request.current_direction.strip() or request.long_term_goal.strip() or "当前方向"
         normalized_plan = self._normalize_plan_items(suggestion.full_cycle_plan, direction, request.target_cycle)
-        return suggestion.model_copy(update={"full_cycle_plan": normalized_plan})
+        anchors = self._strategy_anchors(request)
+        context_text = self._strategy_context_text(request)
+        suggested_keywords = [
+            value.strip()
+            for value in suggestion.tracking_keywords
+            if self._strategy_value_is_supported(value, context_text, anchors)
+        ]
+        tracking_keywords = self._dedupe_strategy_values(
+            [*anchors, *suggested_keywords]
+        )[:8]
+        if not tracking_keywords:
+            tracking_keywords = [direction]
+
+        suggested_fields = [
+            value.strip()
+            for value in suggestion.fields
+            if self._strategy_value_is_supported(value, context_text, anchors)
+        ]
+        fields = self._dedupe_strategy_values(
+            [direction, *suggested_fields]
+        )[:4]
+        source_preferences = suggestion.source_preferences or [
+            MaterialSourceType.arxiv,
+            MaterialSourceType.official_doc,
+            MaterialSourceType.url,
+            MaterialSourceType.pdf,
+        ]
+
+        return suggestion.model_copy(
+            update={
+                "full_cycle_plan": normalized_plan,
+                "tracking_keywords": tracking_keywords,
+                "fields": fields,
+                "source_preferences": source_preferences,
+            }
+        )
+
+    def _strategy_anchors(self, request: DirectionProfileSuggestionRequest) -> list[str]:
+        texts = [
+            request.weekly_focus,
+            *request.active_tasks,
+            request.current_direction,
+            request.long_term_goal,
+            *request.full_cycle_plan,
+            request.current_stage,
+        ]
+        anchors: list[str] = []
+        for text in texts:
+            for match in re.findall(
+                r"[A-Za-z0-9][A-Za-z0-9+.-]*(?:\s+[A-Za-z0-9][A-Za-z0-9+.-]*){0,3}",
+                text,
+            ):
+                cleaned = re.sub(r"\s+", " ", match).strip(" .-/")
+                cleaned = re.sub(r"^[xX]\s+(?=[A-Za-z0-9])", "", cleaned)
+                if not cleaned or not self._distinctive_strategy_tokens(cleaned):
+                    continue
+                anchors.append(cleaned)
+        return self._dedupe_strategy_values(anchors)[:10]
+
+    def _strategy_context_text(self, request: DirectionProfileSuggestionRequest) -> str:
+        return " ".join(
+            [
+                request.current_direction,
+                request.long_term_goal,
+                request.current_stage,
+                request.background_summary,
+                request.weekly_focus,
+                *request.active_tasks,
+                request.next_action,
+                *request.full_cycle_plan,
+            ]
+        ).lower()
+
+    def _strategy_value_is_supported(
+        self,
+        value: str,
+        context_text: str,
+        anchors: list[str],
+    ) -> bool:
+        cleaned = value.strip().lower()
+        if not cleaned:
+            return False
+        if cleaned in context_text:
+            return True
+        tokens = self._distinctive_strategy_tokens(cleaned)
+        if not tokens:
+            return False
+        anchor_tokens = {
+            token
+            for anchor in anchors
+            for token in self._distinctive_strategy_tokens(anchor)
+        }
+        return bool(tokens & anchor_tokens)
+
+    def _distinctive_strategy_tokens(self, value: str) -> set[str]:
+        generic = {
+            "agent", "ai", "personal", "workflow", "learning", "material",
+            "source", "execution", "loop", "career", "capability", "self",
+            "directed", "research", "deep", "dive", "plan", "week", "day",
+        }
+        return {
+            token.lower()
+            for token in re.findall(r"[A-Za-z0-9][A-Za-z0-9+.-]*", value)
+            if len(token) >= 2 and token.lower() not in generic
+        }
+
+    def _dedupe_strategy_values(self, values: list[str]) -> list[str]:
+        deduped: list[str] = []
+        seen = set()
+        for value in values:
+            cleaned = re.sub(r"\s+", " ", value).strip()
+            key = cleaned.lower()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            deduped.append(cleaned)
+        return deduped
 
     def _normalize_plan_items(self, items: list[str], direction: str, target_cycle: str = "") -> list[str]:
         formatted = [item.strip() for item in items if item.strip()]

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.db.migrations import init_db
-from app.schemas.user_context import DirectionProfileSuggestionRequest
+from app.schemas.user_context import DirectionProfileSuggestion, DirectionProfileSuggestionRequest
 from app.services.feed_service import FeedService
 from app.services.user_context_service import UserContextService
 
@@ -204,6 +204,57 @@ def test_direction_profile_suggestion_uses_edited_full_cycle_plan(tmp_path):
         else:
             os.environ["OPENROUTER_API_KEY"] = original_key
         get_settings.cache_clear()
+
+
+def test_direction_strategy_rejects_unrelated_demo_defaults():
+    service = UserContextService()
+    request = DirectionProfileSuggestionRequest(
+        long_term_goal="建立 SLAM、4DGS 与自动驾驶世界模型的差异化能力线",
+        current_direction="SLAM 几何直觉 x 4DGS 动态重建 x 自动驾驶 World Model",
+        current_stage="比较 reconstruction 与 generation 技术路线",
+        background_summary="有自动驾驶定位与 SLAM 工程经验",
+        target_cycle="3 个月",
+        time_budget_min=30,
+        full_cycle_plan=[
+            "第 1 阶段：精读 StreetGaussian 与 4DGS 动态重建材料",
+            "第 2 阶段：比较 reconstruction 与 driving video generation",
+            "第 3 阶段：验证轻量 World Model pipeline",
+        ],
+        weekly_focus="本周聚焦 4DGS / World Model 路线判断",
+        active_tasks=["比较 StreetGaussian 与 driving scene generation"],
+        next_action="选择一篇自动驾驶世界模型论文",
+    )
+    unrelated = DirectionProfileSuggestion(
+        full_cycle_plan=request.full_cycle_plan,
+        weekly_focus=request.weekly_focus,
+        next_action=request.next_action,
+        active_tasks=request.active_tasks,
+        tracking_keywords=[
+            "personal agent",
+            "learning workflow",
+            "material source",
+            "execution loop",
+        ],
+        fields=["AI workflow", "career capability", "self-directed learning"],
+        source_preferences=[],
+        constraints=[],
+    )
+
+    normalized = service._normalize_direction_profile_suggestion(request, unrelated)
+
+    lowered_keywords = {value.lower() for value in normalized.tracking_keywords}
+    assert "4dgs" in lowered_keywords
+    assert "world model" in lowered_keywords
+    assert "streetgaussian" in lowered_keywords
+    assert "personal agent" not in lowered_keywords
+    assert "learning workflow" not in lowered_keywords
+    assert normalized.fields == [request.current_direction]
+    assert [value.value for value in normalized.source_preferences] == [
+        "arxiv",
+        "official_doc",
+        "url",
+        "pdf",
+    ]
 
 
 def test_existing_context_plan_is_normalized_on_read(tmp_path):

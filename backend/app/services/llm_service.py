@@ -365,6 +365,13 @@ Rules:
 - active_tasks should be small, observable actions.
 - active_tasks must be specific enough that a user can immediately act on them.
 - tracking_keywords should be useful search keywords, not generic motivation.
+- Build tracking_keywords and fields from the user's current_direction,
+  long_term_goal, confirmed full_cycle_plan, weekly_focus, and active_tasks.
+- Never substitute generic app concepts such as personal agent, learning
+  workflow, material source, execution loop, career capability, or
+  self-directed learning unless the user explicitly declared that direction.
+- Prefer concrete domain terms, methods, systems, applications, datasets, and
+  research questions that can be used directly in a search query.
 - source_preferences must use only: pdf, url, manual, public_source, arxiv,
   github, official_doc.
 - constraints should help the Agent avoid broad, unfocused reading.

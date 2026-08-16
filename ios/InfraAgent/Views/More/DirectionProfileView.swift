@@ -22,6 +22,7 @@ struct DirectionProfileView: View {
     @State private var isGenerating = false
     @State private var isShowingPlanSheet = false
     @State private var planStep: DirectionPlanStep = .fullCycle
+    @State private var sheetErrorMessage: String?
 
     private let api = UserContextAPI()
     private let sourceOptions = [
@@ -151,6 +152,17 @@ struct DirectionProfileView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             Form {
+                if let sheetErrorMessage {
+                    Section {
+                        Text(sheetErrorMessage)
+                            .font(.subheadline)
+                            .foregroundStyle(.red)
+                        Button("重试当前步骤") {
+                            Task { await retryCurrentPlanStep() }
+                        }
+                    }
+                }
+
                 switch planStep {
                 case .fullCycle:
                     Section("全周期计划") {
@@ -265,6 +277,7 @@ struct DirectionProfileView: View {
     private func generateSuggestion() async {
         isGenerating = true
         message = nil
+        sheetErrorMessage = nil
         defer { isGenerating = false }
 
         do {
@@ -285,12 +298,14 @@ struct DirectionProfileView: View {
             apply(suggestion)
             message = "Agent 已生成计划，请按步骤确认后保存。"
         } catch {
-            message = "Agent 生成失败，你仍可以手动编辑后续配置：\(error.localizedDescription)"
+            sheetErrorMessage = "Agent 生成失败：\(error.localizedDescription)"
+            message = sheetErrorMessage
         }
     }
 
     private func beginPlanGeneration() async {
         planStep = .fullCycle
+        sheetErrorMessage = nil
         isShowingPlanSheet = true
         await generateSuggestion()
     }
@@ -298,11 +313,13 @@ struct DirectionProfileView: View {
     private func confirmCurrentPlanStep() async {
         switch planStep {
         case .fullCycle:
-            await regenerateWeekPlanFromEditedFullCycle()
-            planStep = .week
+            if await regenerateWeekPlanFromEditedFullCycle() {
+                planStep = .week
+            }
         case .week:
-            await regenerateStrategyFromEditedWeekPlan()
-            planStep = .strategy
+            if await regenerateStrategyFromEditedWeekPlan() {
+                planStep = .strategy
+            }
         case .strategy:
             await save()
             if message?.hasPrefix("已保存") == true {
@@ -386,8 +403,9 @@ struct DirectionProfileView: View {
         sourcePreferences = Set(suggestion.sourcePreferences)
     }
 
-    private func regenerateWeekPlanFromEditedFullCycle() async {
+    private func regenerateWeekPlanFromEditedFullCycle() async -> Bool {
         isGenerating = true
+        sheetErrorMessage = nil
         defer { isGenerating = false }
 
         do {
@@ -408,13 +426,23 @@ struct DirectionProfileView: View {
             constraintsText = suggestion.constraints.joined(separator: "\n")
             sourcePreferences = Set(suggestion.sourcePreferences)
             message = "已根据你修改后的全周期计划重新生成第一周计划。"
+            return true
         } catch {
-            message = "基于全周期计划生成第一周计划失败：\(error.localizedDescription)"
+            sheetErrorMessage = "基于全周期计划生成第一周计划失败：\(error.localizedDescription)"
+            message = sheetErrorMessage
+            return false
         }
     }
 
-    private func regenerateStrategyFromEditedWeekPlan() async {
+    private func regenerateStrategyFromEditedWeekPlan() async -> Bool {
         isGenerating = true
+        sheetErrorMessage = nil
+        // Old persisted Demo values must never be presented as a newly
+        // generated strategy while this request is in flight or after failure.
+        keywordsText = ""
+        fieldsText = ""
+        sourcePreferences = []
+        constraintsText = ""
         defer { isGenerating = false }
 
         do {
@@ -431,8 +459,20 @@ struct DirectionProfileView: View {
             constraintsText = suggestion.constraints.joined(separator: "\n")
             sourcePreferences = Set(suggestion.sourcePreferences)
             message = "已根据你确认后的第一周计划重新生成检索策略。"
+            return true
         } catch {
-            message = "基于第一周计划生成检索策略失败：\(error.localizedDescription)"
+            sheetErrorMessage = "基于第一周计划生成检索策略失败：\(error.localizedDescription)"
+            message = sheetErrorMessage
+            return false
+        }
+    }
+
+    private func retryCurrentPlanStep() async {
+        switch planStep {
+        case .fullCycle:
+            await generateSuggestion()
+        case .week, .strategy:
+            await confirmCurrentPlanStep()
         }
     }
 
@@ -543,9 +583,13 @@ struct DirectionProfileView: View {
     private var canConfirmCurrentPlanStep: Bool {
         switch planStep {
         case .fullCycle:
-            return fullCyclePlanValidationMessage == nil
-        case .week, .strategy:
+            return fullCyclePlanValidationMessage == nil && sheetErrorMessage == nil
+        case .week:
             return true
+        case .strategy:
+            return sheetErrorMessage == nil &&
+                !splitLines(keywordsText).isEmpty &&
+                !splitLines(fieldsText).isEmpty
         }
     }
 
