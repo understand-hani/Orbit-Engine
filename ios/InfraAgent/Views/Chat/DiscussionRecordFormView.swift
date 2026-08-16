@@ -2,7 +2,7 @@ import SwiftUI
 
 struct DiscussionRecordFormView: View {
     let session: BaseSession
-    let threadID: String
+    let thread: AIChatThread
 
     @Environment(\.dismiss) private var dismiss
 
@@ -10,20 +10,14 @@ struct DiscussionRecordFormView: View {
     @State private var keyInsight = ""
     @State private var nextAction = ""
     @State private var durationMin = 15
-    @State private var isLoading = false
     @State private var isSaving = false
     @State private var message: String?
 
-    private let chatAPI = ChatAPI()
     private let checkinAPI = CheckinAPI()
 
     var body: some View {
         NavigationStack {
             Form {
-                if isLoading {
-                    LoadingView(title: "正在准备总结")
-                }
-
                 if let message {
                     Section {
                         Text(message)
@@ -54,7 +48,7 @@ struct DiscussionRecordFormView: View {
                     } label: {
                         Label(isSaving ? "正在保存" : "保存到归档", systemImage: "tray.and.arrow.down")
                     }
-                    .disabled(isSaving || isLoading || summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(isSaving || summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
             .navigationTitle("保存讨论")
@@ -67,24 +61,21 @@ struct DiscussionRecordFormView: View {
                 }
             }
             .task {
-                await loadSummary()
+                loadSummary()
             }
         }
     }
 
-    private func loadSummary() async {
+    private func loadSummary() {
         guard summary.isEmpty && keyInsight.isEmpty && nextAction.isEmpty else { return }
-        isLoading = true
-        defer { isLoading = false }
+        let latestQuestion = thread.messages.last(where: { $0.role == "user" })?.content
+            ?? "围绕当前材料进行了讨论"
+        let latestAnswer = thread.messages.last(where: { $0.role == "assistant" })?.content
+            ?? "已明确需要回到当前材料核对证据与结论边界。"
 
-        do {
-            let draft = try await chatAPI.summarize(threadID: threadID)
-            summary = draft.summary
-            keyInsight = draft.keyInsights.joined(separator: "\n")
-            nextAction = draft.actionItems.joined(separator: "\n")
-        } catch {
-            message = error.localizedDescription
-        }
+        summary = "围绕“\(session.title)”完成了一次 Agent 讨论，重点问题：\(latestQuestion)"
+        keyInsight = latestAnswer
+        nextAction = localNextAction
     }
 
     private func save() async {
@@ -111,7 +102,18 @@ struct DiscussionRecordFormView: View {
             message = "已保存到归档"
             dismiss()
         } catch {
-            message = error.localizedDescription
+            message = "归档服务暂不可用，当前草稿已保留，可稍后重试。"
+        }
+    }
+
+    private var localNextAction: String {
+        switch session.taskType {
+        case .researchFeeder:
+            return "回到论文原文或关键图表，核对一条能支持当前判断的直接证据。"
+        case .techRadar:
+            return "核对该信号的一手来源，再决定是否转入 Deep Dive。"
+        case .jdAnalysis:
+            return "把讨论结论转成一个可验证的能力补齐或求职行动。"
         }
     }
 }

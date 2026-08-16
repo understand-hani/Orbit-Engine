@@ -70,7 +70,7 @@ struct AgentChatView: View {
         }
         .sheet(isPresented: $isSavingDiscussion) {
             if let thread {
-                DiscussionRecordFormView(session: session, threadID: thread.id)
+                DiscussionRecordFormView(session: session, thread: thread)
             }
         }
     }
