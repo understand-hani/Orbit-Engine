@@ -116,6 +116,7 @@ class OpenRouterChatService:
             },
             "provider": {
                 "require_parameters": True,
+                "sort": "latency",
             },
         }
         if max_tokens is not None:
@@ -152,6 +153,9 @@ class OpenRouterChatService:
         body: Dict[str, Any] = {
             "model": self.settings.openrouter_model,
             "messages": [{"role": "system", "content": system_prompt}] + messages,
+            "provider": {
+                "sort": "latency",
+            },
         }
         if max_tokens is not None:
             body["max_tokens"] = max_tokens

@@ -76,8 +76,25 @@ class CheckinService:
         weekly_sessions = self._week_sessions(session)
         completed_checkins = [item for item in checkins if item.status == CheckinStatus.completed]
         payload = {
-            "plan": context.plan.model_dump(mode="json"),
-            "completed_checkins": [item.model_dump(mode="json") for item in completed_checkins],
+            "plan": {
+                "weekly_focus": self._truncate(context.plan.weekly_focus, 300),
+                "active_tasks": [
+                    self._truncate(item, 220)
+                    for item in context.plan.active_tasks[:5]
+                    if item.strip()
+                ],
+                "next_action": self._truncate(context.plan.next_action, 220),
+            },
+            "completed_checkins": [
+                {
+                    "session_id": item.session_id,
+                    "task_type": item.task_type.value,
+                    "summary": self._truncate(item.summary, 260),
+                    "key_insight": self._truncate(item.key_insight, 320),
+                    "next_action": self._truncate(item.next_action, 220),
+                }
+                for item in completed_checkins[:8]
+            ],
             "weekly_evidence": self._weekly_evidence(weekly_sessions, completed_checkins),
         }
         if self.settings.llm_provider == "openrouter":
@@ -87,6 +104,8 @@ class CheckinService:
                     user_payload=payload,
                     output_model=LLMWeeklyStudioDraftOutput,
                     schema_name="weekly_studio_draft",
+                    timeout_sec=12,
+                    max_tokens=480,
                 )
                 return WeeklyStudioDraftResponse(
                     completion_summary=output.completion_summary,
@@ -128,14 +147,16 @@ class CheckinService:
         completed_by_session = {item.session_id: item for item in checkins}
         evidence = []
         for item in sessions:
+            if len(evidence) >= 6:
+                break
             checkin = completed_by_session.get(item.id)
             if checkin is None:
                 continue
             completion = {
-                "summary": checkin.summary,
-                "key_insight": checkin.key_insight,
-                "user_notes": checkin.user_notes,
-                "source_summary": checkin.source_summary,
+                "summary": self._truncate(checkin.summary, 220),
+                "key_insight": self._truncate(checkin.key_insight, 280),
+                "user_notes": self._truncate(checkin.user_notes or "", 220),
+                "source_summary": self._truncate(checkin.source_summary or "", 260),
             }
             if isinstance(item.payload, TechRadarPayload):
                 evidence.append(
@@ -144,14 +165,14 @@ class CheckinService:
                         "completion": completion,
                         "signals": [
                             {
-                                "title": signal.title,
-                                "technical_substance": signal.technical_substance,
-                                "why_it_matters": signal.why_it_matters,
+                                "title": self._truncate(signal.title, 160),
+                                "technical_substance": self._truncate(signal.technical_substance, 300),
+                                "why_it_matters": self._truncate(signal.why_it_matters, 240),
                                 "evidence_status": signal.evidence_status,
                                 "recommended_depth": signal.recommended_depth.value,
                                 "user_mark": signal.user_mark.value,
                             }
-                            for signal in item.payload.digest.items[:3]
+                            for signal in item.payload.digest.items[:2]
                         ],
                     }
                 )
@@ -165,22 +186,38 @@ class CheckinService:
                         "type": "deep_dive",
                         "completion": completion,
                         "material_evidence": {
-                            "summary": primary.summary if primary else "",
-                            "selected_passages": self._reader_payload(
-                                item.payload,
-                                primary.id if primary else "",
-                            ).get("selected_passages", []),
+                            "summary": self._truncate(primary.summary if primary else "", 500),
+                            "selected_passages": self._weekly_passage_evidence(
+                                item.payload, primary.id if primary else ""
+                            ),
                         },
                         "notes": {
-                            "core_idea": item.payload.notes.core_idea,
-                            "evidence": item.payload.notes.evidence,
-                            "limitations": item.payload.notes.limitations,
-                            "relation_to_my_plan": item.payload.notes.relation_to_my_plan,
-                            "next_action": item.payload.notes.next_action,
+                            "core_idea": self._truncate(item.payload.notes.core_idea, 260),
+                            "evidence": self._truncate(item.payload.notes.evidence, 280),
+                            "limitations": self._truncate(item.payload.notes.limitations, 220),
+                            "relation_to_my_plan": self._truncate(
+                                item.payload.notes.relation_to_my_plan, 220
+                            ),
+                            "next_action": self._truncate(item.payload.notes.next_action, 180),
                         },
                     }
                 )
         return evidence
+
+    def _weekly_passage_evidence(self, payload: ResearchFeederPayload, paper_id: str) -> List[dict]:
+        reader = next((item for item in payload.paper_readers if item.paper_id == paper_id), None)
+        if reader is None and payload.paper_reader and payload.paper_reader.paper_id == paper_id:
+            reader = payload.paper_reader
+        if reader is None:
+            return []
+        return [
+            {
+                "section_name": self._truncate(passage.section_name, 100),
+                "text_excerpt": self._truncate(passage.text_excerpt, 320),
+                "why_selected": self._truncate(passage.why_selected, 180),
+            }
+            for passage in reader.selected_passages[:2]
+        ]
 
     def _structured_weekly_summary(
         self,

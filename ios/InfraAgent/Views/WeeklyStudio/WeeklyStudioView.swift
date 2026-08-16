@@ -236,6 +236,30 @@ struct WeeklyStudioView: View {
         }
     }
 
+    private func applyLocalDraft() {
+        let insights = completedCheckins.compactMap { checkin -> String? in
+            let insight = trimmed(checkin.keyInsight)
+            if !insight.isEmpty {
+                return String(insight.prefix(180))
+            }
+            let summary = trimmed(checkin.summary)
+            return summary.isEmpty ? nil : String(summary.prefix(180))
+        }
+        if insights.isEmpty {
+            completionSummary = "本周尚无完成归档可供总结；下一周继续完成一个可验证的最小学习闭环。"
+        } else {
+            completionSummary = "本周已沉淀：\(insights.prefix(2).joined(separator: "；"))"
+        }
+
+        let fallbackPriorities = context?.plan.activeTasks.filter { !trimmed($0).isEmpty }.prefix(3) ?? []
+        let priorities = Array(fallbackPriorities)
+        firstPriority = priorities.indices.contains(0) ? priorities[0] : (context?.plan.nextAction ?? "")
+        secondPriority = priorities.indices.contains(1) ? priorities[1] : ""
+        thirdPriority = priorities.indices.contains(2) ? priorities[2] : ""
+        draftProvider = "local"
+        hasDraft = true
+    }
+
     private func generateDraft() async {
         isGenerating = true
         errorMessage = nil
@@ -251,7 +275,9 @@ struct WeeklyStudioView: View {
             saveMessage = nil
             hasDraft = true
         } catch {
-            errorMessage = error.localizedDescription
+            applyLocalDraft()
+            errorMessage = nil
+            saveMessage = "远端 Agent 暂未响应，已使用本周记录生成结构化草稿。"
         }
     }
 
