@@ -255,7 +255,7 @@ struct PaperDetailView: View {
                 extractedReader = analyzedReader
                 extractionStatus = "已从真实 PDF 提取 \(analyzedReader.selectedPassages.count) 个精选段落、\(analyzedReader.keyFigures.count) 个图表标题，并完成 Agent 分析。"
             } catch {
-                extractionStatus = "已从真实 PDF 提取 \(updatedReader.selectedPassages.count) 个精选段落、\(updatedReader.keyFigures.count) 个图表标题；后端同步失败，但本页结果仍可阅读。"
+                extractionStatus = "原文已完整提取，但 Agent 分析生成或同步失败：\(error.localizedDescription)。请确认后端和 OpenRouter 后重试。"
             }
         } catch {
             extractionStatus = "读取失败：\(error.localizedDescription)"

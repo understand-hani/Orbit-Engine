@@ -84,10 +84,12 @@ final class APIClient {
     func put<T: Decodable, Body: Encodable>(
         _ path: String,
         queryItems: [URLQueryItem] = [],
+        timeoutInterval: TimeInterval = AppConfig.apiTimeoutInterval,
         body: Body
     ) async throws -> T {
         var request = try makeRequest(path: path, queryItems: queryItems)
         request.httpMethod = "PUT"
+        request.timeoutInterval = timeoutInterval
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try encoder.encode(body)
         return try await send(request)

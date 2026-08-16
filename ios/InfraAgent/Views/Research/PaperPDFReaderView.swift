@@ -192,9 +192,7 @@ enum PDFReadingSignalExtractor {
                 page: candidate.page,
                 sectionName: "PDF 第 \(candidate.page) 页",
                 textExcerpt: candidate.text,
-                whySelected: candidate.matchedTerms.isEmpty
-                    ? "该段来自真实 PDF 正文，包含较完整的方法或证据描述。"
-                    : "该段来自真实 PDF 正文，并直接覆盖 \(candidate.matchedTerms.joined(separator: "、"))。",
+                whySelected: "Agent 分析尚未生成。",
                 readingQuestion: "这段论述的问题、方法假设、证据和适用边界分别是什么？",
                 status: "unread"
             )
@@ -224,7 +222,7 @@ enum PDFReadingSignalExtractor {
                     source: paper.title,
                     usage: .methodFigure
                 ),
-                whyImportant: "该图表标题来自真实 PDF，可用于核对方法结构、实验设置或主要结果。",
+                whyImportant: "Agent 分析尚未生成。",
                 readingQuestion: "这张图表支持了论文的哪项结论，横纵轴、模块或对照组分别代表什么？"
             )
         }
@@ -244,31 +242,63 @@ enum PDFReadingSignalExtractor {
     }
 
     private static func paragraphChunks(_ text: String) -> [String] {
+        let normalized = text
+            .replacingOccurrences(
+                of: #"([A-Za-z])-\s+([a-z])"#,
+                with: "$1$2",
+                options: .regularExpression
+            )
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return [] }
+
+        var sentences: [String] = []
+        normalized.enumerateSubstrings(
+            in: normalized.startIndex..<normalized.endIndex,
+            options: [.bySentences, .substringNotRequired]
+        ) { _, range, _, _ in
+            let sentence = String(normalized[range])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !sentence.isEmpty {
+                sentences.append(sentence)
+            }
+        }
+        if sentences.isEmpty {
+            sentences = [normalized]
+        }
+        if let last = sentences.last, !hasSentenceEnding(last) {
+            // PDFKit returns one page at a time. A page often ends halfway
+            // through a sentence; do not present that trailing fragment as a
+            // complete extracted passage.
+            sentences.removeLast()
+        }
+
         var chunks: [String] = []
         var buffer = ""
-
-        func flush() {
-            let cleaned = buffer.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if cleaned.count >= 120 {
-                chunks.append(String(cleaned.prefix(700)))
-            }
-            buffer = ""
-        }
-
-        for rawLine in text.components(separatedBy: .newlines) {
-            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
-            if line.isEmpty {
-                flush()
-                continue
-            }
-            buffer += buffer.isEmpty ? line : " \(line)"
-            if buffer.count >= 480 {
-                flush()
+        for sentence in sentences {
+            let combined = buffer.isEmpty ? sentence : "\(buffer) \(sentence)"
+            if !buffer.isEmpty, combined.count > 1000, buffer.count >= 240 {
+                chunks.append(buffer)
+                buffer = sentence
+            } else {
+                buffer = combined
             }
         }
-        flush()
+        if buffer.count >= 120 {
+            chunks.append(buffer)
+        }
+
+        // Every chunk ends at a sentence boundary. There is deliberately no
+        // prefix/suffix character slicing here: the displayed source passage
+        // must never be cut in the middle of a sentence.
         return chunks
+    }
+
+    private static func hasSentenceEnding(_ text: String) -> Bool {
+        text.range(
+            of: #"[.!?。！？](?:\s*\[[^\]]+\])?[\"'”’）)\]]*\s*$"#,
+            options: .regularExpression
+        ) != nil
     }
 
     private static func captions(in text: String) -> [String] {
