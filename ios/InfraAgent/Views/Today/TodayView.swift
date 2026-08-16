@@ -136,6 +136,8 @@ struct TodayView: View {
                             NavigationLink {
                                 if session.taskType == .jdAnalysis {
                                     JDIntelligenceView()
+                                } else if session.id.hasSuffix("_research_feeder_manual") {
+                                    SessionDestinationView(session: session, onCompleted: nil)
                                 } else {
                                     SessionQueueView(seedSession: session)
                                 }

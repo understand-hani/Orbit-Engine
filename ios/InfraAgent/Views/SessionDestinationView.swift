@@ -197,7 +197,11 @@ struct SessionQueueView: View {
             let latestSession = try await sessionAPI.session(id: seedSession.id)
             updateSession(latestSession)
         } catch {
-            sessions.removeAll { $0.id == seedSession.id }
+            if isManualPreviewQueue {
+                updateSession(seedSession)
+            } else {
+                sessions.removeAll { $0.id == seedSession.id }
+            }
         }
     }
 
@@ -205,6 +209,11 @@ struct SessionQueueView: View {
         isCreating = true
         errorMessage = nil
         defer { isCreating = false }
+
+        if isManualPreviewQueue {
+            updateSession(seedSession)
+            return
+        }
 
         do {
             let session = try await sessionAPI.generateAndSaveMock(
@@ -285,6 +294,10 @@ struct SessionQueueView: View {
 
     private var activeSessions: [BaseSession] {
         sessions.filter { isActive($0) && belongsToCurrentQueue($0) }
+    }
+
+    private var isManualPreviewQueue: Bool {
+        seedSession.id.hasSuffix("_research_feeder_manual")
     }
 
     private func displayName(for session: BaseSession, index: Int) -> String {
