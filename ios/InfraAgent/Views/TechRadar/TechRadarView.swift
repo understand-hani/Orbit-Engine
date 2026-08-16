@@ -250,9 +250,15 @@ struct TechRadarView: View {
                 }
                 currentSession = updatedSession
                 currentPayload = updatedPayload
+                let generatedItems = realRadarItems(updatedPayload.digest.items)
+                guard !generatedItems.isEmpty else {
+                    radarRun = nil
+                    message = updatedPayload.digest.summary
+                    return
+                }
                 radarRun = makeRadarRun(
                     input: input,
-                    items: updatedPayload.digest.items
+                    items: generatedItems
                 )
                 message = nil
             } catch {

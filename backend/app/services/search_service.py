@@ -192,7 +192,10 @@ class SearchService:
         items: List[SourceItem] = []
         per_source = max(1, min(max_results, 10))
         try:
-            items.extend(self.search_public_web(query, per_source).items)
+            # Niche technical directions often have no meaningful item in a
+            # one-month window. Relevance and date remain visible to the user,
+            # so use a wider discovery window and let Radar perform filtering.
+            items.extend(self.search_public_web(query, per_source, freshness="oneYear").items)
         except Exception as exc:
             items.append(self._error_item(SourceType.web, query, exc))
         return CombinedSearchResponse(

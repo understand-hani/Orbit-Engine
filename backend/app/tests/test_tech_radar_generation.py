@@ -1,5 +1,6 @@
 import os
 import tempfile
+import time
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -49,6 +50,12 @@ class StaticSearchService:
 class FailingSearchService:
     def search_industry_sources(self, query: str, max_results: int = 5) -> CombinedSearchResponse:
         raise RuntimeError("network unavailable")
+
+
+class SlowSearchService(StaticSearchService):
+    def search_industry_sources(self, query: str, max_results: int = 5) -> CombinedSearchResponse:
+        time.sleep(0.15)
+        return super().search_industry_sources(query, max_results=max_results)
 
 
 class EmptyPassageSearchService:
@@ -175,6 +182,37 @@ def test_tech_radar_uses_user_goal_for_queries_and_relevance():
         else:
             os.environ["DATABASE_PATH"] = original_path
         get_settings.cache_clear()
+
+
+def test_radar_queries_run_in_parallel():
+    agent = MockTechRadarAgent(search_service=SlowSearchService())
+    payload = TechRadarPayload(
+        radar_type=RadarType.product_strategy_radar,
+        scope=RadarScope(topics=["4DGS", "world model", "autonomous driving"]),
+        digest=RadarDigest(
+            week_start=date(2026, 8, 10),
+            week_end=date(2026, 8, 16),
+            summary="pending",
+        ),
+    )
+
+    started_at = time.monotonic()
+    generated = agent.generate(payload)
+    elapsed = time.monotonic() - started_at
+
+    assert generated.digest.items
+    assert len(agent.search_service.queries) == 3
+    assert elapsed < 0.35
+
+
+def test_radar_expands_common_niche_direction_aliases():
+    agent = MockTechRadarAgent()
+
+    query = agent._search_query_for_seed("StreetGaussian / 4DGS / World Model")
+
+    assert "4D Gaussian Splatting" in query
+    assert "driving world model" in query
+    assert "autonomous driving" in query
 
 
 def test_radar_relevance_allows_signal_matching_a_specific_goal_term():

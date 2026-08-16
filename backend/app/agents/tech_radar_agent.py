@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import re
 from typing import List, Optional, Set
@@ -5,7 +6,7 @@ from typing import List, Optional, Set
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
-from app.schemas.source import SourceItem, SourceItemType, SourceType
+from app.schemas.source import CombinedSearchResponse, SourceItem, SourceItemType, SourceType
 from app.schemas.tech_radar import RadarItem, RadarSourcePassage, RecommendedDepth, TechRadarPayload
 from app.schemas.user_context import UserContext
 from app.services.llm_service import OpenRouterChatService
@@ -168,7 +169,10 @@ class MockTechRadarAgent:
         user_context: Optional[UserContext] = None,
     ) -> TechRadarPayload:
         radar_context = self._radar_context_terms(payload, user_context)
-        search_plan = self._build_search_plan(user_context, radar_context)
+        # Radar refresh is a latency-sensitive breadth scan. Keep both LLM
+        # planning and prose generation off this path; detail judgement remains
+        # available when the user opens an individual signal.
+        search_plan = self._fallback_search_plan(radar_context)
         relevance_anchors = self._relevance_anchor_terms(radar_context)
         items = self._industry_items_from_search(
             payload,
@@ -176,7 +180,6 @@ class MockTechRadarAgent:
             search_plan.queries,
             relevance_anchors,
             search_plan.excluded_terms,
-            user_context,
         )
         if items:
             summary = "本轮 Signal Radar 已基于公开网页、新闻/RSS、开源与论文 metadata 生成行业动态信号。"
@@ -269,17 +272,14 @@ class MockTechRadarAgent:
         queries: List[str],
         required_terms: List[str],
         excluded_terms: List[str],
-        user_context: Optional[UserContext],
     ) -> List[RadarItem]:
         candidates: List[SourceItem] = []
         seen_urls = set()
-        for query in queries:
-            try:
-                response = self.search_service.search_industry_sources(
-                    query,
-                    max_results=RADAR_SEARCH_FETCH_LIMIT,
-                )
-            except Exception:
+        active_queries = queries[:3]
+        with ThreadPoolExecutor(max_workers=max(1, len(active_queries))) as executor:
+            responses = executor.map(self._search_industry_query, active_queries)
+        for response in responses:
+            if response is None:
                 continue
             for source_item in response.items:
                 if source_item.id.endswith("_search_error") or "error" in source_item.tags:
@@ -299,11 +299,23 @@ class MockTechRadarAgent:
                     break
             if len(candidates) >= 18:
                 break
-        collected = self._select_radar_candidates(candidates, user_context, required_terms)
+        collected = self._ensure_five_star_candidate([
+            (item, self._deterministic_relevance_score(item, required_terms))
+            for item in candidates[:RADAR_ITEM_LIMIT]
+        ])
         return [
             self._radar_item_from_source(payload, item, index, required_terms, relevance_score)
             for index, (item, relevance_score) in enumerate(collected[:RADAR_ITEM_LIMIT], start=1)
         ]
+
+    def _search_industry_query(self, query: str) -> Optional[CombinedSearchResponse]:
+        try:
+            return self.search_service.search_industry_sources(
+                query,
+                max_results=RADAR_SEARCH_FETCH_LIMIT,
+            )
+        except Exception:
+            return None
 
     def _source_key(self, source_item: SourceItem) -> str:
         return str(source_item.url) if source_item.url else f"{source_item.source.value}:{source_item.id}"
@@ -516,11 +528,23 @@ class MockTechRadarAgent:
             )
         # Search one query per high-priority seed instead of spending all calls
         # on generic rewrites of the first sentence in the profile.
-        queries = [f"{seed} news product research update" for seed in seeds[:3]]
+        queries = [self._search_query_for_seed(seed) for seed in seeds[:3]]
         return RadarSearchPlan(
             queries=queries,
             required_terms=self._context_match_terms(radar_context),
         )
+
+    def _search_query_for_seed(self, seed: str) -> str:
+        lowered = seed.lower()
+        aliases: List[str] = []
+        if "4dgs" in lowered:
+            aliases.append("4D Gaussian Splatting")
+        if "world model" in lowered or "世界模型" in seed:
+            aliases.append("driving world model")
+        if "streetgaussian" in lowered:
+            aliases.append("Gaussian Splatting autonomous driving")
+        expanded = " ".join(self._dedupe_terms([seed, *aliases]))
+        return f"{expanded} news product research update"
 
     def _context_match_terms(self, radar_context: List[str]) -> List[str]:
         terms: List[str] = []
