@@ -11,6 +11,7 @@ struct DiscussionRecordFormView: View {
     @State private var nextAction = ""
     @State private var durationMin = 15
     @State private var isSaving = false
+    @State private var isRefining = false
     @State private var message: String?
 
     private let chatAPI = ChatAPI()
@@ -19,6 +20,12 @@ struct DiscussionRecordFormView: View {
     var body: some View {
         NavigationStack {
             Form {
+                if isRefining {
+                    Section {
+                        LoadingView(title: "Agent 正在提炼讨论精髓")
+                    }
+                }
+
                 if let message {
                     Section {
                         Text(message)
@@ -49,7 +56,10 @@ struct DiscussionRecordFormView: View {
                     } label: {
                         Label(isSaving ? "正在保存" : "保存到归档", systemImage: "tray.and.arrow.down")
                     }
-                    .disabled(isSaving || summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(
+                        isSaving || isRefining ||
+                        summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
                 }
             }
             .navigationTitle("保存讨论")
@@ -69,26 +79,27 @@ struct DiscussionRecordFormView: View {
 
     private func loadSummary() async {
         guard summary.isEmpty && keyInsight.isEmpty && nextAction.isEmpty else { return }
+        isRefining = true
+        defer { isRefining = false }
 
-        let localSummary = localDiscussionSummary
-        let localInsight = localKeyInsight
-        let localAction = localNextAction
-        summary = localSummary
-        keyInsight = localInsight
-        nextAction = localAction
-
-        guard !thread.id.hasPrefix("local_") else { return }
-        do {
-            let draft = try await chatAPI.summarize(threadID: thread.id)
-            guard summary == localSummary,
-                  keyInsight == localInsight,
-                  nextAction == localAction else { return }
-            summary = draft.summary
-            keyInsight = draft.keyInsights.joined(separator: "\n")
-            nextAction = draft.actionItems.joined(separator: "\n")
-        } catch {
-            // The local conversation-based draft remains available without interruption.
+        if !thread.id.hasPrefix("local_") {
+            do {
+                let draft = try await chatAPI.summarize(threadID: thread.id)
+                if !draft.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    summary = draft.summary
+                    keyInsight = draft.keyInsights.joined(separator: "\n")
+                    nextAction = draft.actionItems.joined(separator: "\n")
+                    return
+                }
+            } catch {
+                // A conversation-specific local draft keeps archiving usable offline.
+            }
         }
+
+        let draft = localConversationDraft
+        summary = draft.summary
+        keyInsight = draft.insight
+        nextAction = draft.action
     }
 
     private func save() async {
@@ -119,36 +130,64 @@ struct DiscussionRecordFormView: View {
         }
     }
 
-    private var localNextAction: String {
-        switch session.taskType {
-        case .researchFeeder:
-            return "回到论文原文或关键图表，核对一条能支持当前判断的直接证据。"
-        case .techRadar:
-            return "核对该信号的一手来源，再决定是否转入 Deep Dive。"
-        case .jdAnalysis:
-            return "把讨论结论转成一个可验证的能力补齐或求职行动。"
+    private var localConversationDraft: (summary: String, insight: String, action: String) {
+        let validMessages = thread.messages.filter { message in
+            !message.content.contains("The request timed out") &&
+            !message.content.contains("讨论请求失败") &&
+            !message.content.contains("远端 Agent 暂未响应") &&
+            !message.content.contains("Mock fallback")
         }
+        let question = cleanFragment(
+            validMessages.last(where: { $0.role == "user" })?.content ?? "本次问题",
+            limit: 90
+        )
+        let answer = validMessages.last(where: { $0.role == "assistant" })?.content ?? ""
+        let points = discussionPoints(answer)
+        let actionWords = ["建议", "下一步", "应当", "需要", "核验", "确认", "追踪", "阅读"]
+        let actionPoint = points.first { point in actionWords.contains { point.contains($0) } }
+        let insight = points.first(where: { $0 != actionPoint }) ?? points.first
+
+        guard let insight else {
+            return (
+                "本次讨论围绕“\(question)”展开。",
+                "当前有效对话尚未形成足够具体、可归档的判断。",
+                "继续围绕“\(question)”补充证据，并确认一个可执行的下一步。"
+            )
+        }
+        return (
+            cleanFragment("围绕“\(question)”，讨论聚焦于\(insight)", limit: 180),
+            cleanFragment(insight, limit: 140),
+            cleanFragment(
+                actionPoint ?? "继续围绕“\(question)”补充证据，并确认一个可执行的下一步。",
+                limit: 140
+            )
+        )
     }
 
-    private var localKeyInsight: String {
-        switch session.taskType {
-        case .researchFeeder:
-            return "核心判断是用原文段落和图表证据校验结论，避免把材料概述视为已验证事实。"
-        case .techRadar:
-            return "核心判断是先区分一手证据与转载信息，再评估信号的技术实质和跟进价值。"
-        case .jdAnalysis:
-            return "核心判断是把岗位要求映射到已有经历与能力缺口，再确定可验证的优先行动。"
+    private func discussionPoints(_ content: String) -> [String] {
+        var result: [String] = []
+        for rawLine in content.components(separatedBy: .newlines) {
+            let line = cleanFragment(rawLine, limit: 160)
+            guard line.count >= 8,
+                  !["好的", "当然", "下面", "以下", "总的来说"].contains(where: { line.hasPrefix($0) }),
+                  !result.contains(line) else { continue }
+            result.append(line)
         }
+        return Array(result.prefix(5))
     }
 
-    private var localDiscussionSummary: String {
-        switch session.taskType {
-        case .researchFeeder:
-            return "本次讨论聚焦于论文结论、证据支撑及其与当前研究任务的关联。"
-        case .techRadar:
-            return "本次讨论聚焦于当前信号的信息可信度、技术实质与跟进价值。"
-        case .jdAnalysis:
-            return "本次讨论聚焦于岗位要求、现有能力证据与优先补齐方向。"
-        }
+    private func cleanFragment(_ content: String, limit: Int) -> String {
+        let stripped = content.replacingOccurrences(
+            of: #"^(?:#{1,6}\s*|[-*•>]\s*|\d+[.)、]\s*)+"#,
+            with: "",
+            options: .regularExpression
+        )
+        let compact = stripped
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "。；; "))
+        guard compact.count > limit else { return compact }
+        return String(compact.prefix(limit)).trimmingCharacters(in: .whitespacesAndNewlines) + "..."
     }
 }

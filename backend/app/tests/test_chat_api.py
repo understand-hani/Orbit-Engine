@@ -110,6 +110,28 @@ def test_summarize_thread_returns_mock_history_draft():
         get_settings.cache_clear()
 
 
+def test_discussion_fallback_keeps_conversation_specific_details():
+    service = ChatService()
+    summary, insight, action = service._fallback_discussion_takeaway(
+        [
+            {"role": "user", "content": "这篇 4DGS 论文的时序一致性证据是否充分？"},
+            {
+                "role": "assistant",
+                "content": (
+                    "## 核心判断\n"
+                    "论文只报告了相邻帧重投影误差，尚未验证长序列漂移。\n"
+                    "- 下一步建议核对消融实验中是否包含跨场景长序列。"
+                ),
+            },
+        ]
+    )
+
+    assert "4DGS" in summary
+    assert "相邻帧重投影误差" in insight
+    assert "跨场景长序列" in action
+    assert "信息可信度、技术实质与跟进价值" not in summary
+
+
 def test_deep_dive_chat_messages_include_real_material_context():
     original_path = os.environ.get("DATABASE_PATH")
     db_path = Path(tempfile.mkdtemp()) / "infra_chat_context_test.db"

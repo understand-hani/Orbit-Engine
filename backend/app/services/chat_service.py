@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import uuid4
@@ -133,7 +134,7 @@ class ChatService:
                 pass
 
         fallback_summary, fallback_insight, fallback_action = self._fallback_discussion_takeaway(
-            thread.task_type
+            conversation
         )
         return AIChatSummary(
             thread_id=thread.id,
@@ -448,21 +449,46 @@ class ChatService:
         )
         return not any(marker in content for marker in failure_markers)
 
-    def _fallback_discussion_takeaway(self, task_type: TaskType) -> tuple[str, str, str]:
-        if task_type == TaskType.tech_radar:
-            return (
-                "本次讨论聚焦于当前信号的信息可信度、技术实质与跟进价值。",
-                "核心判断是先区分一手证据与转载信息，再评估信号的技术实质和跟进价值。",
-                "核验信号的一手来源，并据此决定是否转入 Deep Dive。",
-            )
-        if task_type == TaskType.research_feeder:
-            return (
-                "本次讨论聚焦于论文结论、证据支撑及其与当前研究任务的关联。",
-                "核心判断是用原文段落和图表证据校验结论，避免把材料概述视为已验证事实。",
-                "回到原文核对一条能直接支持当前判断的证据。",
-            )
-        return (
-            "本次讨论聚焦于岗位要求、现有能力证据与优先补齐方向。",
-            "核心判断是把岗位要求映射到已有经历与能力缺口，再确定可验证的优先行动。",
-            "选择一个最关键的能力缺口，完成对应的验证行动。",
+    def _fallback_discussion_takeaway(
+        self, conversation: list[dict[str, str]]
+    ) -> tuple[str, str, str]:
+        user_turns = [item["content"] for item in conversation if item["role"] == "user"]
+        assistant_turns = [
+            item["content"] for item in conversation if item["role"] == "assistant"
+        ]
+        question = self._clean_discussion_fragment(user_turns[-1]) if user_turns else "本次问题"
+        points = self._discussion_points(assistant_turns[-1]) if assistant_turns else []
+        action_markers = ("建议", "下一步", "应当", "需要", "核验", "确认", "追踪", "阅读")
+        action = next(
+            (point for point in points if any(marker in point for marker in action_markers)),
+            "",
         )
+        insight = next((point for point in points if point != action), points[0] if points else "")
+
+        if insight:
+            summary = self._truncate(f"围绕“{question}”，讨论聚焦于{insight}", 180)
+            key_insight = self._truncate(insight, 140)
+        else:
+            summary = self._truncate(f"本次讨论围绕“{question}”展开。", 140)
+            key_insight = "当前有效对话尚未形成足够具体、可归档的判断。"
+
+        if not action:
+            action = self._truncate(
+                f"继续围绕“{question}”补充证据，并确认一个可执行的下一步。", 140
+            )
+        return summary, key_insight, self._truncate(action, 140)
+
+    def _discussion_points(self, content: str) -> list[str]:
+        points: list[str] = []
+        for raw_line in content.splitlines():
+            line = self._clean_discussion_fragment(raw_line)
+            if len(line) < 8 or line.startswith(("好的", "当然", "下面", "以下", "总的来说")):
+                continue
+            if line not in points:
+                points.append(line)
+        return points[:5]
+
+    def _clean_discussion_fragment(self, content: str) -> str:
+        text = re.sub(r"^(?:#{1,6}\s*|[-*•>]\s*|\d+[.)、]\s*)+", "", content.strip())
+        text = re.sub(r"\s+", " ", text)
+        return self._truncate(text, 160).rstrip("。；; ")
