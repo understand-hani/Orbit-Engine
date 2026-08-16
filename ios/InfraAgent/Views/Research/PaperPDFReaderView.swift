@@ -17,11 +17,19 @@ struct PaperPDFReaderView: View {
             } else if isLoading {
                 LoadingView(title: "Loading PDF...")
             } else if let errorMessage {
-                EmptyStateView(
-                    title: "PDF unavailable",
-                    systemImage: "doc.richtext",
-                    message: errorMessage
-                )
+                VStack(spacing: 12) {
+                    EmptyStateView(
+                        title: "PDF unavailable",
+                        systemImage: "doc.richtext",
+                        message: errorMessage
+                    )
+                    Button {
+                        Task { await loadPDF() }
+                    } label: {
+                        Label("重新下载", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
             } else {
                 EmptyStateView(
                     title: "No PDF",
@@ -38,6 +46,7 @@ struct PaperPDFReaderView: View {
     }
 
     private func loadPDF() async {
+        errorMessage = nil
         isLoading = true
         defer { isLoading = false }
 
@@ -62,18 +71,43 @@ enum PaperPDFLoader {
         if FileManager.default.fileExists(atPath: destination.path), PDFDocument(url: destination) != nil {
             return destination
         }
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try? FileManager.default.removeItem(at: destination)
+        }
 
         guard let remoteURL = reader.pdfURL else {
             throw PaperPDFLoadError.missingURL
         }
 
+        var failures: [String] = []
+        for candidateURL in downloadCandidates(for: remoteURL) {
+            do {
+                return try await downloadPDF(
+                    from: candidateURL,
+                    to: destination
+                )
+            } catch {
+                failures.append(error.localizedDescription)
+            }
+        }
+        throw PaperPDFLoadError.downloadFailed(
+            failures.last ?? "所有 PDF 下载地址均不可用。"
+        )
+    }
+
+    private static func downloadPDF(from remoteURL: URL, to destination: URL) async throws -> URL {
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 60
-        configuration.timeoutIntervalForResource = 180
+        configuration.timeoutIntervalForRequest = 120
+        configuration.timeoutIntervalForResource = 600
         configuration.waitsForConnectivity = false
         let session = URLSession(configuration: configuration)
-        var request = URLRequest(url: remoteURL, timeoutInterval: 60)
-        request.setValue("OrbitEngine/0.1 (PDF reader)", forHTTPHeaderField: "User-Agent")
+        defer { session.finishTasksAndInvalidate() }
+        var request = URLRequest(url: remoteURL, timeoutInterval: 120)
+        request.setValue("application/pdf,application/octet-stream;q=0.9,*/*;q=0.5", forHTTPHeaderField: "Accept")
+        request.setValue(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15",
+            forHTTPHeaderField: "User-Agent"
+        )
 
         let (downloadURL, response) = try await session.download(for: request)
         guard let http = response as? HTTPURLResponse,
@@ -92,6 +126,37 @@ enum PaperPDFLoader {
             throw PaperPDFLoadError.invalidPDF
         }
         return destination
+    }
+
+    private static func downloadCandidates(for remoteURL: URL) -> [URL] {
+        var candidates = [remoteURL]
+        guard let host = remoteURL.host?.lowercased(), host.contains("arxiv.org"),
+              let arxivID = arxivID(from: remoteURL) else {
+            return candidates
+        }
+
+        for value in [
+            "https://arxiv.org/pdf/\(arxivID)",
+            "https://export.arxiv.org/pdf/\(arxivID)",
+        ] {
+            if let url = URL(string: value),
+               !candidates.contains(where: { $0.absoluteString == url.absoluteString }) {
+                candidates.append(url)
+            }
+        }
+        return candidates
+    }
+
+    private static func arxivID(from url: URL) -> String? {
+        let components = url.pathComponents.filter { $0 != "/" }
+        guard let markerIndex = components.firstIndex(where: { $0 == "pdf" || $0 == "abs" }),
+              components.indices.contains(markerIndex + 1) else {
+            return nil
+        }
+        let value = components[markerIndex + 1]
+            .replacingOccurrences(of: ".pdf", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
     }
 
     private static func cachedURL(paperID: String) -> URL {
@@ -119,6 +184,7 @@ enum PaperPDFLoadError: LocalizedError {
     case missingURL
     case badResponse(Int)
     case invalidPDF
+    case downloadFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -128,6 +194,8 @@ enum PaperPDFLoadError: LocalizedError {
             return "PDF 下载失败（HTTP \(status)）。可以先使用“打开论文页面”检查 arXiv 是否可访问。"
         case .invalidPDF:
             return "下载结果不是有效 PDF，可能被网络提示页或访问限制替换。"
+        case .downloadFailed(let reason):
+            return "PDF 下载失败，已尝试 arXiv 主站和备用站点。\(reason)"
         }
     }
 }
