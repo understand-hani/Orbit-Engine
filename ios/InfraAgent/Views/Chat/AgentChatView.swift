@@ -8,7 +8,6 @@ struct AgentChatView: View {
     @State private var thread: AIChatThread?
     @State private var draft = ""
     @State private var isLoading = false
-    @State private var errorMessage: String?
     @State private var isUsingLocalFallback = false
     @State private var isSavingDiscussion = false
 
@@ -17,10 +16,6 @@ struct AgentChatView: View {
     var body: some View {
         VStack(spacing: 0) {
             List {
-                if let errorMessage {
-                    ErrorBanner(message: errorMessage)
-                }
-
                 if isUsingLocalFallback {
                     Label("快速讨论模式", systemImage: "bolt.horizontal.circle")
                         .font(.caption)
@@ -82,18 +77,19 @@ struct AgentChatView: View {
 
     private func loadThread() async {
         guard thread == nil else { return }
-        isLoading = true
-        defer { isLoading = false }
+        thread = localThread()
+        isUsingLocalFallback = true
 
         do {
-            thread = try await chatAPI.createThread(
+            let remoteThread = try await chatAPI.createThread(
                 AIChatThreadCreate(sessionID: session.id, contextRefs: contextRefs)
             )
-            errorMessage = nil
+            if thread?.messages.isEmpty == true {
+                thread = remoteThread
+                isUsingLocalFallback = false
+            }
         } catch {
-            thread = localThread()
-            isUsingLocalFallback = true
-            errorMessage = nil
+            // The local thread is already usable; no blocking error state is needed.
         }
     }
 
@@ -118,11 +114,9 @@ struct AgentChatView: View {
         do {
             let response = try await chatAPI.send(threadID: threadID, content: content)
             thread = response.thread
-            errorMessage = nil
         } catch {
             appendLocalExchange(question: content)
             isUsingLocalFallback = true
-            errorMessage = nil
         }
     }
 
