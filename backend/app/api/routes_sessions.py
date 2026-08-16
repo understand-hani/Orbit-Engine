@@ -19,8 +19,14 @@ def preview_session(
     target_date: Optional[date] = Query(default=None, alias="date"),
     task_type: Optional[TaskType] = Query(default=None),
     weekly_studio: bool = False,
+    manual_workspace: bool = False,
 ) -> BaseSession:
-    return feed_service.preview_session(target_date, task_type, weekly_studio)
+    return feed_service.preview_session(
+        target_date,
+        task_type,
+        weekly_studio,
+        manual_workspace,
+    )
 
 
 @router.get("/sessions/mock", response_model=BaseSession)

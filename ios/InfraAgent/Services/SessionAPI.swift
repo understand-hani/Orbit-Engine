@@ -11,8 +11,19 @@ struct SessionAPI {
         try await resolvedClient.get("/api/sessions/today", queryItems: dateQuery(date))
     }
 
-    func preview(date: String? = nil, taskType: TaskType? = nil) async throws -> BaseSession {
-        try await resolvedClient.get("/api/sessions/preview", queryItems: sessionQuery(date: date, taskType: taskType))
+    func preview(
+        date: String? = nil,
+        taskType: TaskType? = nil,
+        manualWorkspace: Bool = false
+    ) async throws -> BaseSession {
+        try await resolvedClient.get(
+            "/api/sessions/preview",
+            queryItems: sessionQuery(
+                date: date,
+                taskType: taskType,
+                manualWorkspace: manualWorkspace
+            )
+        )
     }
 
     func mock(date: String? = nil, taskType: TaskType? = nil, weeklyStudio: Bool = false) async throws -> BaseSession {
@@ -86,13 +97,21 @@ struct SessionAPI {
         return [URLQueryItem(name: "date", value: date)]
     }
 
-    private func sessionQuery(date: String?, taskType: TaskType?, weeklyStudio: Bool = false) -> [URLQueryItem] {
+    private func sessionQuery(
+        date: String?,
+        taskType: TaskType?,
+        weeklyStudio: Bool = false,
+        manualWorkspace: Bool = false
+    ) -> [URLQueryItem] {
         var items = dateQuery(date)
         if let taskType {
             items.append(URLQueryItem(name: "task_type", value: taskType.rawValue))
         }
         if weeklyStudio {
             items.append(URLQueryItem(name: "weekly_studio", value: "true"))
+        }
+        if manualWorkspace {
+            items.append(URLQueryItem(name: "manual_workspace", value: "true"))
         }
         return items
     }

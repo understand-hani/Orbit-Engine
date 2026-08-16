@@ -306,13 +306,31 @@ def test_missing_manual_deep_dive_is_recovered_without_duplicate_material_genera
     feed.research_agent = CountingResearchAgent()
 
     session = feed.refresh_research_materials(
-        "session_2026-08-16_research_feeder",
+        "session_2026-08-16_research_feeder_manual",
         query="StreetGaussian 4DGS",
     )
 
     assert session is not None
-    assert session.id == "session_2026-08-16_research_feeder"
+    assert session.id == "session_2026-08-16_research_feeder_manual"
     assert feed.research_agent.calls == 1
+
+
+def test_manual_deep_dive_id_does_not_collide_with_sunday_weekly_studio():
+    feed = FeedService()
+    sunday = date(2026, 8, 16)
+
+    scheduled = feed.preview_session(sunday)
+    manual = feed.preview_session(
+        sunday,
+        task_type=TaskType.research_feeder,
+        manual_workspace=True,
+    )
+
+    assert scheduled.payload.research_day_role == ResearchDayRole.manual_deep_dive
+    assert manual.payload.research_day_role == ResearchDayRole.select_and_start
+    assert scheduled.id == "session_2026-08-16_research_feeder"
+    assert manual.id == "session_2026-08-16_research_feeder_manual"
+    assert scheduled.id != manual.id
 
 
 def test_deep_dive_search_anchors_keep_phrases_and_drop_generic_fragments():

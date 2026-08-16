@@ -58,7 +58,8 @@ final class TodayViewModel: ObservableObject {
                 // discovery starts only after the user taps “生成候选”.
                 session = try await sessionAPI.preview(
                     date: entry.date,
-                    taskType: entry.taskTypeOverride
+                    taskType: entry.taskTypeOverride,
+                    manualWorkspace: true
                 )
             } else {
                 session = try await sessionAPI.mock(

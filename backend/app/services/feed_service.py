@@ -34,12 +34,25 @@ class FeedService:
         target_date: Optional[date] = None,
         task_type: Optional[TaskType] = None,
         weekly_studio: bool = False,
+        manual_workspace: bool = False,
     ) -> BaseSession:
-        return self.coordinator.create_session(
+        session = self.coordinator.create_session(
             target_date,
             task_type_override=task_type,
             weekly_studio=weekly_studio,
         )
+        if (
+            manual_workspace
+            and task_type == TaskType.research_feeder
+            and not weekly_studio
+        ):
+            return session.model_copy(
+                update={
+                    "id": f"{session.id}_manual",
+                    "ai_chat_thread_id": f"{session.ai_chat_thread_id}_manual",
+                }
+            )
+        return session
 
     def generate_mock_session(
         self,
