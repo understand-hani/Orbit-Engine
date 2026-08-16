@@ -89,6 +89,7 @@ class OpenRouterChatService:
         output_model: Type[BaseModel],
         schema_name: str,
         timeout_sec: Optional[float] = None,
+        max_tokens: Optional[int] = None,
     ) -> BaseModel:
         if not self.settings.openrouter_api_key:
             raise RuntimeError("OPENROUTER_API_KEY is not configured")
@@ -117,6 +118,8 @@ class OpenRouterChatService:
                 "require_parameters": True,
             },
         }
+        if max_tokens is not None:
+            body["max_tokens"] = max_tokens
 
         url = f"{self.settings.openrouter_base_url.rstrip('/')}/chat/completions"
         headers = {

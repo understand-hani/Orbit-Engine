@@ -134,6 +134,7 @@ struct DirectionProfileSuggestion: Codable {
     let fields: [String]
     let sourcePreferences: [String]
     let constraints: [String]
+    let generationMode: String?
 
     enum CodingKeys: String, CodingKey {
         case fullCyclePlan = "full_cycle_plan"
@@ -144,5 +145,6 @@ struct DirectionProfileSuggestion: Codable {
         case fields
         case sourcePreferences = "source_preferences"
         case constraints
+        case generationMode = "generation_mode"
     }
 }

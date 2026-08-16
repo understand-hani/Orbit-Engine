@@ -2,6 +2,9 @@ import Foundation
 
 struct PlanNormalizer {
     static func normalizedContext(_ context: UserContext) -> (context: UserContext, changed: Bool) {
+        guard !context.plan.fullCyclePlan.isEmpty else {
+            return (context, false)
+        }
         var updated = context
         let normalizedPlan = normalizedFullCyclePlan(
             context.plan.fullCyclePlan,
@@ -178,8 +181,8 @@ struct PlanNormalizer {
         case 1:
             return [
                 "把「\(goalFocus)」拆成 3 个必须回答的问题，列出每个问题对应的关键词、反向关键词和判断标准。",
-                "围绕「\(goalFocus)」筛出 5-8 份锚点材料，至少包含综述/经典论文、代表项目或官方文档、一个反例或争议来源。",
-                "逐份材料记录核心概念、方法假设、输入输出、适用边界和与个人方向的关系，每份材料形成 5-8 行证据卡。",
+                "围绕「\(goalFocus)」筛出一组锚点材料，覆盖综述或经典材料、代表项目或官方文档，以及反例或争议来源。",
+                "逐份材料记录核心概念、方法假设、输入输出、适用边界和与个人方向的关系，形成简明证据卡。",
                 "把材料中的概念、方法、数据输入和评估指标整理成一张概念地图，标出高频术语和不确定术语。",
                 "针对不确定术语补读 2-3 份材料，更新关键词表和证据卡，删除无法服务本阶段目标的材料。",
                 "汇总阶段地图，标记下一阶段要比较的 2-3 条路线或方法，并写出每条路线值得比较的原因。"

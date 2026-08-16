@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import re
+import time
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -22,13 +24,15 @@ from app.services.llm_service import (
     OpenRouterChatService,
 )
 
-DIRECTION_SUGGESTION_LLM_TIMEOUT_SEC = 12.0
+DIRECTION_SUGGESTION_MAX_TOKENS = 2400
 SEARCHABLE_DIRECTION_SOURCES = {
     MaterialSourceType.arxiv,
     MaterialSourceType.github,
     MaterialSourceType.official_doc,
     MaterialSourceType.url,
 }
+
+logger = logging.getLogger(__name__)
 
 
 class UserContextService:
@@ -44,7 +48,12 @@ class UserContextService:
             if normalized != existing:
                 return self.repository.save(normalized)
             return normalized
-        return self.repository.save(self._default_context())
+        initial_context = (
+            self._demo_context()
+            if self.settings.app_env.strip().lower() == "demo"
+            else self._new_user_context()
+        )
+        return self.repository.save(initial_context)
 
     def save(self, context: UserContext) -> UserContext:
         return self.repository.save(self._normalize_context(context))
@@ -58,23 +67,39 @@ class UserContextService:
         # reserved for the first draft instead of being called again at every
         # confirmation step.
         if request.full_cycle_plan:
-            return self._normalize_direction_profile_suggestion(
+            suggestion = self._normalize_direction_profile_suggestion(
                 request,
                 self._fallback_direction_profile(request),
             )
+            return suggestion.model_copy(update={"generation_mode": "deterministic"})
         if self.settings.llm_provider == "openrouter":
+            started_at = time.monotonic()
             try:
                 output = self.llm.generate_json(
                     system_prompt=DIRECTION_PROFILE_SUGGESTION_SYSTEM_PROMPT,
                     user_payload=request.model_dump(mode="json"),
                     output_model=DirectionProfileSuggestion,
                     schema_name="direction_profile_suggestion",
-                    timeout_sec=DIRECTION_SUGGESTION_LLM_TIMEOUT_SEC,
+                    timeout_sec=self.settings.openrouter_timeout_sec,
+                    max_tokens=DIRECTION_SUGGESTION_MAX_TOKENS,
                 )
-                return self._normalize_direction_profile_suggestion(request, output)
-            except Exception:
-                pass
-        return self._normalize_direction_profile_suggestion(request, self._fallback_direction_profile(request))
+                elapsed_ms = round((time.monotonic() - started_at) * 1000)
+                logger.info("direction_profile_llm_succeeded elapsed_ms=%s", elapsed_ms)
+                suggestion = self._normalize_direction_profile_suggestion(request, output)
+                return suggestion.model_copy(update={"generation_mode": "llm"})
+            except Exception as exc:
+                elapsed_ms = round((time.monotonic() - started_at) * 1000)
+                logger.warning(
+                    "direction_profile_llm_failed elapsed_ms=%s error_type=%s error=%s",
+                    elapsed_ms,
+                    type(exc).__name__,
+                    str(exc)[:240],
+                )
+        suggestion = self._normalize_direction_profile_suggestion(
+            request,
+            self._fallback_direction_profile(request),
+        )
+        return suggestion.model_copy(update={"generation_mode": "fallback"})
 
     def add_material(self, request: UserMaterialCreate) -> UserMaterial:
         context = self.get_or_create()
@@ -105,7 +130,6 @@ class UserContextService:
         request: DirectionProfileSuggestionRequest,
     ) -> DirectionProfileSuggestion:
         direction = request.current_direction.strip() or "当前方向"
-        stage = request.current_stage.strip() or "当前阶段"
         full_cycle_plan = [item.strip() for item in request.full_cycle_plan if item.strip()]
         if not full_cycle_plan:
             full_cycle_plan = [
@@ -130,12 +154,7 @@ class UserContextService:
             active_tasks=active_tasks,
             tracking_keywords=[
                 item
-                for item in [
-                    direction,
-                    request.long_term_goal.strip(),
-                    stage,
-                    current_milestone,
-                ]
+                for item in [direction]
                 if item
             ],
             fields=[direction],
@@ -197,7 +216,7 @@ class UserContextService:
             for item in body.replace("；", "。").replace(";", "。").split("。")
             if item.strip()
         ]
-        return tasks[:3] or [week_plan]
+        return [f"本周：{item}" for item in tasks[:3]] or [f"本周：{week_plan}"]
 
     def _normalize_context(self, context: UserContext) -> UserContext:
         normalized_plan = self._normalize_work_learning_plan(context)
@@ -219,6 +238,8 @@ class UserContextService:
         )
 
     def _normalize_work_learning_plan(self, context: UserContext) -> WorkLearningPlan:
+        if not context.plan.full_cycle_plan:
+            return context.plan
         direction = context.profile.goal or context.plan.long_term_goal or "当前方向"
         normalized_full_cycle_plan = self._normalize_plan_items(
             context.plan.full_cycle_plan,
@@ -244,6 +265,7 @@ class UserContextService:
             value.strip()
             for value in suggestion.tracking_keywords
             if self._strategy_value_is_supported(value, context_text, anchors)
+            and self._strategy_value_is_searchable(value)
         ]
         tracking_keywords = self._dedupe_strategy_values(
             [*anchors, *suggested_keywords]
@@ -335,16 +357,30 @@ class UserContextService:
         }
         return bool(tokens & anchor_tokens)
 
+    def _strategy_value_is_searchable(self, value: str) -> bool:
+        cleaned = re.sub(r"\s+", " ", value).strip()
+        lowered = cleaned.lower()
+        if not cleaned or len(cleaned) > 60:
+            return False
+        if re.search(r"\b(?:week|day)\s*\d", lowered):
+            return False
+        if re.search(r"第\s*\d+\s*阶段|具体执行计划|产出：|目标：", cleaned):
+            return False
+        return bool(self._distinctive_strategy_tokens(cleaned) or re.search(r"[\u4e00-\u9fff]", cleaned))
+
     def _distinctive_strategy_tokens(self, value: str) -> set[str]:
         generic = {
             "agent", "ai", "personal", "workflow", "learning", "material",
             "source", "execution", "loop", "career", "capability", "self",
             "directed", "research", "deep", "dive", "plan", "week", "day",
+            "baseline", "line", "lines", "item", "items",
         }
         return {
             token.lower()
             for token in re.findall(r"[A-Za-z0-9][A-Za-z0-9+.-]*", value)
-            if len(token) >= 2 and token.lower() not in generic
+            if len(token) >= 2
+            and token.lower() not in generic
+            and re.search(r"[A-Za-z]", token)
         }
 
     def _dedupe_strategy_values(self, values: list[str]) -> list[str]:
@@ -493,8 +529,8 @@ class UserContextService:
         if index == 1:
             return [
                 f"把「{goal_focus}」拆成 3 个必须回答的问题，列出每个问题对应的关键词、反向关键词和判断标准。",
-                f"围绕「{goal_focus}」筛出 5-8 份锚点材料，至少包含综述/经典论文、代表项目或官方文档、一个反例或争议来源。",
-                "逐份材料记录核心概念、方法假设、输入输出、适用边界和与个人方向的关系，每份材料形成 5-8 行证据卡。",
+                f"围绕「{goal_focus}」筛出一组锚点材料，覆盖综述或经典材料、代表项目或官方文档，以及反例或争议来源。",
+                "逐份材料记录核心概念、方法假设、输入输出、适用边界和与个人方向的关系，形成简明证据卡。",
                 "把材料中的概念、方法、数据输入和评估指标整理成一张概念地图，标出高频术语和不确定术语。",
                 "针对不确定术语补读 2-3 份材料，更新关键词表和证据卡，删除无法服务本阶段目标的材料。",
                 "汇总阶段地图，标记下一阶段要比较的 2-3 条路线或方法，并写出每条路线值得比较的原因。",
@@ -737,7 +773,40 @@ class UserContextService:
         ]
         return len(execution_steps) >= len(self._week_ranges(max(duration_weeks, 1)))
 
-    def _default_context(self) -> UserContext:
+    def _new_user_context(self) -> UserContext:
+        now = datetime.now(timezone.utc)
+        return UserContext(
+            profile=PersonalProfile(
+                display_name="新用户",
+                goal="",
+                background_summary="",
+                current_stage="",
+                constraints=[],
+                updated_at=now,
+            ),
+            plan=WorkLearningPlan(
+                long_term_goal="",
+                target_cycle="",
+                full_cycle_plan=[],
+                weekly_focus="",
+                active_tasks=[],
+                next_action="",
+                tracking_keywords=[],
+                updated_at=now,
+            ),
+            preferences=UserPreference(
+                fields=[],
+                source_preferences=[
+                    MaterialSourceType.arxiv,
+                    MaterialSourceType.official_doc,
+                    MaterialSourceType.url,
+                ],
+                updated_at=now,
+            ),
+            materials=[],
+        )
+
+    def _demo_context(self) -> UserContext:
         now = datetime.now(timezone.utc)
         profile = PersonalProfile(
             display_name="Demo User",

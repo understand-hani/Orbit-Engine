@@ -53,6 +53,16 @@ back to the existing mock JD analysis so the iOS flow remains usable.
 The backend always reads `backend/.env`; do not put the API key in `.env.example`
 and do not commit `.env`.
 
+## New user and explicit demo data
+
+`APP_ENV=development` creates an empty user context. Direction onboarding can
+save and continue with a user-derived local plan even when OpenRouter times out;
+the LLM response enhances that editable draft when it arrives.
+
+Use `APP_ENV=demo` only for a fresh, explicitly pre-filled showcase database.
+Demo data is never injected into the normal new-user path. Changing `APP_ENV`
+does not overwrite an existing SQLite user context.
+
 ## Signal Radar search
 
 Signal Radar uses Bocha Web Search for current news and organisation/product

@@ -20,6 +20,7 @@ struct DirectionProfileView: View {
     @State private var isLoading = false
     @State private var isSaving = false
     @State private var isGenerating = false
+    @State private var isEnhancingInitialPlan = false
     @State private var isShowingPlanSheet = false
     @State private var planStep: DirectionPlanStep = .fullCycle
     @State private var sheetErrorMessage: String?
@@ -150,6 +151,17 @@ struct DirectionProfileView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             Form {
+                if isEnhancingInitialPlan {
+                    Section {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text("基础计划已可编辑，Agent 正在后台尝试优化")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 if let currentSheetError = sheetErrorMessage {
                     Section {
                         Text(currentSheetError)
@@ -302,7 +314,9 @@ struct DirectionProfileView: View {
                 )
             )
             apply(suggestion)
-            message = "Agent 已生成计划，请按步骤确认后保存。"
+            message = suggestion.generationMode == "llm"
+                ? "Agent 已生成计划，请按步骤确认后保存。"
+                : "已生成可编辑的基础计划；Agent 本次未及时响应，你仍可继续确认并保存。"
         } catch {
             sheetErrorMessage = "Agent 生成失败：\(error.localizedDescription)"
             message = sheetErrorMessage
@@ -314,7 +328,55 @@ struct DirectionProfileView: View {
         sheetErrorMessage = nil
         isShowingPlanSheet = true
         if !hasReusableFullCyclePlan {
-            await generateSuggestion()
+            let draftSnapshot = applyImmediateDraft()
+            await enhanceInitialDraft(replacing: draftSnapshot)
+        }
+    }
+
+    @discardableResult
+    private func applyImmediateDraft() -> String {
+        let direction = goal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? longTermGoal : goal
+        fullCyclePlanText = PlanNormalizer.normalizedFullCyclePlan(
+            [],
+            direction: direction,
+            targetCycle: targetCycle
+        ).joined(separator: "\n\n")
+        sheetErrorMessage = nil
+        message = "已生成可编辑的基础计划；无需等待 Agent 即可继续确认。"
+        return fullCyclePlanText
+    }
+
+    private func enhanceInitialDraft(replacing draftSnapshot: String) async {
+        isEnhancingInitialPlan = true
+        defer { isEnhancingInitialPlan = false }
+
+        do {
+            let suggestion = try await api.suggestDirection(
+                DirectionProfileSuggestionRequest(
+                    longTermGoal: longTermGoal,
+                    currentDirection: goal,
+                    currentStage: currentStage,
+                    backgroundSummary: backgroundSummary,
+                    targetCycle: targetCycle,
+                    timeBudgetMin: timeBudget,
+                    fullCyclePlan: [],
+                    weeklyFocus: "",
+                    activeTasks: [],
+                    nextAction: ""
+                )
+            )
+            guard isShowingPlanSheet,
+                  isFullCycleStep,
+                  fullCyclePlanText == draftSnapshot else {
+                return
+            }
+            apply(suggestion)
+            message = suggestion.generationMode == "llm"
+                ? "Agent 已在后台优化计划，请确认后保存。"
+                : "基础计划已可用；Agent 本次未及时响应，可稍后重新生成。"
+        } catch {
+            guard isShowingPlanSheet, isFullCycleStep else { return }
+            message = "基础计划已可用；Agent 增强暂不可用，但不影响确认和保存。"
         }
     }
 

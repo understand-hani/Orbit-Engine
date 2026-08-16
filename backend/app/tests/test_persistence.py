@@ -145,6 +145,7 @@ def test_direction_profile_suggestion_falls_back_without_llm(tmp_path):
         assert suggestion.fields == ["新能源行业研究"]
         assert suggestion.source_preferences
         assert "45" in suggestion.constraints[0]
+        assert suggestion.generation_mode == "fallback"
     finally:
         if original_path is None:
             os.environ.pop("DATABASE_PATH", None)
@@ -268,6 +269,83 @@ def test_direction_strategy_rejects_unrelated_demo_defaults():
         "official_doc",
         "url",
     ]
+
+
+def test_new_user_context_is_blank_outside_explicit_demo_mode(tmp_path):
+    original_path = os.environ.get("DATABASE_PATH")
+    original_env = os.environ.get("APP_ENV")
+    os.environ["DATABASE_PATH"] = str(tmp_path / "blank_user.db")
+    os.environ["APP_ENV"] = "development"
+    get_settings.cache_clear()
+    try:
+        init_db()
+        context = UserContextService().get_or_create()
+
+        assert context.profile.display_name == "新用户"
+        assert context.profile.goal == ""
+        assert context.plan.full_cycle_plan == []
+        assert context.plan.tracking_keywords == []
+        assert context.preferences.fields == []
+        assert context.materials == []
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        if original_env is None:
+            os.environ.pop("APP_ENV", None)
+        else:
+            os.environ["APP_ENV"] = original_env
+        get_settings.cache_clear()
+
+
+def test_demo_context_requires_explicit_demo_environment(tmp_path):
+    original_path = os.environ.get("DATABASE_PATH")
+    original_env = os.environ.get("APP_ENV")
+    os.environ["DATABASE_PATH"] = str(tmp_path / "demo_user.db")
+    os.environ["APP_ENV"] = "demo"
+    get_settings.cache_clear()
+    try:
+        init_db()
+        context = UserContextService().get_or_create()
+
+        assert context.profile.display_name == "Demo User"
+        assert "4DGS" in context.profile.goal
+        assert context.plan.full_cycle_plan
+        assert context.materials
+    finally:
+        if original_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = original_path
+        if original_env is None:
+            os.environ.pop("APP_ENV", None)
+        else:
+            os.environ["APP_ENV"] = original_env
+        get_settings.cache_clear()
+
+
+def test_direction_strategy_filters_numeric_ranges_and_generic_baseline():
+    service = UserContextService()
+    request = DirectionProfileSuggestionRequest(
+        current_direction="SLAM 与 4DGS 动态重建",
+        full_cycle_plan=[
+            "Week 1-2 / Day 1-5：围绕 StreetGaussian 与 4DGS 筛出 5-8 份材料并建立 baseline",
+            "比较 SLAM filtering 与动态场景重建",
+            "形成路线判断",
+        ],
+        weekly_focus="比较 StreetGaussian 与 SLAM filtering",
+    )
+
+    suggestion = service.suggest_direction_profile(request)
+
+    lowered = {value.lower() for value in suggestion.tracking_keywords}
+    assert "5-8" not in lowered
+    assert "baseline" not in lowered
+    assert "streetgaussian" in lowered
+    assert "slam filtering" in lowered
+    assert all("week" not in value and "day" not in value for value in lowered)
+    assert suggestion.generation_mode == "deterministic"
 
 
 def test_confirmed_full_cycle_plan_does_not_call_llm_again():
