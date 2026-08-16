@@ -32,6 +32,9 @@ struct ChatAPI {
     }
 
     func summarize(threadID: String) async throws -> AIChatSummary {
-        try await resolvedClient.post("/api/chat/threads/\(threadID)/summarize")
+        try await resolvedClient.post(
+            "/api/chat/threads/\(threadID)/summarize",
+            timeoutInterval: 8
+        )
     }
 }

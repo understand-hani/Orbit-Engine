@@ -13,6 +13,7 @@ struct DiscussionRecordFormView: View {
     @State private var isSaving = false
     @State private var message: String?
 
+    private let chatAPI = ChatAPI()
     private let checkinAPI = CheckinAPI()
 
     var body: some View {
@@ -61,21 +62,37 @@ struct DiscussionRecordFormView: View {
                 }
             }
             .task {
-                loadSummary()
+                await loadSummary()
             }
         }
     }
 
-    private func loadSummary() {
+    private func loadSummary() async {
         guard summary.isEmpty && keyInsight.isEmpty && nextAction.isEmpty else { return }
         let latestQuestion = thread.messages.last(where: { $0.role == "user" })?.content
             ?? "围绕当前材料进行了讨论"
         let latestAnswer = thread.messages.last(where: { $0.role == "assistant" })?.content
             ?? "已明确需要回到当前材料核对证据与结论边界。"
 
-        summary = "围绕“\(session.title)”完成了一次 Agent 讨论，重点问题：\(latestQuestion)"
-        keyInsight = latestAnswer
-        nextAction = localNextAction
+        let localSummary = "围绕“\(session.title)”完成了一次 Agent 讨论，重点问题：\(latestQuestion)"
+        let localInsight = latestAnswer
+        let localAction = localNextAction
+        summary = localSummary
+        keyInsight = localInsight
+        nextAction = localAction
+
+        guard !thread.id.hasPrefix("local_") else { return }
+        do {
+            let draft = try await chatAPI.summarize(threadID: thread.id)
+            guard summary == localSummary,
+                  keyInsight == localInsight,
+                  nextAction == localAction else { return }
+            summary = draft.summary
+            keyInsight = draft.keyInsights.joined(separator: "\n")
+            nextAction = draft.actionItems.joined(separator: "\n")
+        } catch {
+            // The local conversation-based draft remains available without interruption.
+        }
     }
 
     private func save() async {
