@@ -355,16 +355,80 @@ class CheckinService:
             )
             payload["deep_dive"] = {
                 "research_context": session.payload.research_context.model_dump(mode="json"),
-                "reading_pack": session.payload.reading_pack.model_dump(mode="json"),
-                "primary_paper": primary_paper.model_dump(mode="json") if primary_paper else None,
+                "reading_goal": session.payload.reading_pack.reading_goal,
+                "selection_reason": session.payload.reading_pack.selection_reason,
+                "primary_paper": self._paper_brief(primary_paper),
                 "selected_materials": [
                     material.model_dump(mode="json") for material in session.payload.selected_materials
                 ],
-                "paper_reader": self._reader_payload(session.payload, primary_paper.id if primary_paper else ""),
-                "notes": session.payload.notes.model_dump(mode="json"),
-                "agent_discussions": self._discussion_payload(session.id),
+                "paper_reader": self._reader_brief(session.payload, primary_paper.id if primary_paper else ""),
+                "notes": {
+                    "core_idea": session.payload.notes.core_idea,
+                    "evidence": session.payload.notes.evidence,
+                    "next_action": session.payload.notes.next_action,
+                },
             }
         return payload
+
+    def _paper_brief(self, paper) -> Optional[dict]:
+        if paper is None:
+            return None
+        return {
+            "title": paper.title,
+            "authors": paper.authors[:6],
+            "venue": paper.venue,
+            "published_at": paper.published_at.isoformat() if paper.published_at else None,
+            "url": str(paper.url) if paper.url else "",
+            "abstract": self._truncate(paper.summary, 900),
+            "why_selected": self._truncate(paper.why_selected, 360),
+            "tags": paper.tags[:6],
+        }
+
+    def _reader_brief(self, payload: ResearchFeederPayload, paper_id: str) -> dict:
+        reader = next((item for item in payload.paper_readers if item.paper_id == paper_id), None)
+        if reader is None and payload.paper_reader and payload.paper_reader.paper_id == paper_id:
+            reader = payload.paper_reader
+        if reader is None:
+            return {}
+
+        return {
+            "abstract": self._truncate(
+                next(
+                    (
+                        section.extracted_text
+                        for section in reader.sections
+                        if "abstract" in section.section_name.lower() and section.extracted_text
+                    ),
+                    "",
+                ),
+                900,
+            ),
+            "sections": [
+                {
+                    "section_name": section.section_name,
+                    "why_read": self._truncate(section.why_read, 180),
+                }
+                for section in reader.sections[:2]
+            ],
+            "selected_passages": [
+                {
+                    "section_name": passage.section_name,
+                    "why_selected": self._truncate(passage.why_selected, 220),
+                }
+                for passage in reader.selected_passages[:2]
+            ],
+            "key_figures": [
+                {
+                    "figure_label": figure.figure_label,
+                    "why_important": self._truncate(figure.why_important, 220),
+                }
+                for figure in reader.key_figures[:2]
+            ],
+        }
+
+    def _truncate(self, value: str, limit: int) -> str:
+        normalized = " ".join((value or "").split())
+        return normalized if len(normalized) <= limit else normalized[:limit].rstrip() + "…"
 
     def _reader_payload(self, payload: ResearchFeederPayload, paper_id: str) -> dict:
         reader = next((item for item in payload.paper_readers if item.paper_id == paper_id), None)
