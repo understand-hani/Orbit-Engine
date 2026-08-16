@@ -497,8 +497,16 @@ private struct DeepDiveMaterialSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(candidates.isEmpty ? "生成候选" : "确认") {
+                    Button {
                         Task { await save() }
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                                .controlSize(.small)
+                                .accessibilityLabel("正在生成候选")
+                        } else {
+                            Text(candidates.isEmpty ? "生成候选" : "确认")
+                        }
                     }
                     .disabled(isSaving || !canSave)
                 }
@@ -521,6 +529,10 @@ private struct DeepDiveMaterialSheet: View {
         isSaving = true
         message = nil
         defer { isSaving = false }
+
+        if candidates.isEmpty && selectedSource == "public_source" {
+            message = "正在并行检索近一年 arXiv 论文，并按当前目标和计划评定关联度…"
+        }
 
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -1,5 +1,6 @@
 from datetime import date
 from datetime import datetime, timedelta, timezone
+from threading import Barrier
 
 from app.agents.tech_radar_agent import MockTechRadarAgent
 from app.agents.research_feeder_agent import ResearchFeederAgent
@@ -204,11 +205,14 @@ def test_deep_dive_uses_personal_direction_and_rejects_old_or_unrelated_papers(m
     class PersonalDirectionSearchService:
         def __init__(self) -> None:
             self.arxiv_calls = 0
+            self.web_calls = 0
             self.queries = []
+            self.search_barrier = Barrier(2)
 
         def search_arxiv(self, query: str, max_results: int = 5) -> SourceSearchResponse:
             self.arxiv_calls += 1
             self.queries.append(query)
+            self.search_barrier.wait(timeout=1)
             return SourceSearchResponse(
                 query=query,
                 source=SourceType.arxiv,
@@ -253,6 +257,21 @@ def test_deep_dive_uses_personal_direction_and_rejects_old_or_unrelated_papers(m
                 fetched_at=now,
             )
 
+        def search_public_web(
+            self,
+            query: str,
+            max_results: int = 5,
+            freshness: str = "oneMonth",
+        ) -> SourceSearchResponse:
+            self.web_calls += 1
+            self.search_barrier.wait(timeout=1)
+            return SourceSearchResponse(
+                query=query,
+                source=SourceType.web,
+                items=[],
+                fetched_at=now,
+            )
+
     class MockSettings:
         llm_provider = "mock"
         openrouter_api_key = None
@@ -269,6 +288,7 @@ def test_deep_dive_uses_personal_direction_and_rejects_old_or_unrelated_papers(m
     )
 
     assert search_service.arxiv_calls == 1
+    assert search_service.web_calls == 1
     assert " OR " in search_service.queries[0]
     assert search_service.queries[0].count('all:"') >= 2
     assert len(generated.papers) == 2

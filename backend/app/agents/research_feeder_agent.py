@@ -1,4 +1,5 @@
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from urllib.parse import urlparse
@@ -25,11 +26,10 @@ from app.services.search_service import SearchService
 
 RESEARCH_ITEM_LIMIT = 3
 RESEARCH_SEARCH_FETCH_LIMIT = 16
-RESEARCH_MIN_CANDIDATE_COUNT = 2
 RESEARCH_FRESHNESS_DAYS = 366
 RESEARCH_MIN_SCORE = 3
 RESEARCH_PRIMARY_SCORE = 5
-RESEARCH_LLM_TIMEOUT_SEC = 8.0
+RESEARCH_LLM_TIMEOUT_SEC = 6.0
 RESEARCH_BROAD_TERMS = {
     "ai",
     "artificial intelligence",
@@ -69,23 +69,6 @@ class ResearchCandidateRating(BaseModel):
 
 class ResearchCandidateSelection(BaseModel):
     selections: List[ResearchCandidateRating] = Field(default_factory=list)
-
-
-RESEARCH_SEARCH_PLANNER_PROMPT = """
-You plan arXiv searches for a personal Deep Dive reading session.
-
-Use the supplied user profile, personal field preferences, long-term goal,
-current stage, full-cycle plan, weekly focus, active tasks, next action, tracking
-keywords, and the current Deep Dive task. Return 2 or 3 concise English search
-queries suitable for arXiv plus 2 to 8 distinctive English technical terms or
-aliases that a paper title/abstract should contain. Translate Chinese technical
-directions into standard English research terminology when needed.
-
-The queries must target the user's actual method, system, application, or
-research question. Do not replace a specific direction with generic AI, model,
-agent, computer vision, or machine learning papers. Return only JSON matching
-the supplied schema.
-""".strip()
 
 
 RESEARCH_RESULT_SELECTOR_PROMPT = """
@@ -196,29 +179,44 @@ class ResearchFeederAgent:
         # Wrapping an entire planner sentence as one quoted arXiv phrase makes
         # recall collapse because the abstract must contain that exact sentence.
         arxiv_query = self._combined_arxiv_query(plan)
-        try:
-            items = self.search_service.search_arxiv(
+        web_query = self._combined_web_query(plan)
+        # The remote Mac may reach arXiv slowly while Bocha remains available.
+        # Run both independent transports together so one timeout does not delay
+        # the other by another full source-timeout window.
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            arxiv_future = executor.submit(
+                self._search_arxiv_items,
                 arxiv_query,
-                max_results=RESEARCH_SEARCH_FETCH_LIMIT,
-            ).items
-        except Exception:
-            items = []
-        self._append_research_candidates(candidates, seen_ids, items, plan.required_terms)
-
-        # Bocha is only a transport fallback when direct arXiv access yields too
-        # few candidates. The accepted content contract remains arXiv /abs pages.
-        if len(candidates) < RESEARCH_MIN_CANDIDATE_COUNT:
+            )
+            web_future = executor.submit(
+                self._search_web_items,
+                web_query,
+            )
             try:
-                items = self.search_service.search_public_web(
-                    self._combined_web_query(plan),
-                    max_results=RESEARCH_SEARCH_FETCH_LIMIT,
-                    freshness="oneYear",
-                ).items
+                arxiv_items = arxiv_future.result()
             except Exception:
-                items = []
-            self._append_research_candidates(candidates, seen_ids, items, plan.required_terms)
+                arxiv_items = []
+            try:
+                web_items = web_future.result()
+            except Exception:
+                web_items = []
+        self._append_research_candidates(candidates, seen_ids, arxiv_items, plan.required_terms)
+        self._append_research_candidates(candidates, seen_ids, web_items, plan.required_terms)
 
         return self._select_research_candidates(candidates, payload, user_context, plan.required_terms)
+
+    def _search_arxiv_items(self, query: str) -> List[SourceItem]:
+        return self.search_service.search_arxiv(
+            query,
+            max_results=RESEARCH_SEARCH_FETCH_LIMIT,
+        ).items
+
+    def _search_web_items(self, query: str) -> List[SourceItem]:
+        return self.search_service.search_public_web(
+            query,
+            max_results=RESEARCH_SEARCH_FETCH_LIMIT,
+            freshness="oneYear",
+        ).items
 
     def _combined_arxiv_query(self, plan: ResearchSearchPlan) -> str:
         anchors = plan.required_terms[:6] or plan.queries[:3]
@@ -397,27 +395,6 @@ class ResearchFeederAgent:
             queries=fallback_queries or ["computer vision"],
             required_terms=self._meaningful_terms(fallback_terms)[:8],
         )
-        settings = get_settings()
-        if user_context is None or settings.llm_provider.lower() != "openrouter" or not settings.openrouter_api_key:
-            return fallback
-        try:
-            planned = OpenRouterChatService().generate_json(
-                system_prompt=RESEARCH_SEARCH_PLANNER_PROMPT,
-                user_payload={
-                    "user_direction": self._user_direction_payload(payload, user_context),
-                    "manual_query": query.strip(),
-                    "source_contract": "arXiv papers published within the last 366 days",
-                },
-                output_model=ResearchSearchPlan,
-                schema_name="research_search_plan",
-                timeout_sec=RESEARCH_LLM_TIMEOUT_SEC,
-            )
-            queries = self._dedupe_terms([value.strip() for value in planned.queries if value.strip()])[:3]
-            required_terms = self._meaningful_terms(planned.required_terms)[:8]
-            if queries and required_terms:
-                return ResearchSearchPlan(queries=queries, required_terms=required_terms)
-        except Exception:
-            pass
         return fallback
 
     def _user_direction_payload(
