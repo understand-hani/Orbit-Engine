@@ -75,6 +75,14 @@ struct SessionAPI {
         try await resolvedClient.post("/api/sessions/\(sessionID)/radar/refresh")
     }
 
+    func addSignalLink(sessionID: String, link: SignalLinkCreate) async throws -> BaseSession {
+        try await resolvedClient.post(
+            "/api/sessions/\(sessionID)/signals",
+            timeoutInterval: 60,
+            body: link
+        )
+    }
+
     func saveSelectedResearchMaterials(
         sessionID: String,
         materials: [ConfirmedResearchMaterial]

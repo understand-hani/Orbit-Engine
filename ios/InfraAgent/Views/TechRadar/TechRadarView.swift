@@ -33,14 +33,71 @@ struct TechRadarView: View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(currentSession.title)
+                    Text("今日信号")
                         .font(.title3)
                         .fontWeight(.semibold)
-                    Text(currentPayload.digest.summary)
+                    Text("把你已经信任的信息源带进来，再决定它是否值得占用今天的注意力。")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 6)
+            }
+
+            Section("添加可信信号") {
+                Button {
+                    isShowingRadarInput = true
+                } label: {
+                    HStack {
+                        Label("粘贴文章或材料链接", systemImage: "plus.circle")
+                        Spacer()
+                        if isGeneratingRadar {
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(isGeneratingRadar)
+
+                Text("支持公众号文章、论文、GitHub 和官方发布页。页面无法读取时仍会保存原始链接，并清楚标记证据状态。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if activeSignals.isEmpty {
+                Section {
+                    VStack(spacing: 10) {
+                        Image(systemName: "link.badge.plus")
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
+                        Text("还没有今日信号")
+                            .font(.headline)
+                        Text("粘贴一篇今天想看的公众号文章、论文或官方链接。Agent 会以你的主线帮你判断，而不是重新做一次全网搜索。")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+                } else {
+                    Section("已收录的信号") {
+                        ForEach(activeSignals) { item in
+                            NavigationLink {
+                                TechRadarItemDetailView(session: currentSession, item: item)
+                            } label: {
+                                SignalInboxCardView(item: item)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let context {
+                Section("当前主线") {
+                    RadarSummaryLine(title: "本周重点", value: context.plan.weeklyFocus)
+                    RadarSummaryLine(title: "下一步", value: context.plan.nextAction)
+                    if !context.plan.trackingKeywords.isEmpty {
+                        TagRow(tags: Array(context.plan.trackingKeywords.prefix(5)))
+                    }
+                }
             }
 
             if let message {
@@ -50,145 +107,10 @@ struct TechRadarView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-
-            Section("当前工作区") {
-                VStack(alignment: .leading, spacing: 10) {
-                    RadarSummaryLine(title: "本周重点", value: context?.plan.weeklyFocus ?? payload.digest.summary)
-                    RadarSummaryLine(title: "下一步动作", value: context?.plan.nextAction ?? "生成本轮 Signal Radar 后，把最重要的信号分流到 Deep Dive、暂存或忽略。")
-                    if let context, !context.plan.trackingKeywords.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("计划关键词")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            TagRow(tags: Array(context.plan.trackingKeywords.prefix(6)))
-                        }
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-
-            Section("Agent 能做什么") {
-                RadarCapabilityRow(
-                    systemImage: "sparkle.magnifyingglass",
-                    title: "扫描外部信号",
-                    detail: "根据计划关键词、材料源偏好和外部信号，直接判断哪些变化值得追。"
-                )
-                RadarCapabilityRow(
-                    systemImage: "arrow.triangle.branch",
-                    title: "识别方向变化",
-                    detail: "判断哪些信号会改变当前学习 / 研究路线，哪些只是噪音。"
-                )
-                RadarCapabilityRow(
-                    systemImage: "arrow.right.doc.on.clipboard",
-                    title: "做路由决策",
-                    detail: "把信号分流为转 Deep Dive、暂存、忽略或加入本周任务。"
-                )
-            }
-
-            Section("新建 Signal Radar") {
-                Button {
-                    isShowingRadarInput = true
-                } label: {
-                    HStack {
-                        Label("生成本轮 Signal Radar", systemImage: "dot.radiowaves.left.and.right")
-                        Spacer()
-                        if isGeneratingRadar {
-                            ProgressView()
-                        }
-                    }
-                }
-                .disabled(isGeneratingRadar)
-
-                Text("Signal Radar 不做候选池；点击后直接生成本轮扫描结果：摘要、为什么和我有关、噪音判断和路由动作。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            if let radarRun {
-                Section("本轮 Signal Radar") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(radarRun.title)
-                            .font(.headline)
-                        Text(radarRun.summary)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 4)
-
-                    ForEach(radarRun.decisions) { decision in
-                        NavigationLink {
-                            RadarDecisionDetailView(
-                                session: currentSession,
-                                decision: decision
-                            )
-                        } label: {
-                            RadarDecisionCardView(decision: decision)
-                        }
-                    }
-                }
-            }
-
-            Section("上下文来源") {
-                Text(contextSources)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            if !currentPayload.digest.followUpQuestions.isEmpty {
-                Section("Agent 讨论") {
-                    ForEach(currentPayload.digest.followUpQuestions, id: \.self) { question in
-                        NavigationLink {
-                            AgentChatView(
-                                session: currentSession,
-                                contextRefs: ["tech_radar", "question:\(question)"],
-                                title: "Agent 讨论"
-                            )
-                        } label: {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Label("和 Agent 讨论", systemImage: "bubble.left.and.bubble.right")
-                                Text(question)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                }
-            }
-
-            if radarRun != nil {
-                if currentSession.status == .completed || currentSession.status == .archived {
-                    Section("Signal Radar 归档") {
-                        Label("该 Signal Radar 已作为完整卡片保存到归档", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    PartRecordFormView(
-                        session: currentSession,
-                        defaultSummary: "完成了 \(currentSession.title)：筛选并判断了本轮外部信号。",
-                        defaultKeyInsight: radarArchiveKeyInsight,
-                        sourceTitle: currentSession.title,
-                        sourceSummary: currentPayload.digest.summary,
-                        userNotes: radarArchiveNotes,
-                        sectionTitle: "Signal Radar 归档",
-                        status: "completed",
-                        completesSession: true,
-                        onSessionCompleted: { completedSession in
-                            currentSession = completedSession
-                            message = "已按 \(completedSession.title) 保存到归档"
-                            onCompleted?(completedSession)
-                        }
-                    )
-                }
-            }
         }
-        .navigationTitle("技术雷达")
-        .onAppear {
-            restoreRadarRunIfNeeded()
-        }
+        .navigationTitle("今日信号")
         .task {
             await loadContext()
-            restoreRadarRunIfNeeded()
         }
         .sheet(isPresented: $isShowingRadarInput) {
             NavigationStack {
@@ -205,6 +127,10 @@ struct TechRadarView: View {
                 )
             }
         }
+    }
+
+    private var activeSignals: [RadarItem] {
+        currentPayload.digest.items.filter { $0.userMark != "archived" }
     }
 
     private var contextSources: String {
@@ -240,6 +166,30 @@ struct TechRadarView: View {
     private func generateRadar(input: RadarInput) async {
         isGeneratingRadar = true
         defer { isGeneratingRadar = false }
+
+        if input.source == .url {
+            do {
+                let updatedSession = try await sessionAPI.addSignalLink(
+                    sessionID: currentSession.id,
+                    link: SignalLinkCreate(
+                        url: input.url.trimmingCharacters(in: .whitespacesAndNewlines),
+                        title: input.title.trimmingCharacters(in: .whitespacesAndNewlines),
+                        sourceName: "",
+                        note: input.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+                    )
+                )
+                guard case .techRadar(let updatedPayload) = updatedSession.payload else {
+                    message = "添加信号失败：后端返回了非 Signal Inbox session。"
+                    return
+                }
+                currentSession = updatedSession
+                currentPayload = updatedPayload
+                message = "已收录链接。打开该信号可查看原文、证据状态，并和 Agent 一起判断是否追踪。"
+            } catch {
+                message = "添加链接失败：\(error.localizedDescription)"
+            }
+            return
+        }
 
         if input.source == .agent {
             do {
@@ -515,6 +465,8 @@ private enum RadarInputSource: String, CaseIterable, Identifiable {
     case pdf
     case manual
 
+    static let availableCases: [RadarInputSource] = [.url]
+
     var id: String { rawValue }
 
     var title: String {
@@ -690,7 +642,7 @@ private struct RadarInputSheet: View {
     let onGenerate: (RadarInput) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var source: RadarInputSource = .agent
+    @State private var source: RadarInputSource = .url
     @State private var title = ""
     @State private var url = ""
     @State private var summary = ""
@@ -698,7 +650,7 @@ private struct RadarInputSheet: View {
     var body: some View {
         Form {
             Section("来源") {
-                ForEach(RadarInputSource.allCases) { option in
+                ForEach(RadarInputSource.availableCases) { option in
                     Button {
                         source = option
                     } label: {
@@ -771,13 +723,13 @@ private struct RadarInputSheet: View {
                 }
             }
 
-            Section("Signal Radar 输出") {
-                Text("生成后不会进入候选池，而是直接得到本轮 Signal Radar：每条信号包含摘要、为什么相关、噪音判断和路由动作。")
+            Section("保存规则") {
+                Text("链接会保存到后端的今日信号列表。网页无法读取时仍保留原始链接，并标明未取得正文。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("生成 Signal Radar")
+        .navigationTitle("添加可信信号")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -1144,51 +1096,210 @@ private struct RadarSummaryLine: View {
     }
 }
 
+private struct SignalInboxCardView: View {
+    let item: RadarItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(item.title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .lineLimit(2)
+                Spacer()
+                Text(signalEvidenceLabel(item.evidenceStatus))
+                    .font(.caption2)
+                    .foregroundStyle(signalEvidenceColor(item.evidenceStatus))
+            }
+            Text(item.source)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Text(item.summary)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            if !item.whyItMatters.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Label(item.whyItMatters, systemImage: "scope")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 struct TechRadarItemDetailView: View {
     let session: BaseSession
     let item: RadarItem
 
+    @State private var currentItem: RadarItem
+    @State private var statusMessage: String?
+    @State private var isUpdating = false
+    @State private var isGeneratingJudgement = false
+    private let materialAPI = MaterialAPI()
+
+    init(session: BaseSession, item: RadarItem) {
+        self.session = session
+        self.item = item
+        _currentItem = State(initialValue: item)
+    }
+
     var body: some View {
         List {
             Section {
-                Text(item.summary)
-                if !item.whyItMatters.isEmpty {
-                    LabeledContent("为什么重要", value: item.whyItMatters)
+                Text(currentItem.title)
+                    .font(.headline)
+                Text(currentItem.source)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Label(signalEvidenceLabel(currentItem.evidenceStatus), systemImage: "checkmark.seal")
+                    .font(.caption)
+                    .foregroundStyle(signalEvidenceColor(currentItem.evidenceStatus))
+            }
+
+            Section("原文与证据") {
+                if let url = currentItem.url {
+                    Link(destination: url) {
+                        Label("打开原文链接", systemImage: "safari")
+                    }
+                }
+                Text(signalEvidenceDescription(currentItem.evidenceStatus))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if currentItem.sourcePassages.isEmpty {
+                    Text("当前没有可读取的正文摘录。请打开原文确认具体内容后，再与 Agent 讨论。")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(currentItem.sourcePassages) { passage in
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(passage.title)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(passage.excerpt)
+                                .font(.subheadline)
+                                .textSelection(.enabled)
+                        }
+                        .padding(.vertical, 3)
+                    }
                 }
             }
 
-            Section("信号") {
-                Text(item.technicalSubstance)
-                if !item.marketingNoise.isEmpty {
-                    Text(item.marketingNoise)
-                        .foregroundStyle(.secondary)
+            Section("与当前主线的关系") {
+                RadarSummaryLine(title: "Agent 初步判断", value: currentItem.whyItMatters)
+                RadarSummaryLine(title: "需要核对", value: currentItem.marketingNoise)
+                if !currentItem.agentObservation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    RadarSummaryLine(title: "补充观察", value: currentItem.agentObservation)
                 }
+                Button(isGeneratingJudgement ? "正在补充解读…" : "让 Agent 补充解读") {
+                    generateJudgement()
+                }
+                .disabled(isGeneratingJudgement)
             }
 
             Section("Agent 讨论") {
                 NavigationLink {
                     AgentChatView(
                         session: session,
-                        contextRefs: ["tech_radar", "signal:\(item.id)"],
-                        title: "Agent 讨论"
+                        contextRefs: ["tech_radar", "signal:\(currentItem.id)"],
+                        title: "解读这条信号"
                     )
                 } label: {
-                    Label("和 Agent 讨论", systemImage: "bubble.left.and.bubble.right")
+                    Label("和 Agent 一起解读", systemImage: "bubble.left.and.bubble.right")
                 }
             }
 
-            Section("视觉材料") {
-                ForEach(item.visuals) { visual in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label(visual.caption, systemImage: "photo")
-                        Text(visual.source)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+            Section("我的决定") {
+                Text("当前状态：\(signalMarkLabel(currentItem.userMark))")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Button("继续追踪") {
+                    updateMark("track_later", message: "已保留为后续追踪信号")
+                }
+                .disabled(isUpdating)
+                Button("保留为研究线索") {
+                    updateMark("valuable", message: "已保留为研究线索")
+                }
+                .disabled(isUpdating)
+                Button("忽略这条信号", role: .destructive) {
+                    updateMark("noise", message: "已标记为忽略")
+                }
+                .disabled(isUpdating)
+                if let statusMessage {
+                    Text(statusMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
-        .navigationTitle(item.title)
+        .navigationTitle("信号详情")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func generateJudgement() {
+        isGeneratingJudgement = true
+        Task {
+            defer { isGeneratingJudgement = false }
+            do {
+                currentItem = try await materialAPI.generateRadarItemJudgement(
+                    sessionID: session.id,
+                    itemID: currentItem.id
+                )
+            } catch {
+                statusMessage = "暂时无法补充 Agent 解读：\(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func updateMark(_ mark: String, message: String) {
+        isUpdating = true
+        Task {
+            defer { isUpdating = false }
+            do {
+                currentItem = try await materialAPI.markRadarItem(
+                    sessionID: session.id,
+                    itemID: currentItem.id,
+                    mark: mark
+                )
+                statusMessage = message
+            } catch {
+                statusMessage = "状态更新失败：\(error.localizedDescription)"
+            }
+        }
+    }
+}
+
+private func signalEvidenceLabel(_ status: String) -> String {
+    switch status {
+    case "excerpt_available": return "已提取正文"
+    case "link_only": return "仅保存链接"
+    case "metadata_with_structured_summary": return "摘要证据"
+    default: return "待核对原文"
+    }
+}
+
+private func signalEvidenceDescription(_ status: String) -> String {
+    switch status {
+    case "excerpt_available": return "已从公开页面提取以下段落。摘录仅用于定位重点，重要判断仍应回到原文确认。"
+    case "link_only": return "该页面没有成功读取到正文，可能受公众号或网站访问限制影响。链接已保留，系统不会把未读取内容当作事实。"
+    case "metadata_with_structured_summary": return "当前只有结构化摘要或页面元数据，尚未取得完整正文。"
+    default: return "当前证据有限，请打开原文核对具体事实与适用边界。"
+    }
+}
+
+private func signalEvidenceColor(_ status: String) -> Color {
+    status == "excerpt_available" ? .green : .orange
+}
+
+private func signalMarkLabel(_ mark: String) -> String {
+    switch mark {
+    case "valuable": return "研究线索"
+    case "track_later": return "继续追踪"
+    case "noise": return "已忽略"
+    case "archived": return "已归档"
+    default: return "未决定"
     }
 }
 

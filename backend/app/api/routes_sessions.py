@@ -7,6 +7,7 @@ from app.schemas.common import TaskType
 from app.schemas.session import BaseSession, SessionRenameRequest
 from app.schemas.jd_analysis import JDInputCreate
 from app.schemas.research_feeder import ConfirmedResearchMaterial, ResearchMaterialSearchRequest
+from app.schemas.tech_radar import SignalLinkCreate
 from app.services.feed_service import FeedService
 
 
@@ -113,6 +114,14 @@ def refresh_radar_session(session_id: str) -> BaseSession:
     session = feed_service.refresh_tech_radar_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Radar session not found")
+    return session
+
+
+@router.post("/sessions/{session_id}/signals", response_model=BaseSession)
+def add_signal_link(session_id: str, request: SignalLinkCreate) -> BaseSession:
+    session = feed_service.add_signal_link(session_id, request)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Signal Inbox session not found")
     return session
 
 

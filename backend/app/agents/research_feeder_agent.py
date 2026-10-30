@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from datetime import datetime, timedelta, timezone
@@ -211,7 +213,7 @@ class ResearchFeederAgent:
         # Do not let a transport that ignores its socket timeout hold the API
         # response open. Running requests may finish in the background, but the
         # current material-generation request observes the explicit deadline.
-        executor.shutdown(wait=False, cancel_futures=True)
+        executor.shutdown(wait=False)
 
         self._append_research_candidates(candidates, seen_ids, arxiv_items, plan.required_terms)
         self._append_research_candidates(candidates, seen_ids, web_items, plan.required_terms)

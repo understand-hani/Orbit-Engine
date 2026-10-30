@@ -236,3 +236,17 @@ struct RadarItemMarkRequest: Codable {
         case archiveNote = "archive_note"
     }
 }
+
+struct SignalLinkCreate: Codable {
+    let url: String
+    let title: String
+    let sourceName: String
+    let note: String
+
+    enum CodingKeys: String, CodingKey {
+        case url
+        case title
+        case sourceName = "source_name"
+        case note
+    }
+}

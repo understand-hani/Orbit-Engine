@@ -2,7 +2,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 
 from app.schemas.common import VisualAsset
 
@@ -78,6 +78,15 @@ class RadarItem(BaseModel):
 class RadarItemMarkRequest(BaseModel):
     user_mark: RadarUserMark
     archive_note: str = ""
+
+
+class SignalLinkCreate(BaseModel):
+    """A user-provided public link that enters the trusted Signal Inbox."""
+
+    url: HttpUrl
+    title: str = Field(default="", max_length=240)
+    source_name: str = Field(default="", max_length=120)
+    note: str = Field(default="", max_length=2_000)
 
 
 class RadarDigest(BaseModel):

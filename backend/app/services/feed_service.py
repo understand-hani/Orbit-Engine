@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from datetime import date, datetime, timezone
 from typing import Optional
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from app.agents.jd_career_agent import MockJDCareerAgent
@@ -16,7 +17,13 @@ from app.schemas.common import SessionStatus, SuggestedAction, TaskType
 from app.schemas.jd_analysis import JDInput, JDInputCreate
 from app.schemas.research_feeder import ConfirmedResearchMaterial, ResearchFeederPayload
 from app.schemas.session import BaseSession
-from app.schemas.tech_radar import TechRadarPayload
+from app.schemas.tech_radar import (
+    RadarItem,
+    RadarSourcePassage,
+    RecommendedDepth,
+    SignalLinkCreate,
+    TechRadarPayload,
+)
 
 
 class FeedService:
@@ -162,6 +169,105 @@ class FeedService:
         )
         return self.sessions.save(updated_session)
 
+    def add_signal_link(
+        self,
+        session_id: str,
+        request: SignalLinkCreate,
+    ) -> Optional[BaseSession]:
+        """Persist a trusted user link without making public-web search a prerequisite.
+
+        Page extraction is best effort.  In particular, a public WeChat article may
+        reject a server request; the original link remains useful and its evidence
+        status makes that limitation visible instead of inventing a summary.
+        """
+        session = self.sessions.get_by_id(session_id)
+        if session is None or session.task_type != TaskType.tech_radar:
+            return None
+
+        url = str(request.url)
+        if any(str(item.url) == url for item in session.payload.digest.items if item.url):
+            return session
+
+        parsed = urlparse(url)
+        host = parsed.netloc
+        if host.startswith("www."):
+            host = host[4:]
+        host = host or "用户提供的来源"
+        title = request.title.strip() or host
+        source_name = request.source_name.strip() or host
+        note = request.note.strip()
+        passages = self._signal_link_passages(url)
+        evidence_status = "excerpt_available" if passages else "link_only"
+        summary = note or (
+            "用户添加了一条可信来源链接。先确认原文中的具体事实、方法或产品变化，"
+            "再决定是否值得继续追踪。"
+        )
+        item = RadarItem(
+            id=f"signal_link_{uuid4().hex[:12]}",
+            radar_type=session.payload.radar_type,
+            title=title,
+            source=source_name,
+            url=request.url,
+            signal_type="用户提供的可信链接",
+            summary=summary,
+            relevance_score=3,
+            agent_observation="",
+            technical_substance=passages[0].excerpt if passages else summary,
+            marketing_noise=(
+                "尚未取得正文；请打开原文确认账号、发布时间、具体技术事实与证据边界。"
+                if not passages
+                else "正文摘录已取得，但仍需核对原文上下文，不应只根据摘录下结论。"
+            ),
+            why_it_matters=self._signal_link_relevance(note),
+            evidence_status=evidence_status,
+            source_passages=passages,
+            visuals=[],
+            recommended_depth=RecommendedDepth.read if passages else RecommendedDepth.skim,
+            tags=["trusted_link", host, "signal_inbox"],
+        )
+        digest = session.payload.digest.model_copy(
+            update={
+                "summary": "今日信号已收录用户提供的可信链接；请先看原文证据，再决定忽略、追踪或继续研究。",
+                "items": [item, *session.payload.digest.items],
+                "top_signals": [item.summary, *session.payload.digest.top_signals][:3],
+                "follow_up_questions": [
+                    "这条链接的核心事实是什么？它会改变当前主线的哪个判断？",
+                    "原文是否给出方法、数据、代码或其他可核验的证据？",
+                ],
+            }
+        )
+        return self.sessions.save(
+            session.model_copy(
+                update={"payload": session.payload.model_copy(update={"digest": digest}), "updated_at": datetime.now(timezone.utc)}
+            )
+        )
+
+    def _signal_link_passages(self, url: str) -> list[RadarSourcePassage]:
+        try:
+            excerpts = self.tech_radar_agent.search_service.fetch_web_passages(url, max_passages=5)
+        except Exception:
+            excerpts = []
+        return [
+            RadarSourcePassage(
+                id=f"source_excerpt_{index}",
+                title=f"原文摘录 {index}",
+                excerpt=excerpt,
+                source_url=url,
+                location=f"网页段落 {index}",
+            )
+            for index, excerpt in enumerate(excerpts, start=1)
+        ]
+
+    def _signal_link_relevance(self, note: str) -> str:
+        context = self.user_contexts.get()
+        anchors = []
+        if context:
+            anchors = [context.plan.weekly_focus, context.plan.next_action, *context.plan.active_tasks]
+        related = next((value.strip() for value in anchors if value and value.strip()), "当前研究主线")
+        if note:
+            return f"用户将此链接作为可信信号输入。需要结合「{related}」判断它是否提供可验证的新事实，而非只跟随信息热度。"
+        return f"这条可信链接需要结合「{related}」判断：它是否值得继续追踪，或能否转化为一个具体研究行动。"
+
     def get_sessions_by_date(self, target_date: date) -> list:
         return self.sessions.get_by_date(target_date.isoformat())
 
@@ -300,7 +406,7 @@ class FeedService:
         if not session_id.startswith(prefix) or suffix not in session_id:
             return None
 
-        date_value = session_id.removeprefix(prefix).split(suffix, maxsplit=1)[0]
+        date_value = session_id[len(prefix) :].split(suffix, maxsplit=1)[0]
         try:
             target_date = date.fromisoformat(date_value)
         except ValueError:
